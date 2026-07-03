@@ -10,10 +10,12 @@ class AvatarPicker extends StatefulWidget {
   const AvatarPicker({
     super.key,
     required this.onImagePicked,
+    required this.onError,
     this.initialImageUrl,
   });
 
   final void Function(File image) onImagePicked;
+  final void Function(String message) onError;
   final String? initialImageUrl;
 
   @override
@@ -86,8 +88,9 @@ class _AvatarPickerState extends State<AvatarPicker> {
       } else {
         setState(() => _processing = false);
       }
-    } catch (e) {
-      setState(() => _processing = false);
+    } catch (error) {
+      if (mounted) setState(() => _processing = false);
+      widget.onError('เปิดหน้าปรับรูปไม่สำเร็จ กรุณาลองเลือกรูปใหม่');
     }
   }
 

@@ -149,6 +149,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                               initialImageUrl: widget.initialUser?.avatarUrl,
                               onImagePicked: (file) =>
                                   setState(() => _avatarFile = file),
+                              onError: _showMessage,
                             ),
                             const SizedBox(height: 24),
                             TextFormField(

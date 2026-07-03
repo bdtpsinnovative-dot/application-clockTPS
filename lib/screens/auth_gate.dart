@@ -62,6 +62,7 @@ class _AuthGateState extends State<AuthGate> {
         );
       }
     } on ProfileRequiredException {
+      _user = null;
       _setState(_GateState.profileRequired);
     } on SessionExpiredException {
       await _service.signOut();
@@ -85,6 +86,7 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _signOut() async {
     await _service.signOut();
+    _user = null;
     _setState(_GateState.signedOut);
   }
 
