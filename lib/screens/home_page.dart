@@ -148,12 +148,24 @@ class _AppDrawer extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.45),
                       width: 2,
                     ),
+                    image: user.avatarUrl != null && user.avatarUrl!.trim().isNotEmpty
+                        ? DecorationImage(
+                            image: NetworkImage(
+                              user.avatarUrl!.startsWith('r2://')
+                                  ? user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
+                                  : user.avatarUrl!,
+                            ),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    color: Colors.white,
-                    size: 34,
-                  ),
+                  child: user.avatarUrl != null && user.avatarUrl!.trim().isNotEmpty
+                      ? null
+                      : const Icon(
+                          Icons.person_rounded,
+                          color: Colors.white,
+                          size: 34,
+                        ),
                 ),
                 const SizedBox(height: 14),
                 Text(

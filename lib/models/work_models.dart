@@ -91,3 +91,26 @@ DateTime? _tryDate(dynamic value) {
   if (value is! String || value.isEmpty) return null;
   return DateTime.tryParse(value)?.toLocal();
 }
+
+class LeaveBalanceRecord {
+  const LeaveBalanceRecord({
+    required this.leaveType,
+    required this.quota,
+    required this.used,
+    required this.remaining,
+  });
+
+  factory LeaveBalanceRecord.fromJson(Map<String, dynamic> json) {
+    return LeaveBalanceRecord(
+      leaveType: json['leave_type'] as String? ?? '',
+      quota: (json['quota'] as num? ?? 0).toDouble(),
+      used: (json['used'] as num? ?? 0).toDouble(),
+      remaining: (json['remaining'] as num? ?? 0).toDouble(),
+    );
+  }
+
+  final String leaveType;
+  final double quota;
+  final double used;
+  final double remaining;
+}

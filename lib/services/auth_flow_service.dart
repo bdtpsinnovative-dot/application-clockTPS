@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -10,6 +11,8 @@ import '../models/app_user.dart';
 import '../models/work_models.dart';
 
 class AuthFlowService {
+  @visibleForTesting
+  static String? mockDeviceId;
   AuthFlowService({Dio? dio, FlutterSecureStorage? storage})
     : _dio =
           dio ??
@@ -236,6 +239,16 @@ class AuthFlowService {
     return requests;
   }
 
+  Future<List<LeaveBalanceRecord>> getLeaveBalances(int year) async {
+    final response = await _authorizedGet(
+      '/api/leaves/quota',
+      queryParameters: {'year': year},
+    );
+    return _listData(response)
+        .map(LeaveBalanceRecord.fromJson)
+        .toList(growable: false);
+  }
+
   Future<void> createRequest({
     required String type,
     required DateTime date,
@@ -268,6 +281,57 @@ class AuthFlowService {
     return _listData(
       response,
     ).map(HolidayRecord.fromJson).toList(growable: false);
+  }
+
+  Future<void> bindDevice(String deviceId) async {
+    await _authorizedPut(
+      '/api/users/me/device',
+      data: {'device_id': deviceId},
+    );
+  }
+
+  Future<AttendanceRecord> checkIn({
+    required double lat,
+    required double lng,
+    required String deviceId,
+    required List<double> faceVector,
+    String? photoUrl,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/attendance/checkin',
+      data: {
+        'lat': lat,
+        'lng': lng,
+        'device_id': deviceId,
+        'face_vector': faceVector,
+        if (photoUrl != null) 'photo_url': photoUrl,
+      },
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return AttendanceRecord.fromJson(data);
+    }
+    throw const AuthFlowException('ข้อมูลตอบกลับจากระบบเช็คอินไม่ถูกต้อง');
+  }
+
+  Future<AttendanceRecord> checkOut({
+    double? lat,
+    double? lng,
+    String? photoUrl,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/attendance/checkout',
+      data: {
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
+        if (photoUrl != null) 'photo_url': photoUrl,
+      },
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return AttendanceRecord.fromJson(data);
+    }
+    throw const AuthFlowException('ข้อมูลตอบกลับจากระบบเช็คเอาท์ไม่ถูกต้อง');
   }
 
   Future<void> _captureSession(
@@ -359,6 +423,22 @@ class AuthFlowService {
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
+        path,
+        data: data,
+        options: Options(headers: _authorizationHeaders()),
+      );
+      return response.data ?? const {};
+    } on DioException catch (error) {
+      throw AuthFlowException(_apiMessage(error));
+    }
+  }
+
+  Future<Map<String, dynamic>> _authorizedPut(
+    String path, {
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final response = await _dio.put<Map<String, dynamic>>(
         path,
         data: data,
         options: Options(headers: _authorizationHeaders()),

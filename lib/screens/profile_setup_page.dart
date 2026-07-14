@@ -46,13 +46,13 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   }
 
   Future<void> _scanFace() async {
-    final vector = await Navigator.of(context).push<List<double>>(
+    final result = await Navigator.of(context).push<FaceScannerResult>(
       MaterialPageRoute(builder: (_) => const FaceScannerPage()),
     );
 
-    if (vector != null) {
+    if (result != null) {
       setState(() {
-        _faceVector = vector;
+        _faceVector = result.faceVector;
       });
       _showMessage('สแกนใบหน้าสำเร็จ ระบบจดจำโครงหน้าของคุณแล้ว');
     }

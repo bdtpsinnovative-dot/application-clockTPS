@@ -1,12 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+
+import 'face_scanner_page.dart';
 
 import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/app_loading_view.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
@@ -29,8 +35,10 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime _now = DateTime.now();
   AttendanceRecord? _attendance;
   HolidayRecord? _nextHoliday;
+  List<LeaveBalanceRecord>? _leaveBalances;
   String? _error;
   bool _loading = true;
+  bool _submitting = false;
 
   @override
   void initState() {
@@ -56,9 +64,11 @@ class _DashboardPageState extends State<DashboardPage> {
       final results = await Future.wait([
         widget.service.getAttendance(DateTime.now()),
         widget.service.getHolidays(DateTime.now().year),
+        widget.service.getLeaveBalances(DateTime.now().year),
       ]);
       final attendance = results[0] as AttendanceRecord?;
       final holidays = results[1] as List<HolidayRecord>;
+      final leaveBalances = results[2] as List<LeaveBalanceRecord>;
 
       final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
       HolidayRecord? nextHoliday;
@@ -75,6 +85,7 @@ class _DashboardPageState extends State<DashboardPage> {
         setState(() {
           _attendance = attendance;
           _nextHoliday = nextHoliday;
+          _leaveBalances = leaveBalances;
         });
       }
     } catch (error) {
@@ -84,16 +95,128 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  void _showNextStep() {
+  Future<String> _getDeviceId() async {
+    if (AuthFlowService.mockDeviceId != null) {
+      return AuthFlowService.mockDeviceId!;
+    }
+    final deviceInfo = DeviceInfoPlugin();
+    if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      return iosInfo.identifierForVendor ?? 'ios_unknown_device';
+    } else if (Platform.isAndroid) {
+      final androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.id;
+    } else if (Platform.isMacOS) {
+      final macosInfo = await deviceInfo.macOsInfo;
+      return macosInfo.systemGUID ?? 'macos_unknown_device';
+    }
+    return 'unknown_device';
+  }
+
+  Future<Position> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw const LocationServiceDisabledException();
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('กรุณาอนุญาตการเข้าถึงตำแหน่งที่ตั้ง');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception('คุณได้ปฏิเสธการเข้าถึงตำแหน่งอย่างถาวร กรุณาเปิดสิทธิ์ในตั้งค่าอุปกรณ์');
+    }
+
+    final position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+      ),
+    );
+
+    if (position.isMocked) {
+      throw Exception('ระบบตรวจพบการจำลองพิกัด (Mock Location) ไม่สามารถลงเวลาได้');
+    }
+
+    return position;
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            'หน้าตาพร้อมแล้ว การเชื่อม GPS/กล้องจะทำในขั้นตอนถัดไป',
-          ),
-        ),
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _handleClockInOut() async {
+    final attendance = _attendance;
+    final checkedIn = attendance?.checkInAt != null;
+    final checkedOut = attendance?.checkOutAt != null;
+
+    if (checkedIn && !checkedOut) {
+      await _clockOut();
+    } else {
+      await _clockIn();
+    }
+  }
+
+  Future<void> _clockIn() async {
+    try {
+      final position = await _determinePosition();
+      final deviceId = await _getDeviceId();
+
+      if (!mounted) return;
+      final result = await Navigator.of(context).push<FaceScannerResult>(
+        MaterialPageRoute(builder: (_) => const FaceScannerPage()),
       );
+
+      if (result == null) return;
+
+      setState(() => _submitting = true);
+
+      final photoUrl = await widget.service.uploadImage(result.imageFile);
+
+      await widget.service.checkIn(
+        lat: position.latitude,
+        lng: position.longitude,
+        deviceId: deviceId,
+        faceVector: result.faceVector,
+        photoUrl: photoUrl,
+      );
+
+      await _loadToday();
+      _showMessage('เช็คอินเข้างานสำเร็จ');
+    } catch (e) {
+      _showMessage(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _clockOut() async {
+    try {
+      final position = await _determinePosition();
+
+      setState(() => _submitting = true);
+
+      await widget.service.checkOut(
+        lat: position.latitude,
+        lng: position.longitude,
+      );
+
+      await _loadToday();
+      _showMessage('เช็คเอาท์ออกงานสำเร็จ');
+    } catch (e) {
+      _showMessage(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -104,8 +227,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
     return ColoredBox(
       color: workBackground,
-      child: RefreshIndicator(
-        onRefresh: _loadToday,
+      child: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: _loadToday,
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
@@ -151,7 +276,8 @@ class _DashboardPageState extends State<DashboardPage> {
               offset: const Offset(0, -28),
               child: Center(
                 child: FilledButton.icon(
-                  onPressed: _showNextStep,
+                  key: const ValueKey('clock_in_out_button'),
+                  onPressed: _submitting ? null : _handleClockInOut,
                   icon: Icon(
                     checkedIn && !checkedOut
                         ? Icons.logout_rounded
@@ -284,41 +410,46 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                   const SizedBox(height: 15),
-                  const WorkCard(
+                  WorkCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        WorkCardTitle(
+                        const WorkCardTitle(
                           icon: Icons.assessment_outlined,
                           title: 'สิทธิวันลาคงเหลือประจำปี',
                           color: workSky,
                         ),
-                        SizedBox(height: 16),
-                        _QuotaBar(
-                          label: 'ลาป่วย',
-                          value: 30,
-                          total: 30,
-                          color: Color(0xFF22C55E),
-                        ),
-                        SizedBox(height: 13),
-                        _QuotaBar(
-                          label: 'ลากิจ',
-                          value: 6,
-                          total: 6,
-                          color: Color(0xFFF59E0B),
-                        ),
-                        SizedBox(height: 13),
-                        _QuotaBar(
-                          label: 'ลาพักร้อน',
-                          value: 6,
-                          total: 6,
-                          color: workBlue,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'แสดงค่าเริ่มต้นจาก schema — รอ API โควตารายบุคคล',
-                          style: TextStyle(color: workMuted, fontSize: 11),
-                        ),
+                        const SizedBox(height: 16),
+                        if (_leaveBalances == null)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else if (_leaveBalances!.isEmpty)
+                          const Text(
+                            'ไม่พบข้อมูลสิทธิวันลาประจำปี',
+                            style: TextStyle(color: workMuted),
+                          )
+                        else
+                          ..._leaveBalances!.map((b) {
+                            Color color = workBlue;
+                            if (b.leaveType.contains('ป่วย')) {
+                              color = const Color(0xFF22C55E);
+                            } else if (b.leaveType.contains('กิจ')) {
+                              color = const Color(0xFFF59E0B);
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 13),
+                              child: _QuotaBar(
+                                label: b.leaveType,
+                                value: b.remaining.toInt(),
+                                total: b.quota.toInt(),
+                                color: color,
+                              ),
+                            );
+                          }),
                       ],
                     ),
                   ),
@@ -328,7 +459,13 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
       ),
-    );
+      if (_submitting)
+        const AppLoadingOverlay(
+          message: 'กำลังบันทึกเวลา...',
+        ),
+    ],
+  ),
+);
   }
 
   String _timeText(DateTime? value) {

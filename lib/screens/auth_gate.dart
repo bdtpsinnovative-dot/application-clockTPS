@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 import '../models/app_user.dart';
 import '../services/auth_flow_service.dart';
@@ -11,14 +13,15 @@ import 'profile_setup_page.dart';
 enum _GateState { loading, signedOut, profileRequired, pending, active, error }
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key, this.service});
+  final AuthFlowService? service;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
 
 class _AuthGateState extends State<AuthGate> {
-  final AuthFlowService _service = AuthFlowService();
+  late final AuthFlowService _service;
   _GateState _state = _GateState.loading;
   AppUser? _user;
   String _errorMessage = '';
@@ -27,6 +30,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? AuthFlowService();
     WidgetsBinding.instance.addPostFrameCallback((_) => _restoreAndResolve());
   }
 
@@ -57,6 +61,20 @@ class _AuthGateState extends State<AuthGate> {
       if (!user.isProfileComplete) {
         _setState(_GateState.profileRequired);
       } else {
+        if (user.status == 'active') {
+          try {
+            final deviceId = await _getDeviceId();
+            await _service.bindDevice(deviceId);
+          } catch (e) {
+            debugPrint('Device binding failed: $e');
+            _errorMessage = e.toString()
+                .replaceAll('Exception: ', '')
+                .replaceAll('AuthFlowException: ', '');
+            _setState(_GateState.error);
+            _resolving = false;
+            return;
+          }
+        }
         _setState(
           user.status == 'active' ? _GateState.active : _GateState.pending,
         );
@@ -78,6 +96,24 @@ class _AuthGateState extends State<AuthGate> {
     } finally {
       _resolving = false;
     }
+  }
+
+  Future<String> _getDeviceId() async {
+    if (AuthFlowService.mockDeviceId != null) {
+      return AuthFlowService.mockDeviceId!;
+    }
+    final deviceInfo = DeviceInfoPlugin();
+    if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      return iosInfo.identifierForVendor ?? 'ios_unknown_device';
+    } else if (Platform.isAndroid) {
+      final androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.id;
+    } else if (Platform.isMacOS) {
+      final macosInfo = await deviceInfo.macOsInfo;
+      return macosInfo.systemGUID ?? 'macos_unknown_device';
+    }
+    return 'unknown_device';
   }
 
   void _setState(_GateState value) {

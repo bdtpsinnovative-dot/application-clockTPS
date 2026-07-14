@@ -5,8 +5,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
 
 import '../services/face_ml_service.dart';
+
+class FaceScannerResult {
+  final List<double> faceVector;
+  final File imageFile;
+
+  FaceScannerResult({required this.faceVector, required this.imageFile});
+}
 
 enum LivenessStep {
   lookStraight,
@@ -19,6 +27,9 @@ enum LivenessStep {
 
 class FaceScannerPage extends StatefulWidget {
   const FaceScannerPage({super.key});
+
+  @visibleForTesting
+  static FaceScannerResult? mockResult;
 
   @override
   State<FaceScannerPage> createState() => _FaceScannerPageState();
@@ -43,6 +54,14 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
   @override
   void initState() {
     super.initState();
+    if (FaceScannerPage.mockResult != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pop(FaceScannerPage.mockResult);
+        }
+      });
+      return;
+    }
     unawaited(_initialize());
   }
 
@@ -243,8 +262,16 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
       final vector = await _mlService.extractFaceVector(faceImage);
       if (!mounted) return;
 
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File(
+        '${tempDir.path}/face_scan_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      await tempFile.parent.create(recursive: true);
+      await tempFile.writeAsBytes(img.encodeJpg(faceImage));
+
       setState(() => _currentStep = LivenessStep.done);
-      Navigator.of(context).pop(vector);
+      if (!mounted) return;
+      Navigator.of(context).pop(FaceScannerResult(faceVector: vector, imageFile: tempFile));
     } catch (error) {
       if (!mounted) return;
       setState(() {

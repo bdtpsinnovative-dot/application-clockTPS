@@ -221,6 +221,33 @@ class _LoginPageState extends State<LoginPage> {
                             return null;
                           },
                         ),
+                        if (!_isRegister)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('ลืมรหัสผ่าน'),
+                                    content: const Text(
+                                      'กรุณาติดต่อฝ่ายบุคคล (HR) ของบริษัทเพื่อรีเซ็ตรหัสผ่านของคุณ หรือตรวจสอบอีเมลยืนยันการตั้งค่าจากระบบหลังบ้าน',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('ตกลง'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'ลืมรหัสผ่าน?',
+                                style: TextStyle(color: workMuted),
+                              ),
+                            ),
+                          ),
                         if (_isRegister) ...[
                           const SizedBox(height: 16),
                           TextFormField(
