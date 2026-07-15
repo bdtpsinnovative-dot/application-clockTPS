@@ -11,11 +11,13 @@ class WorkCalendarPage extends StatefulWidget {
     required this.service,
     required this.onMenu,
     required this.onOpenRequests,
+    required this.isActive,
   });
 
   final AuthFlowService service;
   final VoidCallback onMenu;
   final VoidCallback onOpenRequests;
+  final bool isActive;
 
   @override
   State<WorkCalendarPage> createState() => _WorkCalendarPageState();
@@ -33,6 +35,14 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
   void initState() {
     super.initState();
     _loadMonth();
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkCalendarPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _loadMonthBackground();
+    }
   }
 
   Future<void> _loadMonth() async {
@@ -55,6 +65,24 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
       if (mounted) setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadMonthBackground() async {
+    try {
+      final results = await Future.wait([
+        widget.service.getAttendanceHistory(_month.year, _month.month),
+        widget.service.getHolidays(_month.year),
+      ]);
+      if (mounted) {
+        setState(() {
+          _attendance = results[0] as List<AttendanceRecord>;
+          _holidays = results[1] as List<HolidayRecord>;
+          _error = null;
+        });
+      }
+    } catch (_) {
+      // Ignore background load errors silently
     }
   }
 
@@ -89,7 +117,6 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
             WorkHeader(
               title: 'ปฏิทินตารางงาน',
               subtitle: 'การลงเวลาและวันหยุด',
-              onMenu: widget.onMenu,
               bottomPadding: 68,
             ),
             Transform.translate(
@@ -220,50 +247,144 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
                     const SizedBox(height: 12),
                     WorkCard(
                       padding: const EdgeInsets.all(16),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.edit_calendar_rounded,
-                              color: workBlue,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: selectedHoliday != null
+                                      ? const Color(0xFFFEE2E2)
+                                      : selectedAttendance != null
+                                          ? _getStatusColor(selectedAttendance.status).withValues(alpha: 0.1)
+                                          : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  selectedHoliday != null
+                                      ? Icons.celebration_rounded
+                                      : selectedAttendance != null
+                                          ? (selectedAttendance.status == 'offsite'
+                                              ? Icons.location_on_rounded
+                                              : selectedAttendance.status == 'late'
+                                                  ? Icons.history_toggle_off_rounded
+                                                  : Icons.badge_rounded)
+                                          : Icons.event_busy_rounded,
+                                  color: selectedHoliday != null
+                                      ? const Color(0xFFEF4444)
+                                      : selectedAttendance != null
+                                          ? _getStatusColor(selectedAttendance.status)
+                                          : workMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      selectedHoliday?.name ??
+                                          (selectedAttendance != null
+                                              ? _getStatusLabel(selectedAttendance.status)
+                                              : 'ไม่มีบันทึกเวลาทำงาน'),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        color: workText,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      DateFormat(
+                                        'EEEE, d MMM yyyy',
+                                      ).format(_selected),
+                                      style: const TextStyle(
+                                        color: workMuted,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          if (selectedAttendance != null && selectedHoliday == null) ...[
+                            const SizedBox(height: 12),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 12),
+                            Row(
                               children: [
-                                Text(
-                                  selectedHoliday?.name ??
-                                      (selectedAttendance != null
-                                          ? 'มีบันทึกการลงเวลา'
-                                          : 'ไม่มีกำหนดการ'),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Row(
+                                        children: [
+                                          Icon(Icons.login_rounded, size: 14, color: Color(0xFF22C55E)),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'เวลาเข้างาน',
+                                            style: TextStyle(
+                                              color: workMuted,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _formatTime(selectedAttendance.checkInAt),
+                                        style: const TextStyle(
+                                          color: workText,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Text(
-                                  DateFormat(
-                                    'EEEE, d MMM yyyy',
-                                  ).format(_selected),
-                                  style: const TextStyle(
-                                    color: workMuted,
-                                    fontSize: 12,
+                                Container(
+                                  width: 1,
+                                  height: 32,
+                                  color: const Color(0xFFF1F5F9),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Row(
+                                        children: [
+                                          Icon(Icons.logout_rounded, size: 14, color: Color(0xFFEF4444)),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'เวลาออกงาน',
+                                            style: TextStyle(
+                                              color: workMuted,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _formatTime(selectedAttendance.checkOutAt),
+                                        style: const TextStyle(
+                                          color: workText,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                          TextButton(
-                            onPressed: widget.onOpenRequests,
-                            child: const Text('ยื่นคำขอ'),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -293,6 +414,65 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
 
   bool _sameDate(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'on_time':
+        return 'เข้างานตรงเวลา';
+      case 'late':
+        return 'เข้างานสาย';
+      case 'offsite':
+        return 'ปฏิบัติงานนอกสถานที่';
+      case 'sick_leave_full':
+        return 'ลาป่วย (เต็มวัน)';
+      case 'sick_leave_morning':
+        return 'ลาป่วย (ครึ่งเช้า)';
+      case 'sick_leave_afternoon':
+        return 'ลาป่วย (ครึ่งบ่าย)';
+      case 'personal_leave_full':
+        return 'ลากิจ (เต็มวัน)';
+      case 'personal_leave_morning':
+        return 'ลากิจ (ครึ่งเช้า)';
+      case 'personal_leave_afternoon':
+        return 'ลากิจ (ครึ่งบ่าย)';
+      case 'annual_leave':
+        return 'ลาพักร้อน';
+      case 'no_record':
+      case 'absent':
+        return 'ไม่มีบันทึกการเข้างาน';
+      default:
+        return 'บันทึกสถานะ: $status';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'on_time':
+        return const Color(0xFF22C55E);
+      case 'late':
+        return const Color(0xFFF59E0B);
+      case 'offsite':
+        return const Color(0xFF3B82F6);
+      case 'sick_leave_full':
+      case 'sick_leave_morning':
+      case 'sick_leave_afternoon':
+      case 'personal_leave_full':
+      case 'personal_leave_morning':
+      case 'personal_leave_afternoon':
+      case 'annual_leave':
+        return const Color(0xFF8B5CF6);
+      case 'no_record':
+      case 'absent':
+        return const Color(0xFFEF4444);
+      default:
+        return workMuted;
+    }
+  }
+
+  String _formatTime(DateTime? dateTime) {
+    if (dateTime == null) return '--:--';
+    return DateFormat('HH:mm').format(dateTime) + ' น.';
   }
 }
 

@@ -1,14 +1,20 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:camera_android/camera_android.dart';
+import 'package:camera_platform_interface/camera_platform_interface.dart';
 
 import 'config/app_config.dart';
 import 'screens/auth_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isAndroid) {
+    CameraPlatform.instance = AndroidCamera();
+  }
   await dotenv.load(fileName: '.env');
   AppConfig.validate();
   Intl.defaultLocale = 'th_TH';

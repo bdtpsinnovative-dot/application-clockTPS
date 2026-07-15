@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class AttendanceRecord {
   const AttendanceRecord({
     required this.date,
@@ -30,6 +32,7 @@ class WorkRequestRecord {
     required this.status,
     required this.isOffsite,
     this.duration,
+    this.medicalCertUrl,
   });
 
   factory WorkRequestRecord.leave(Map<String, dynamic> json) {
@@ -41,6 +44,7 @@ class WorkRequestRecord {
       status: json['status'] as String? ?? 'pending',
       duration: json['duration'] as String?,
       isOffsite: false,
+      medicalCertUrl: json['medical_cert_url'] as String?,
     );
   }
 
@@ -52,6 +56,7 @@ class WorkRequestRecord {
       reason: json['reason'] as String? ?? '',
       status: json['status'] as String? ?? 'pending',
       isOffsite: true,
+      medicalCertUrl: null,
     );
   }
 
@@ -62,6 +67,21 @@ class WorkRequestRecord {
   final String status;
   final String? duration;
   final bool isOffsite;
+  final String? medicalCertUrl;
+
+  List<String> get attachments {
+    if (medicalCertUrl == null || medicalCertUrl!.trim().isEmpty) return [];
+    final urlStr = medicalCertUrl!.trim();
+    if (urlStr.startsWith('[') && urlStr.endsWith(']')) {
+      try {
+        final decoded = jsonDecode(urlStr);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toList();
+        }
+      } catch (_) {}
+    }
+    return urlStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+  }
 }
 
 class HolidayRecord {

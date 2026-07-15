@@ -254,6 +254,7 @@ class AuthFlowService {
     required DateTime date,
     required String reason,
     required String duration,
+    String? medicalCertUrl,
   }) async {
     if (type == 'ออกหน้างาน') {
       await _authorizedPost(
@@ -269,8 +270,48 @@ class AuthFlowService {
         'leave_type': type,
         'duration': duration,
         'reason': reason.trim(),
+        if (medicalCertUrl != null) 'medical_cert_url': medicalCertUrl,
       },
     );
+  }
+
+  Future<void> updateRequest({
+    required String id,
+    required bool isOffsite,
+    required String type,
+    required DateTime date,
+    required String reason,
+    required String duration,
+    String? medicalCertUrl,
+  }) async {
+    if (isOffsite) {
+      await _authorizedPut(
+        '/api/offsite/$id',
+        data: {'date': _dateValue(date), 'reason': reason.trim()},
+      );
+      return;
+    }
+    await _authorizedPut(
+      '/api/leaves/$id',
+      data: {
+        'date': _dateValue(date),
+        'leave_type': type,
+        'duration': duration,
+        'reason': reason.trim(),
+        if (medicalCertUrl != null) 'medical_cert_url': medicalCertUrl,
+      },
+    );
+  }
+
+  Future<void> deleteRequest({
+    required String id,
+    required bool isOffsite,
+  }) async {
+    if (isOffsite) {
+      await _authorizedDelete('/api/offsite/$id');
+      return;
+    }
+    await _authorizedDelete('/api/leaves/$id');
   }
 
   Future<List<HolidayRecord>> getHolidays(int year) async {
@@ -281,6 +322,13 @@ class AuthFlowService {
     return _listData(
       response,
     ).map(HolidayRecord.fromJson).toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> getWorkLocations() async {
+    final response = await _authorizedGet('/api/locations');
+    final data = response['data'];
+    if (data is! List) return const [];
+    return data.whereType<Map<String, dynamic>>().toList(growable: false);
   }
 
   Future<void> bindDevice(String deviceId) async {
@@ -441,6 +489,18 @@ class AuthFlowService {
       final response = await _dio.put<Map<String, dynamic>>(
         path,
         data: data,
+        options: Options(headers: _authorizationHeaders()),
+      );
+      return response.data ?? const {};
+    } on DioException catch (error) {
+      throw AuthFlowException(_apiMessage(error));
+    }
+  }
+
+  Future<Map<String, dynamic>> _authorizedDelete(String path) async {
+    try {
+      final response = await _dio.delete<Map<String, dynamic>>(
+        path,
         options: Options(headers: _authorizationHeaders()),
       );
       return response.data ?? const {};
