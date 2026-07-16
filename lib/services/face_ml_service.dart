@@ -74,6 +74,15 @@ class FaceMLService {
     _interpreter = null;
   }
 
+  double compareVectors(List<double> vector1, List<double> vector2) {
+    if (vector1.length != vector2.length) return 0.0;
+    double dotProduct = 0.0;
+    for (int i = 0; i < vector1.length; i++) {
+      dotProduct += vector1[i] * vector2[i];
+    }
+    return dotProduct;
+  }
+
   bool _sameShape(List<int> actual, List<int> expected) {
     if (actual.length != expected.length) return false;
     for (var i = 0; i < actual.length; i++) {

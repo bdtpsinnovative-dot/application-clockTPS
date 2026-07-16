@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,109 @@ import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
 import '../services/face_ml_service.dart';
+
+/// Data class to pass camera image data across isolate boundary.
+class _CropFaceParams {
+  final List<Uint8List> planeBytes;
+  final List<int> planeBytesPerRow;
+  final List<int?> planeBytesPerPixel;
+  final int imageWidth;
+  final int imageHeight;
+  final double boxLeft;
+  final double boxTop;
+  final double boxWidth;
+  final double boxHeight;
+  final int sensorOrientation;
+
+  _CropFaceParams({
+    required this.planeBytes,
+    required this.planeBytesPerRow,
+    required this.planeBytesPerPixel,
+    required this.imageWidth,
+    required this.imageHeight,
+    required this.boxLeft,
+    required this.boxTop,
+    required this.boxWidth,
+    required this.boxHeight,
+    required this.sensorOrientation,
+  });
+}
+
+/// Top-level function for running heavy image processing in an isolate.
+img.Image _cropFaceInIsolate(_CropFaceParams params) {
+  // 1) Convert camera bytes to RGB
+  final output = img.Image(
+    width: params.imageWidth,
+    height: params.imageHeight,
+  );
+
+  if (params.planeBytes.length == 1) {
+    // iOS BGRA8888
+    final plane = params.planeBytes.first;
+    final bytesPerRow = params.planeBytesPerRow.first;
+    for (var y = 0; y < params.imageHeight; y++) {
+      for (var x = 0; x < params.imageWidth; x++) {
+        final index = y * bytesPerRow + x * 4;
+        output.setPixelRgb(x, y, plane[index + 2], plane[index + 1], plane[index]);
+      }
+    }
+  } else {
+    // Android YUV420
+    final yPlane = params.planeBytes[0];
+    final uPlane = params.planeBytes[1];
+    final vPlane = params.planeBytes[2];
+    final yBytesPerRow = params.planeBytesPerRow[0];
+    final uBytesPerRow = params.planeBytesPerRow[1];
+    final vBytesPerRow = params.planeBytesPerRow[2];
+    final uPixelStride = params.planeBytesPerPixel[1] ?? 1;
+    final vPixelStride = params.planeBytesPerPixel[2] ?? 1;
+
+    for (var y = 0; y < params.imageHeight; y++) {
+      for (var x = 0; x < params.imageWidth; x++) {
+        final yValue = yPlane[y * yBytesPerRow + x].toDouble();
+        final uvX = x ~/ 2;
+        final uvY = y ~/ 2;
+        final uValue =
+            uPlane[uvY * uBytesPerRow + uvX * uPixelStride].toDouble() - 128;
+        final vValue =
+            vPlane[uvY * vBytesPerRow + uvX * vPixelStride].toDouble() - 128;
+
+        final red = (yValue + 1.402 * vValue).round().clamp(0, 255);
+        final green =
+            (yValue - 0.344136 * uValue - 0.714136 * vValue).round().clamp(0, 255);
+        final blue = (yValue + 1.772 * uValue).round().clamp(0, 255);
+        output.setPixelRgb(x, y, red, green, blue);
+      }
+    }
+  }
+
+  // 2) Crop FIRST using ML Kit bounding box (in original/unrotated coordinates)
+  final paddingX = params.boxWidth * 0.18;
+  final paddingY = params.boxHeight * 0.18;
+  final left =
+      (params.boxLeft - paddingX).round().clamp(0, output.width - 1);
+  final top =
+      (params.boxTop - paddingY).round().clamp(0, output.height - 1);
+  final right =
+      (params.boxLeft + params.boxWidth + paddingX).round().clamp(1, output.width);
+  final bottom =
+      (params.boxTop + params.boxHeight + paddingY).round().clamp(1, output.height);
+  final cropW = right - left;
+  final cropH = bottom - top;
+
+  if (cropW < 80 || cropH < 80) {
+    throw StateError('ใบหน้าอยู่ไกลเกินไป กรุณาขยับเข้าใกล้กล้อง');
+  }
+
+  var cropped = img.copyCrop(output, x: left, y: top, width: cropW, height: cropH);
+
+  // 3) Rotate AFTER crop so the face is upright
+  if (params.sensorOrientation != 0) {
+    cropped = img.copyRotate(cropped, angle: params.sensorOrientation);
+  }
+
+  return cropped;
+}
 
 class FaceScannerResult {
   final List<double> faceVector;
@@ -258,7 +362,8 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
         await controller!.stopImageStream();
       }
 
-      final faceImage = _cropFace(cameraImage, face);
+      // Run heavy image processing in an isolate (Fix #6)
+      final faceImage = await _cropFaceAsync(cameraImage, face);
       final vector = await _mlService.extractFaceVector(faceImage);
       if (!mounted) return;
 
@@ -271,7 +376,9 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
 
       setState(() => _currentStep = LivenessStep.done);
       if (!mounted) return;
-      Navigator.of(context).pop(FaceScannerResult(faceVector: vector, imageFile: tempFile));
+      Navigator.of(
+        context,
+      ).pop(FaceScannerResult(faceVector: vector, imageFile: tempFile));
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -282,89 +389,27 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
     }
   }
 
-  img.Image _cropFace(CameraImage cameraImage, Face face) {
-    var converted = _cameraImageToRgb(cameraImage);
-    final sensorOrientation =
-        _cameraController?.description.sensorOrientation ?? 0;
-    if (sensorOrientation != 0) {
-      converted = img.copyRotate(converted, angle: sensorOrientation);
-    }
-
+  /// Offloads heavy RGB conversion + crop + rotate to an isolate.
+  Future<img.Image> _cropFaceAsync(CameraImage cameraImage, Face face) {
     final box = face.boundingBox;
-    final paddingX = box.width * 0.18;
-    final paddingY = box.height * 0.18;
-    final left = (box.left - paddingX).round().clamp(0, converted.width - 1);
-    final top = (box.top - paddingY).round().clamp(0, converted.height - 1);
-    final right = (box.right + paddingX).round().clamp(1, converted.width);
-    final bottom = (box.bottom + paddingY).round().clamp(1, converted.height);
-    final width = right - left;
-    final height = bottom - top;
-
-    if (width < 80 || height < 80) {
-      throw StateError('ใบหน้าอยู่ไกลเกินไป กรุณาขยับเข้าใกล้กล้อง');
-    }
-    return img.copyCrop(
-      converted,
-      x: left,
-      y: top,
-      width: width,
-      height: height,
+    final params = _CropFaceParams(
+      planeBytes: cameraImage.planes.map((p) => Uint8List.fromList(p.bytes)).toList(),
+      planeBytesPerRow: cameraImage.planes.map((p) => p.bytesPerRow).toList(),
+      planeBytesPerPixel: cameraImage.planes.map((p) => p.bytesPerPixel).toList(),
+      imageWidth: cameraImage.width,
+      imageHeight: cameraImage.height,
+      boxLeft: box.left,
+      boxTop: box.top,
+      boxWidth: box.width,
+      boxHeight: box.height,
+      sensorOrientation:
+          _cameraController?.description.sensorOrientation ?? 0,
     );
+    return compute(_cropFaceInIsolate, params);
   }
 
-  img.Image _cameraImageToRgb(CameraImage cameraImage) {
-    final output = img.Image(
-      width: cameraImage.width,
-      height: cameraImage.height,
-    );
-
-    if (cameraImage.planes.length == 1) {
-      final plane = cameraImage.planes.first;
-      for (var y = 0; y < cameraImage.height; y++) {
-        for (var x = 0; x < cameraImage.width; x++) {
-          final index = y * plane.bytesPerRow + x * 4;
-          output.setPixelRgb(
-            x,
-            y,
-            plane.bytes[index + 2],
-            plane.bytes[index + 1],
-            plane.bytes[index],
-          );
-        }
-      }
-      return output;
-    }
-
-    final yPlane = cameraImage.planes[0];
-    final uPlane = cameraImage.planes[1];
-    final vPlane = cameraImage.planes[2];
-    final uPixelStride = uPlane.bytesPerPixel ?? 1;
-    final vPixelStride = vPlane.bytesPerPixel ?? 1;
-
-    for (var y = 0; y < cameraImage.height; y++) {
-      for (var x = 0; x < cameraImage.width; x++) {
-        final yValue = yPlane.bytes[y * yPlane.bytesPerRow + x].toDouble();
-        final uvX = x ~/ 2;
-        final uvY = y ~/ 2;
-        final uValue =
-            uPlane.bytes[uvY * uPlane.bytesPerRow + uvX * uPixelStride]
-                .toDouble() -
-            128;
-        final vValue =
-            vPlane.bytes[uvY * vPlane.bytesPerRow + uvX * vPixelStride]
-                .toDouble() -
-            128;
-
-        final red = (yValue + 1.402 * vValue).round().clamp(0, 255);
-        final green = (yValue - 0.344136 * uValue - 0.714136 * vValue)
-            .round()
-            .clamp(0, 255);
-        final blue = (yValue + 1.772 * uValue).round().clamp(0, 255);
-        output.setPixelRgb(x, y, red, green, blue);
-      }
-    }
-    return output;
-  }
+  // _cropFace and _cameraImageToRgb removed — logic moved to top-level
+  // _cropFaceInIsolate() for isolate-safe execution (Fix #4 + #6).
 
   Future<void> _restartImageStream() async {
     final controller = _cameraController;
@@ -401,6 +446,86 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
     unawaited(_faceDetector.close());
     _mlService.dispose();
     super.dispose();
+  }
+
+  int get _completedSteps {
+    switch (_currentStep) {
+      case LivenessStep.lookStraight:
+        return 0;
+      case LivenessStep.turnLeft:
+        return 1;
+      case LivenessStep.turnRight:
+        return 2;
+      case LivenessStep.captureStraight:
+        return 3;
+      case LivenessStep.processing:
+      case LivenessStep.done:
+        return 4;
+    }
+  }
+
+  Widget _buildStepIndicator() {
+    const totalSteps = 4;
+    const labels = ['มองตรง', 'หันซ้าย', 'หันขวา', 'บันทึก'];
+    final completed = _completedSteps;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(totalSteps, (i) {
+        final isCompleted = i < completed;
+        final isCurrent = i == completed && completed < totalSteps;
+        final Color dotColor;
+        if (isCompleted) {
+          dotColor = const Color(0xFF22C55E); // green
+        } else if (isCurrent) {
+          dotColor = const Color(0xFF3B82F6); // blue
+        } else {
+          dotColor = const Color(0xFFCBD5E1); // grey
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: isCurrent ? 14 : 10,
+                height: isCurrent ? 14 : 10,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                  boxShadow: isCurrent
+                      ? [
+                          BoxShadow(
+                            color: dotColor.withOpacity(0.4),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: isCompleted
+                    ? const Icon(Icons.check, size: 8, color: Colors.white)
+                    : null,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                labels[i],
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isCurrent
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFF94A3B8),
+                  fontWeight:
+                      isCurrent ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
   }
 
   @override
@@ -445,14 +570,18 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
                 Container(color: Colors.transparent),
                 Align(
                   alignment: const Alignment(0, -0.3),
-                  child: Container(
-                    width: 280,
-                    height: 280,
-                    decoration: const BoxDecoration(
-                      color: Colors.black,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
+                  child: Builder(builder: (context) {
+                    final circleSize =
+                        MediaQuery.of(context).size.width * 0.7;
+                    return Container(
+                      width: circleSize,
+                      height: circleSize,
+                      decoration: const BoxDecoration(
+                        color: Colors.black,
+                        shape: BoxShape.circle,
+                      ),
+                    );
+                  }),
                 ),
               ],
             ),
@@ -475,7 +604,11 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
                 ],
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Step progress indicator (Fix #5)
+                  _buildStepIndicator(),
+                  const SizedBox(height: 16),
                   Text(
                     _currentStep == LivenessStep.processing
                         ? 'กำลังบันทึกข้อมูล...'
@@ -499,6 +632,34 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
                     const Padding(
                       padding: EdgeInsets.only(top: 20),
                       child: CircularProgressIndicator(),
+                    )
+                  else if (_currentStep == LivenessStep.turnLeft)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: Icon(
+                        Icons.keyboard_double_arrow_left,
+                        size: 48,
+                        color: Color(0xFF3B82F6),
+                      ),
+                    )
+                  else if (_currentStep == LivenessStep.turnRight)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: Icon(
+                        Icons.keyboard_double_arrow_right,
+                        size: 48,
+                        color: Color(0xFF3B82F6),
+                      ),
+                    )
+                  else if (_currentStep == LivenessStep.lookStraight ||
+                      _currentStep == LivenessStep.captureStraight)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: Icon(
+                        Icons.face,
+                        size: 48,
+                        color: Color(0xFF3B82F6),
+                      ),
                     ),
                 ],
               ),
