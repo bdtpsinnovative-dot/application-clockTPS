@@ -621,7 +621,7 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
                               if (selected) {
                                 setState(() {
                                   _type = type;
-                                  if (type == 'ออกหน้างาน') {
+                                  if (type == 'ออกหน้างาน' || type == 'สลับวันหยุด') {
                                     _duration = 'เต็มวัน';
                                   }
                                 });
@@ -649,10 +649,10 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
                         'ระยะเวลา',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workMuted),
                       ),
-                      if (_type == 'ออกหน้างาน') ...[
+                      if (_type == 'ออกหน้างาน' || _type == 'สลับวันหยุด') ...[
                         const SizedBox(width: 8),
                         const Text(
-                          '(ไม่จำเป็นต้องระบุสำหรับประเภทนี้)',
+                          '(ไม่ต้องระบุสำหรับประเภทนี้)',
                           style: TextStyle(fontSize: 10, color: workMuted, fontWeight: FontWeight.normal),
                         ),
                       ],
@@ -663,7 +663,7 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: _durations.map((duration) {
-                        final isDurationEnabled = _type != 'ออกหน้างาน';
+                        final isDurationEnabled = _type != 'ออกหน้างาน' && _type != 'สลับวันหยุด';
                         final isSelected = _duration == duration;
                         final isChipSelected = isDurationEnabled ? isSelected : (duration == 'เต็มวัน');
 
