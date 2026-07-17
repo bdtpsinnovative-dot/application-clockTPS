@@ -206,31 +206,38 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (error) {
       if (error is AccountSuspendedException ||
           error.toString().contains('ระงับ') ||
-          error.toString().toLowerCase().contains('suspended')) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
-              content: const Text(
-                'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
-                textAlign: TextAlign.center,
-              ),
-              actionsAlignment: MainAxisAlignment.center,
-              actions: [
-                FilledButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onSignOut();
-                  },
-                  child: const Text('ตกลง'),
+          error.toString().toLowerCase().contains('suspended') ||
+          error.toString().contains('อนุมัติ') ||
+          error.toString().contains('403')) {
+        try {
+          final user = await widget.service.getMe();
+          if (user.status == 'suspended' || user.status == 'disabled') {
+            if (mounted) {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
+                  content: const Text(
+                    'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
+                    textAlign: TextAlign.center,
+                  ),
+                  actionsAlignment: MainAxisAlignment.center,
+                  actions: [
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        widget.onSignOut();
+                      },
+                      child: const Text('ตกลง'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        }
-        return;
+              );
+            }
+            return;
+          }
+        } catch (_) {}
       }
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -290,30 +297,37 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (error) {
       if (error is AccountSuspendedException ||
           error.toString().contains('ระงับ') ||
-          error.toString().toLowerCase().contains('suspended')) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
-              content: const Text(
-                'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
-                textAlign: TextAlign.center,
-              ),
-              actionsAlignment: MainAxisAlignment.center,
-              actions: [
-                FilledButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onSignOut();
-                  },
-                  child: const Text('ตกลง'),
+          error.toString().toLowerCase().contains('suspended') ||
+          error.toString().contains('อนุมัติ') ||
+          error.toString().contains('403')) {
+        try {
+          final user = await widget.service.getMe();
+          if (user.status == 'suspended' || user.status == 'disabled') {
+            if (mounted) {
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
+                  content: const Text(
+                    'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
+                    textAlign: TextAlign.center,
+                  ),
+                  actionsAlignment: MainAxisAlignment.center,
+                  actions: [
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        widget.onSignOut();
+                      },
+                      child: const Text('ตกลง'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        }
+              );
+            }
+          }
+        } catch (_) {}
       }
       // Ignore other background load errors silently
     }
