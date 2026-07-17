@@ -49,16 +49,6 @@ class WorkHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              if (onMenu != null)
-                IconButton.filledTonal(
-                  onPressed: onMenu,
-                  icon: const Icon(Icons.menu_rounded),
-                  style: IconButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: Colors.white.withValues(alpha: 0.16),
-                  ),
-                ),
-              if (onMenu != null) const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

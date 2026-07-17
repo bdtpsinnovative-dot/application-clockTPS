@@ -4,6 +4,7 @@ class AttendanceRecord {
   const AttendanceRecord({
     required this.date,
     required this.status,
+    required this.userId,
     this.checkInAt,
     this.checkOutAt,
   });
@@ -12,6 +13,7 @@ class AttendanceRecord {
     return AttendanceRecord(
       date: DateTime.parse(json['date'] as String),
       status: json['status'] as String? ?? 'no_record',
+      userId: json['user_id'] as String? ?? '',
       checkInAt: _tryDate(json['check_in_at']),
       checkOutAt: _tryDate(json['check_out_at']),
     );
@@ -19,6 +21,7 @@ class AttendanceRecord {
 
   final DateTime date;
   final String status;
+  final String userId;
   final DateTime? checkInAt;
   final DateTime? checkOutAt;
 }
@@ -26,6 +29,7 @@ class AttendanceRecord {
 class WorkRequestRecord {
   const WorkRequestRecord({
     required this.id,
+    required this.userId,
     required this.type,
     required this.date,
     required this.reason,
@@ -45,6 +49,7 @@ class WorkRequestRecord {
     }
     return WorkRequestRecord(
       id: json['id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
       type: json['leave_type'] as String? ?? 'ใบลา',
       date: DateTime.parse(json['date'] as String),
       reason: json['reason'] as String? ?? '',
@@ -59,6 +64,7 @@ class WorkRequestRecord {
   factory WorkRequestRecord.offsite(Map<String, dynamic> json) {
     return WorkRequestRecord(
       id: json['id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
       type: 'ออกหน้างาน',
       date: DateTime.parse(json['date'] as String),
       reason: json['reason'] as String? ?? '',
@@ -70,6 +76,7 @@ class WorkRequestRecord {
   }
 
   final String id;
+  final String userId;
   final String type;
   final DateTime date;
   final String reason;
@@ -143,4 +150,83 @@ class LeaveBalanceRecord {
   final double quota;
   final double used;
   final double remaining;
+}
+
+class TaskRecord {
+  const TaskRecord({
+    required this.id,
+    required this.assignedTo,
+    required this.title,
+    required this.description,
+    required this.dueDate,
+    required this.status,
+    this.assignedBy,
+    required this.createdAt,
+  });
+
+  factory TaskRecord.fromJson(Map<String, dynamic> json) {
+    return TaskRecord(
+      id: json['id'] as String? ?? '',
+      assignedTo: json['assigned_to'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      dueDate: DateTime.parse(json['due_date'] as String),
+      status: json['status'] as String? ?? 'pending',
+      assignedBy: json['assigned_by'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    );
+  }
+
+  final String id;
+  final String assignedTo;
+  final String title;
+  final String description;
+  final DateTime dueDate;
+  final String status; // "pending" | "in_progress" | "completed"
+  final String? assignedBy;
+  final DateTime createdAt;
+}
+
+class AdminHistoryRecord {
+  const AdminHistoryRecord({
+    required this.date,
+    required this.userName,
+    required this.email,
+    required this.department,
+    required this.position,
+    required this.status,
+    required this.type,
+    required this.reason,
+    this.checkInAt,
+    this.checkOutAt,
+    required this.createdAt,
+  });
+
+  factory AdminHistoryRecord.fromJson(Map<String, dynamic> json) {
+    return AdminHistoryRecord(
+      date: DateTime.parse(json['date'] as String),
+      userName: json['user_name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      department: json['department'] as String? ?? '',
+      position: json['position'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      checkInAt: _tryDate(json['check_in_at']),
+      checkOutAt: _tryDate(json['check_out_at']),
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  final DateTime date;
+  final String userName;
+  final String email;
+  final String department;
+  final String position;
+  final String status;
+  final String type;
+  final String reason;
+  final DateTime? checkInAt;
+  final DateTime? checkOutAt;
+  final DateTime createdAt;
 }

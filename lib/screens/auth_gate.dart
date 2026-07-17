@@ -9,8 +9,9 @@ import 'home_page.dart';
 import 'login_page.dart';
 import 'pending_approval_page.dart';
 import 'profile_setup_page.dart';
+import '../services/fcm_service.dart';
 
-enum _GateState { loading, signedOut, profileRequired, pending, active, error, suspended }
+enum _GateState { loading, signedOut, profileRequired, pending, active, error }
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key, this.service});
@@ -61,15 +62,12 @@ class _AuthGateState extends State<AuthGate> {
       if (!user.isProfileComplete) {
         _setState(_GateState.profileRequired);
       } else {
-        if (user.status == 'disabled' || user.status == 'suspended') {
-          _setState(_GateState.suspended);
-          _resolving = false;
-          return;
-        }
         if (user.status == 'active') {
           try {
             final deviceId = await _getDeviceId();
             await _service.bindDevice(deviceId);
+            // Register FCM device token
+            FcmService.instance.registerDevice(_service);
           } catch (e) {
             debugPrint('Device binding failed: $e');
             _errorMessage = e.toString()
@@ -90,8 +88,6 @@ class _AuthGateState extends State<AuthGate> {
     } on SessionExpiredException {
       await _service.signOut();
       _setState(_GateState.signedOut);
-    } on AccountSuspendedException {
-      _setState(_GateState.suspended);
     } on ApprovalPendingException {
       _setState(_GateState.pending);
     } on AuthFlowException catch (error) {
@@ -135,38 +131,67 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    return switch (_state) {
-      _GateState.loading => const AppLoadingView(
-        message: 'กำลังตรวจสอบบัญชี...',
-      ),
-      _GateState.signedOut => LoginPage(
-        service: _service,
-        onAuthenticated: _resolve,
-      ),
-      _GateState.profileRequired => ProfileSetupPage(
-        service: _service,
-        initialUser: _user,
-        onProfileSaved: _resolve,
-        onSignOut: _signOut,
-      ),
-      _GateState.pending => PendingApprovalPage(
-        onCheckStatus: _resolve,
-        onSignOut: _signOut,
-      ),
-      _GateState.active => HomePage(
-        user: _user!,
-        service: _service,
-        onSignOut: _signOut,
-      ),
-      _GateState.error => _ConnectionErrorPage(
-        message: _errorMessage,
-        onRetry: _resolve,
-        onSignOut: _signOut,
-      ),
-      _GateState.suspended => _SuspendedPage(
-        onSignOut: _signOut,
-      ),
-    };
+    try {
+      return switch (_state) {
+        _GateState.loading => const Scaffold(
+            backgroundColor: Color(0xFFF5F5F5),
+            body: AppLoadingView(message: 'กำลังยืนยันสิทธิ์เข้าใช้...'),
+          ),
+        _GateState.signedOut => LoginPage(
+          service: _service,
+          onAuthenticated: _resolve,
+        ),
+        _GateState.profileRequired => ProfileSetupPage(
+          service: _service,
+          initialUser: _user,
+          onProfileSaved: _resolve,
+          onSignOut: _signOut,
+        ),
+        _GateState.pending => PendingApprovalPage(
+          onCheckStatus: _resolve,
+          onSignOut: _signOut,
+        ),
+        _GateState.active => HomePage(
+          user: _user!,
+          service: _service,
+          onSignOut: _signOut,
+        ),
+        _GateState.error => _ConnectionErrorPage(
+          message: _errorMessage,
+          onRetry: _resolve,
+          onSignOut: _signOut,
+        ),
+      };
+    } catch (e, stack) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.bug_report_rounded, size: 48, color: Colors.red),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'เกิดข้อผิดพลาดในการสร้างหน้าจอ AuthGate',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('ข้อผิดพลาด: $e', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  const Text('ตำแหน่งที่ล่ม:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 4),
+                  Text('$stack', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.grey)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
   }
 }
 
@@ -211,54 +236,6 @@ class _ConnectionErrorPage extends StatelessWidget {
                 label: const Text('ลองใหม่'),
               ),
               TextButton(onPressed: onSignOut, child: const Text('ออกจากระบบ')),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SuspendedPage extends StatelessWidget {
-  const _SuspendedPage({required this.onSignOut});
-  final Future<void> Function() onSignOut;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black54,
-      body: Center(
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 32),
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.block_rounded, size: 64, color: Colors.red),
-              const SizedBox(height: 24),
-              Text(
-                'บัญชีถูกระงับ',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onSignOut,
-                  child: const Text('ไปหน้า Login'),
-                ),
-              ),
             ],
           ),
         ),

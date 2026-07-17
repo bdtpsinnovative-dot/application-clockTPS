@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import '../widgets/avatar_picker.dart';
 
 import '../models/app_user.dart';
 import '../models/work_models.dart';
@@ -13,6 +16,7 @@ class UserProfilePage extends StatefulWidget {
     required this.onMenu,
     required this.onSignOut,
     required this.isActive,
+    required this.onProfileUpdated,
   });
 
   final AppUser user;
@@ -20,6 +24,7 @@ class UserProfilePage extends StatefulWidget {
   final VoidCallback onMenu;
   final Future<void> Function() onSignOut;
   final bool isActive;
+  final VoidCallback onProfileUpdated;
 
   @override
   State<UserProfilePage> createState() => _UserProfilePageState();
@@ -49,6 +54,201 @@ class _UserProfilePageState extends State<UserProfilePage> {
       _leaveBalancesFuture = widget.service.getLeaveBalances(DateTime.now().year);
     });
     await _leaveBalancesFuture;
+  }
+
+  void _showEditProfileBottomSheet(BuildContext context) {
+    final firstCtrl = TextEditingController(text: widget.user.firstName);
+    final lastCtrl = TextEditingController(text: widget.user.lastName);
+    File? selectedFile;
+    bool saving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'แก้ไขข้อมูลโปรไฟล์',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: workText,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    AvatarPicker(
+                      initialImageUrl: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
+                          ? (widget.user.avatarUrl!.startsWith('r2://')
+                              ? widget.user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
+                              : widget.user.avatarUrl!)
+                          : null,
+                      onImagePicked: (file) {
+                        setModalState(() {
+                          selectedFile = file;
+                        });
+                      },
+                      onError: (msg) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(msg), backgroundColor: Colors.red),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'ชื่อจริง',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: workMuted,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: firstCtrl,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'นามสกุล',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: workMuted,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: lastCtrl,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              final fName = firstCtrl.text.trim();
+                              final lName = lastCtrl.text.trim();
+                              if (fName.isEmpty || lName.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('กรุณากรอกชื่อและนามสกุล'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              setModalState(() {
+                                saving = true;
+                              });
+
+                              try {
+                                String finalAvatarUrl = widget.user.avatarUrl ?? '';
+                                if (selectedFile != null) {
+                                  final uploadedUrl = await widget.service.uploadImage(selectedFile!);
+                                  finalAvatarUrl = uploadedUrl;
+                                }
+
+                                await widget.service.updateProfileInfo(
+                                  firstName: fName,
+                                  lastName: lName,
+                                  avatarUrl: finalAvatarUrl,
+                                );
+
+                                if (mounted) {
+                                  widget.onProfileUpdated();
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('เกิดข้อผิดพลาด: ${e.toString()}'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              } finally {
+                                setModalState(() {
+                                  saving = false;
+                                });
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: workBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: saving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('บันทึกข้อมูล', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildLeaveBalancesList(List<LeaveBalanceRecord> balances) {
@@ -137,7 +337,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
         onRefresh: _refresh,
         child: ListView(
           padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
           children: [
             WorkHeader(
               title: 'โปรไฟล์ของฉัน',
@@ -159,37 +358,61 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           Center(
                             child: Column(
                               children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
+                                GestureDetector(
+                                  onTap: () => _showEditProfileBottomSheet(context),
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        width: 64,
+                                        height: 64,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2.5),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.08),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
+                                          image: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
+                                              ? DecorationImage(
+                                                  image: NetworkImage(
+                                                    widget.user.avatarUrl!.startsWith('r2://')
+                                                        ? widget.user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
+                                                        : widget.user.avatarUrl!,
+                                                  ),
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : null,
+                                        ),
+                                        child: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
+                                            ? null
+                                            : const Icon(
+                                                Icons.person_rounded,
+                                                color: workMuted,
+                                                size: 38,
+                                              ),
+                                      ),
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: workBlue,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 1.5),
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt_rounded,
+                                            color: Colors.white,
+                                            size: 10,
+                                          ),
+                                        ),
                                       ),
                                     ],
-                                    image: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
-                                        ? DecorationImage(
-                                            image: NetworkImage(
-                                              widget.user.avatarUrl!.startsWith('r2://')
-                                                  ? widget.user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                                                  : widget.user.avatarUrl!,
-                                            ),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
                                   ),
-                                  child: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
-                                      ? null
-                                      : const Icon(
-                                          Icons.person_rounded,
-                                          color: workMuted,
-                                          size: 34,
-                                        ),
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
@@ -334,7 +557,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 100),
                   ],
                 ),
               ),

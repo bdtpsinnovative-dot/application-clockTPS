@@ -195,6 +195,30 @@ class AuthFlowService {
     }
   }
 
+  Future<AppUser> updateProfileInfo({
+    required String firstName,
+    required String lastName,
+    required String avatarUrl,
+  }) async {
+    try {
+      final data = {
+        'first_name': firstName.trim(),
+        'last_name': lastName.trim(),
+        'avatar_url': avatarUrl.trim(),
+      };
+      await _dio.put<Map<String, dynamic>>(
+        '/api/users/me/profile/info',
+        data: data,
+        options: Options(headers: _authorizationHeaders()),
+      );
+      final user = await getMe();
+      _currentAppUser = user;
+      return user;
+    } on DioException catch (error) {
+      throw AuthFlowException(_apiMessage(error));
+    }
+  }
+
   Future<void> updateFaceVector(List<double> faceVector) async {
     try {
       await _dio.put<Map<String, dynamic>>(
@@ -345,6 +369,168 @@ class AuthFlowService {
       '/api/users/me/device',
       data: {'device_id': deviceId},
     );
+  }
+
+  // --- Admin API Methods ---
+
+  Future<Map<String, dynamic>> _authorizedPatch(
+    String path, {
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        path,
+        data: data,
+        options: Options(headers: _authorizationHeaders()),
+      );
+      return response.data ?? const {};
+    } on DioException catch (error) {
+      throw AuthFlowException(_apiMessage(error));
+    }
+  }
+
+  Future<List<AppUser>> getAdminUsers() async {
+    final response = await _authorizedGet('/admin/users');
+    final data = response['data'];
+    if (data is! List) return const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(AppUser.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<WorkRequestRecord>> getAdminPendingRequests() async {
+    final response = await _authorizedGet('/admin/requests/pending');
+    final data = response['data'];
+    if (data is! Map<String, dynamic>) return const [];
+    
+    final leavesList = data['leaves'] as List? ?? [];
+    final offsiteList = data['offsite'] as List? ?? [];
+
+    final requests = <WorkRequestRecord>[
+      ...leavesList.whereType<Map<String, dynamic>>().map(WorkRequestRecord.leave),
+      ...offsiteList.whereType<Map<String, dynamic>>().map(WorkRequestRecord.offsite),
+    ];
+    requests.sort((a, b) => b.date.compareTo(a.date));
+    return requests;
+  }
+
+  Future<List<AttendanceRecord>> getAdminAttendance(DateTime date) async {
+    final response = await _authorizedGet(
+      '/admin/attendance',
+      queryParameters: {'date': _dateValue(date)},
+    );
+    final data = response['data'];
+    if (data is! List) return const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(AttendanceRecord.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<AdminHistoryRecord>> getAdminMonthlyHistory(String month) async {
+    final response = await _authorizedGet(
+      '/admin/history/monthly',
+      queryParameters: {'month': month},
+    );
+    final data = response['data'];
+    if (data is! List) return const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(AdminHistoryRecord.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<void> approveUser(String id) async {
+    await _authorizedPatch('/admin/users/$id/approve', data: {});
+  }
+
+  Future<void> updateLeaveStatusAdmin(String id, String status) async {
+    await _authorizedPatch('/admin/leaves/$id/status', data: {'status': status});
+  }
+
+  Future<void> updateOffsiteStatusAdmin(String id, String status) async {
+    await _authorizedPatch('/admin/offsite/$id/status', data: {'status': status});
+  }
+
+  Future<void> disableUser(String id) async {
+    await _authorizedPatch('/admin/users/$id/disable', data: {});
+  }
+
+  Future<void> unbindDevice(String id) async {
+    await _authorizedPatch('/admin/users/$id/unbind-device', data: {});
+  }
+
+  Future<void> createLocation({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+  }) async {
+    await _authorizedPost('/admin/locations', data: {
+      'name': name,
+      'latitude': lat,
+      'longitude': lng,
+      'radius_m': radius,
+    });
+  }
+
+  Future<void> deleteLocation(String id) async {
+    await _authorizedDelete('/admin/locations/$id');
+  }
+
+  Future<void> createHoliday({
+    required String name,
+    required DateTime date,
+    required int numDays,
+  }) async {
+    await _authorizedPost('/admin/holidays', data: {
+      'name': name,
+      'date': _dateValue(date),
+      'num_days': numDays,
+    });
+  }
+
+  Future<void> deleteHoliday(String id) async {
+    await _authorizedDelete('/admin/holidays/$id');
+  }
+
+  Future<List<TaskRecord>> getAdminTasks() async {
+    final response = await _authorizedGet('/admin/tasks');
+    final data = response['data'] as List? ?? [];
+    return data.map((json) => TaskRecord.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<TaskRecord>> getMyTasks() async {
+    final response = await _authorizedGet('/api/tasks');
+    final data = response['data'] as List? ?? [];
+    return data.map((json) => TaskRecord.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> createTask({
+    required String title,
+    required String description,
+    required String assignedTo,
+    required DateTime dueDate,
+  }) async {
+    await _authorizedPost('/admin/tasks', data: {
+      'title': title,
+      'description': description,
+      'assigned_to': assignedTo,
+      'due_date': _dateValue(dueDate),
+    });
+  }
+
+  Future<void> updateTaskStatus(String id, String status) async {
+    await _authorizedPatch('/api/tasks/$id/status', data: {'status': status});
+  }
+
+  Future<void> deleteTask(String id) async {
+    await _authorizedDelete('/admin/tasks/$id');
+  }
+
+  Future<void> updateFcmToken(String token) async {
+    await _authorizedPut('/api/users/me/fcm-token', data: {'fcm_token': token});
   }
 
   Future<AttendanceRecord> checkIn({

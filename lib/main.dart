@@ -6,9 +6,11 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:camera_android/camera_android.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'config/app_config.dart';
 import 'screens/auth_gate.dart';
+import 'services/fcm_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +21,14 @@ Future<void> main() async {
   AppConfig.validate();
   Intl.defaultLocale = 'th_TH';
   await initializeDateFormatting('th_TH');
+
+  // Initialize Firebase and FcmService
+  try {
+    await Firebase.initializeApp();
+    await FcmService.instance.init();
+  } catch (e) {
+    debugPrint('Firebase initialization failed: $e');
+  }
 
   runApp(const MyApp());
 }
