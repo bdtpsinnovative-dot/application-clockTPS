@@ -45,6 +45,14 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
     }
   }
 
+  Future<void> _handleRefresh() async {
+    setState(() {
+      _month = DateTime(DateTime.now().year, DateTime.now().month);
+      _selected = DateTime.now();
+    });
+    return _loadMonth();
+  }
+
   Future<void> _loadMonth() async {
     setState(() {
       _loading = true;
@@ -110,7 +118,7 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
     return ColoredBox(
       color: workBackground,
       child: RefreshIndicator(
-        onRefresh: _loadMonth,
+        onRefresh: _handleRefresh,
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
