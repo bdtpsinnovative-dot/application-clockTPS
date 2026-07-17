@@ -216,7 +216,9 @@ class _RequestRow extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   Text(
-                    '${DateFormat('dd MMM yyyy').format(request.date)} · ${request.reason}',
+                    request.type == 'สลับวันหยุด' && request.swapDate != null
+                        ? 'หยุด: ${DateFormat('dd MMM yyyy').format(request.date)} ➔ ชดเชย: ${DateFormat('dd MMM yyyy').format(request.swapDate!)} · ${request.reason}'
+                        : '${DateFormat('dd MMM yyyy').format(request.date)} · ${request.reason}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: workMuted, fontSize: 12),
@@ -371,6 +373,7 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
   final List<File> _selectedImages = [];
   List<String> _existingUrls = [];
   final ImagePicker _picker = ImagePicker();
+  DateTime? _swapDate;
 
   @override
   void initState() {
@@ -380,6 +383,7 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
       _type = req.type;
       _duration = req.duration ?? 'เต็มวัน';
       _selectedDate = req.date;
+      _swapDate = req.swapDate;
       _month = DateTime(_selectedDate.year, _selectedDate.month);
       _reasonController.text = req.reason;
       _existingUrls = List<String>.from(req.attachments);
@@ -424,6 +428,36 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
 
   bool _sameDate(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  Future<void> _pickSwapDate() async {
+    final now = DateTime.now();
+    final firstDate = now.isBefore(_selectedDate) ? now : _selectedDate.subtract(const Duration(days: 30));
+    final lastDate = DateTime(now.year + 1, 12, 31);
+    
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _swapDate ?? _selectedDate.add(const Duration(days: 1)),
+      firstDate: firstDate,
+      lastDate: lastDate,
+      selectableDayPredicate: (date) {
+        final holiday = _holidayAt(date);
+        return holiday == null; // Cannot swap on a holiday
+      },
+    );
+    if (picked != null) {
+      if (_sameDate(picked, _selectedDate)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('วันทำงานชดเชยต้องเป็นคนละวันกับวันที่ต้องการหยุด')),
+          );
+        }
+        return;
+      }
+      setState(() {
+        _swapDate = picked;
+      });
+    }
   }
 
   Future<void> _pickImages() async {
@@ -482,6 +516,20 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_type == 'สลับวันหยุด') {
+      if (_swapDate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('กรุณาเลือกวันทำงานชดเชย')),
+        );
+        return;
+      }
+      if (_sameDate(_selectedDate, _swapDate!)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('วันทำงานชดเชยต้องเป็นคนละวันกับวันที่ต้องการหยุด')),
+        );
+        return;
+      }
+    }
     setState(() => _submitting = true);
     try {
       String? medicalCertUrl;
@@ -513,6 +561,7 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
           reason: _reasonController.text,
           duration: _duration,
           medicalCertUrl: medicalCertUrl,
+          swapDate: _type == 'สลับวันหยุด' ? _swapDate : null,
         );
       } else {
         await widget.service.createRequest(
@@ -521,6 +570,7 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
           reason: _reasonController.text,
           duration: _duration,
           medicalCertUrl: medicalCertUrl,
+          swapDate: _type == 'สลับวันหยุด' ? _swapDate : null,
         );
       }
       if (mounted) Navigator.pop(context, true);
@@ -835,6 +885,40 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
                       ],
                     ),
                   ),
+                  if (_type == 'สลับวันหยุด') ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'เลือกวันที่ต้องการทำงานชดเชย',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workMuted),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: _pickSwapDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _swapDate == null
+                                  ? 'เลือกวันทำงานชดเชย'
+                                  : DateFormat('dd MMM yyyy').format(_swapDate!),
+                              style: TextStyle(
+                                color: _swapDate == null ? const Color(0xFF94A3B8) : workText,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const Icon(Icons.calendar_month_rounded, color: workBlue, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   const Text(
                     'เหตุผล / รายละเอียด',
@@ -1259,6 +1343,10 @@ class _RequestDetailSheetState extends State<_RequestDetailSheet> {
                     _buildDetailRow('ประเภทคำขอ', req.type),
                     const Divider(height: 24, color: Color(0xFFF1F5F9)),
                     _buildDetailRow('วันที่ยื่นคำขอ', DateFormat('dd MMM yyyy').format(req.date)),
+                    if (req.type == 'สลับวันหยุด' && req.swapDate != null) ...[
+                      const Divider(height: 24, color: Color(0xFFF1F5F9)),
+                      _buildDetailRow('วันที่ทำงานชดเชย', DateFormat('dd MMM yyyy').format(req.swapDate!)),
+                    ],
                     if (!req.isOffsite) ...[
                       const Divider(height: 24, color: Color(0xFFF1F5F9)),
                       _buildDetailRow('ระยะเวลา', req.duration ?? 'เต็มวัน'),

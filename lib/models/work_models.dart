@@ -33,9 +33,16 @@ class WorkRequestRecord {
     required this.isOffsite,
     this.duration,
     this.medicalCertUrl,
+    this.swapDate,
   });
 
   factory WorkRequestRecord.leave(Map<String, dynamic> json) {
+    DateTime? parsedSwapDate;
+    if (json['swap_date'] != null && json['swap_date'] is String) {
+      try {
+        parsedSwapDate = DateTime.parse(json['swap_date'] as String);
+      } catch (_) {}
+    }
     return WorkRequestRecord(
       id: json['id'] as String? ?? '',
       type: json['leave_type'] as String? ?? 'ใบลา',
@@ -45,6 +52,7 @@ class WorkRequestRecord {
       duration: json['duration'] as String?,
       isOffsite: false,
       medicalCertUrl: json['medical_cert_url'] as String?,
+      swapDate: parsedSwapDate,
     );
   }
 
@@ -57,6 +65,7 @@ class WorkRequestRecord {
       status: json['status'] as String? ?? 'pending',
       isOffsite: true,
       medicalCertUrl: null,
+      swapDate: null,
     );
   }
 
@@ -68,6 +77,7 @@ class WorkRequestRecord {
   final String? duration;
   final bool isOffsite;
   final String? medicalCertUrl;
+  final DateTime? swapDate;
 
   List<String> get attachments {
     if (medicalCertUrl == null || medicalCertUrl!.trim().isEmpty) return [];

@@ -260,6 +260,7 @@ class AuthFlowService {
     required String reason,
     required String duration,
     String? medicalCertUrl,
+    DateTime? swapDate,
   }) async {
     if (type == 'ออกหน้างาน') {
       await _authorizedPost(
@@ -276,6 +277,7 @@ class AuthFlowService {
         'duration': duration,
         'reason': reason.trim(),
         if (medicalCertUrl != null) 'medical_cert_url': medicalCertUrl,
+        if (swapDate != null) 'swap_date': _dateValue(swapDate),
       },
     );
   }
@@ -288,6 +290,7 @@ class AuthFlowService {
     required String reason,
     required String duration,
     String? medicalCertUrl,
+    DateTime? swapDate,
   }) async {
     if (isOffsite) {
       await _authorizedPut(
@@ -304,6 +307,7 @@ class AuthFlowService {
         'duration': duration,
         'reason': reason.trim(),
         if (medicalCertUrl != null) 'medical_cert_url': medicalCertUrl,
+        if (swapDate != null) 'swap_date': _dateValue(swapDate),
       },
     );
   }
