@@ -559,7 +559,16 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          CameraPreview(controller),
+          SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: controller.value.previewSize?.height ?? 1,
+                height: controller.value.previewSize?.width ?? 1,
+                child: CameraPreview(controller),
+              ),
+            ),
+          ),
           ColorFiltered(
             colorFilter: const ColorFilter.mode(
               Colors.black54,
