@@ -138,6 +138,7 @@ class _HomePageState extends State<HomePage> {
             user: widget.user,
             service: widget.service,
             onMenu: _openMenu,
+            onSignOut: widget.onSignOut,
             isActive: _selectedIndex == 0,
           ),
           RequestsPage(

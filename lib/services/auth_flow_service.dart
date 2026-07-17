@@ -116,6 +116,11 @@ class AuthFlowService {
         throw SessionExpiredException(message);
       }
       if (statusCode == 403) {
+        if (message.toLowerCase().contains('disabled') ||
+            message.toLowerCase().contains('suspended') ||
+            message.contains('ระงับ')) {
+          throw AccountSuspendedException(message);
+        }
         throw ApprovalPendingException(message);
       }
       throw ApiUnavailableException(message);
@@ -578,6 +583,12 @@ class AuthApiException extends AuthFlowException {
     if (value.contains('email not confirmed')) {
       return const AuthApiException('กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ');
     }
+    if (status == 403 &&
+        (value.contains('disabled') ||
+            value.contains('suspended') ||
+            value.contains('ระงับ'))) {
+      return const AuthApiException('บัญชีของคุณถูกระงับการใช้งาน');
+    }
     if (status == 409 || value.contains('already registered')) {
       return const AuthApiException('อีเมลนี้สมัครสมาชิกแล้ว กรุณาเข้าสู่ระบบ');
     }
@@ -611,6 +622,10 @@ class SessionExpiredException extends AuthFlowException {
 
 class ApprovalPendingException extends AuthFlowException {
   const ApprovalPendingException(super.message);
+}
+
+class AccountSuspendedException extends AuthFlowException {
+  const AccountSuspendedException(super.message);
 }
 
 class ApiUnavailableException extends AuthFlowException {

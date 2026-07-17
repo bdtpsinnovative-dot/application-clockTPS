@@ -10,7 +10,7 @@ import 'login_page.dart';
 import 'pending_approval_page.dart';
 import 'profile_setup_page.dart';
 
-enum _GateState { loading, signedOut, profileRequired, pending, active, error }
+enum _GateState { loading, signedOut, profileRequired, pending, active, error, suspended }
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key, this.service});
@@ -61,6 +61,11 @@ class _AuthGateState extends State<AuthGate> {
       if (!user.isProfileComplete) {
         _setState(_GateState.profileRequired);
       } else {
+        if (user.status == 'disabled' || user.status == 'suspended') {
+          _setState(_GateState.suspended);
+          _resolving = false;
+          return;
+        }
         if (user.status == 'active') {
           try {
             final deviceId = await _getDeviceId();
@@ -85,6 +90,8 @@ class _AuthGateState extends State<AuthGate> {
     } on SessionExpiredException {
       await _service.signOut();
       _setState(_GateState.signedOut);
+    } on AccountSuspendedException {
+      _setState(_GateState.suspended);
     } on ApprovalPendingException {
       _setState(_GateState.pending);
     } on AuthFlowException catch (error) {
@@ -156,6 +163,9 @@ class _AuthGateState extends State<AuthGate> {
         onRetry: _resolve,
         onSignOut: _signOut,
       ),
+      _GateState.suspended => _SuspendedPage(
+        onSignOut: _signOut,
+      ),
     };
   }
 }
@@ -201,6 +211,54 @@ class _ConnectionErrorPage extends StatelessWidget {
                 label: const Text('ลองใหม่'),
               ),
               TextButton(onPressed: onSignOut, child: const Text('ออกจากระบบ')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SuspendedPage extends StatelessWidget {
+  const _SuspendedPage({required this.onSignOut});
+  final Future<void> Function() onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black54,
+      body: Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.block_rounded, size: 64, color: Colors.red),
+              const SizedBox(height: 24),
+              Text(
+                'บัญชีถูกระงับ',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: onSignOut,
+                  child: const Text('ไปหน้า Login'),
+                ),
+              ),
             ],
           ),
         ),

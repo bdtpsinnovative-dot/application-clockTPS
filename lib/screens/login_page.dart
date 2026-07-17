@@ -68,7 +68,30 @@ class _LoginPageState extends State<LoginPage> {
       }
       await widget.onAuthenticated();
     } on AuthApiException catch (error) {
-      _showError(error.message);
+      if (error.message == 'บัญชีของคุณถูกระงับการใช้งาน') {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
+              content: const Text(
+                'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
+                textAlign: TextAlign.center,
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ตกลง'),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        _showError(error.message);
+      }
     } catch (error) {
       _showError(_friendlyUnexpectedMessage(error));
     } finally {

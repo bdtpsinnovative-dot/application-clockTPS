@@ -20,12 +20,14 @@ class DashboardPage extends StatefulWidget {
     required this.user,
     required this.service,
     required this.onMenu,
+    required this.onSignOut,
     required this.isActive,
   });
 
   final AppUser user;
   final AuthFlowService service;
   final VoidCallback onMenu;
+  final Future<void> Function() onSignOut;
   final bool isActive;
 
   @override
@@ -202,6 +204,34 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
     } catch (error) {
+      if (error is AccountSuspendedException ||
+          error.toString().contains('ระงับ') ||
+          error.toString().toLowerCase().contains('suspended')) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
+              content: const Text(
+                'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
+                textAlign: TextAlign.center,
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onSignOut();
+                  },
+                  child: const Text('ตกลง'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
       if (mounted) setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -257,8 +287,35 @@ class _DashboardPageState extends State<DashboardPage> {
           _error = null;
         });
       }
-    } catch (_) {
-      // Ignore background load errors silently
+    } catch (error) {
+      if (error is AccountSuspendedException ||
+          error.toString().contains('ระงับ') ||
+          error.toString().toLowerCase().contains('suspended')) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
+              content: const Text(
+                'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
+                textAlign: TextAlign.center,
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onSignOut();
+                  },
+                  child: const Text('ตกลง'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+      // Ignore other background load errors silently
     }
   }
 
