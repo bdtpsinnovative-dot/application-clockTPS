@@ -40,6 +40,7 @@ class AuthFlowService {
 
   bool get hasSession => _accessToken?.isNotEmpty ?? false;
   String get currentUserEmail => _email ?? '';
+  String get currentUserId => _authId ?? '';
   String get baseUrl => AppConfig.apiBaseUrl;
   AppUser? get currentUser => _currentAppUser;
 
@@ -646,12 +647,14 @@ class AuthFlowService {
     String listId,
     String title, {
     String description = '',
+    String priority = 'medium',
     DateTime? startDate,
     DateTime? dueDate,
   }) async {
     final response = await _authorizedPost('/api/tasks/lists/$listId/cards', data: {
       'title': title,
       'description': description,
+      'priority': priority,
       if (startDate != null) 'start_date': startDate.toUtc().toIso8601String(),
       if (dueDate != null) 'due_date': dueDate.toUtc().toIso8601String(),
     });
@@ -664,6 +667,8 @@ class AuthFlowService {
     String? description,
     String? status,
     String? listId,
+    int? sortOrder,
+    String? priority,
     DateTime? startDate,
     DateTime? dueDate,
     String? adminComment,
@@ -673,6 +678,8 @@ class AuthFlowService {
       'description':? description,
       'status':? status,
       'list_id':? listId,
+      'sort_order':? sortOrder,
+      'priority':? priority,
       'start_date': startDate?.toUtc().toIso8601String(),
       'due_date': dueDate?.toUtc().toIso8601String(),
       'admin_comment':? adminComment,

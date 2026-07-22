@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/work_models.dart';
+import 'package:hr_management/widgets/priority_selector.dart';
 import 'package:hr_management/widgets/work_ui.dart';
 import 'package:file_picker/file_picker.dart' as fp;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -38,12 +39,12 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   late int _currentPage;
   List<TaskListRecord> _lists = [];
   bool _loading = false;
-  bool _isDraggingCard = false;
-  TaskCardRecord? _draggedCard;
-  final ValueNotifier<double> _cardDragXNotifier = ValueNotifier<double>(0.0);
   bool _isDraggingList = false;
   TaskListRecord? _draggedList;
   bool _scrolling = false;
+  final ValueNotifier<double> _cardDragXNotifier = ValueNotifier<double>(0.0);
+  // ตรวจจับว่านิ้วอยู่ใน Zone การ์ด → ปิด PageView physics ทันที
+  final ValueNotifier<bool> _cardAreaActive = ValueNotifier(false);
 
   // Status mapping colors & labels for Card badges
   final Map<String, String> _statusLabels = {
@@ -76,6 +77,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   void dispose() {
     _pageController.dispose();
     _cardDragXNotifier.dispose();
+    _cardAreaActive.dispose();
     super.dispose();
   }
 
@@ -84,6 +86,32 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     try {
       final boardLists = await widget.service.getTrelloBoard(widget.task.id);
       if (mounted) {
+        // เรียงลำดับตามความสำคัญ (ด่วนสุดอยู่บนสุด) และนำ Completed ขึ้นบนสุดตามที่ขอ
+        for (var list in boardLists) {
+          list.cards.sort((a, b) {
+            // ดัน Completed ขึ้นบนสุด
+            if (a.status == 'completed' && b.status != 'completed') return -1;
+            if (b.status == 'completed' && a.status != 'completed') return 1;
+
+            // ให้ความสำคัญกับ Priority
+            int getPriorityVal(String p) {
+              switch (p) {
+                case 'urgent': return 4;
+                case 'high': return 3;
+                case 'medium': return 2;
+                case 'low': return 1;
+                default: return 0;
+              }
+            }
+            final pA = getPriorityVal(a.priority);
+            final pB = getPriorityVal(b.priority);
+            if (pA != pB) return pB.compareTo(pA);
+
+            // ถ้าเท่ากันก็เรียงตาม sort_order (ลำดับปกติ)
+            return a.sortOrder.compareTo(b.sortOrder);
+          });
+        }
+        
         setState(() {
           _lists = boardLists;
           _loading = false;
@@ -99,60 +127,37 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     }
   }
 
-  Future<void> _moveCardToList(TaskCardRecord card, String targetListId) async {
-    final originalLists = List<TaskListRecord>.from(
-      _lists.map(
-        (l) => TaskListRecord(
-          id: l.id,
-          taskId: l.taskId,
-          name: l.name,
-          sortOrder: l.sortOrder,
-          cards: List<TaskCardRecord>.from(l.cards),
-        ),
-      ),
-    );
+  // เรียงลำดับการ์ดใหม่ภายในคอลัมน์เดียวกัน
+  // onReorderItem ปรับ newIndex ให้อัตโนมัติแล้ว (ไม่ต้องลบ 1 เอง)
+  Future<void> _reorderCards(TaskListRecord list, int oldIndex, int newIndex) async {
+    final listIdx = _lists.indexWhere((l) => l.id == list.id);
+    if (listIdx == -1) return;
 
+    // Optimistic update
+    final movedCard = _lists[listIdx].cards.removeAt(oldIndex);
     setState(() {
-      TaskCardRecord? foundCard;
-      for (var l in _lists) {
-        final idx = l.cards.indexWhere((c) => c.id == card.id);
-        if (idx != -1) {
-          foundCard = l.cards.removeAt(idx);
-          break;
-        }
-      }
-
-      if (foundCard != null) {
-        final targetList = _lists.firstWhere((l) => l.id == targetListId);
-        targetList.cards.add(
-          TaskCardRecord(
-            id: foundCard.id,
-            listId: targetListId,
-            title: foundCard.title,
-            description: foundCard.description,
-            status: foundCard.status,
-            sortOrder: foundCard.sortOrder,
-            subItems: foundCard.subItems,
-            attachments: foundCard.attachments,
-            adminComment: foundCard.adminComment,
-          ),
-        );
-      }
+      _lists[listIdx].cards.insert(newIndex, movedCard);
     });
 
+    // Persist sort order to backend
     try {
-      await widget.service.updateTaskCard(card.id, status: card.status, description: card.description, listId: targetListId);
+      for (int i = 0; i < _lists[listIdx].cards.length; i++) {
+        await widget.service.updateTaskCard(
+          _lists[listIdx].cards[i].id,
+          sortOrder: i,
+        );
+      }
     } catch (e) {
+      // Rollback: reload board
       if (mounted) {
-        setState(() {
-          _lists = originalLists;
-        });
+        _loadBoard();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ย้ายการ์ดล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('เรียงลำดับการ์ดล้มเหลว: $e'), backgroundColor: Colors.red),
         );
       }
     }
   }
+
 
   void _startEdgeScroll(bool isLeft) {
     if (_scrolling) return;
@@ -262,6 +267,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     final descController = TextEditingController();
     DateTime? startDate;
     DateTime? dueDate;
+    String priority = 'medium';
 
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -355,6 +361,18 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'ความสำคัญ',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workText),
+                  ),
+                  const SizedBox(height: 6),
+                  PrioritySelector(
+                    selectedPriority: priority,
+                    onChanged: (val) {
+                      setDlgState(() => priority = val);
+                    },
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -521,6 +539,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
           listId,
           titleController.text.trim(),
           description: descController.text.trim(),
+          priority: priority,
           startDate: startDate,
           dueDate: dueDate,
         );
@@ -608,12 +627,42 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
                                   ),
                                   if (widget.task.description.isNotEmpty)
-                                    Text(
-                                      widget.task.description,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 12, color: Colors.white70),
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        widget.task.description,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                                      ),
                                     ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          widget.task.assignedTo == widget.service.currentUserId
+                                              ? Icons.star_rounded
+                                              : Icons.group_rounded,
+                                          size: 12,
+                                          color: Colors.white,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          widget.task.assignedTo == widget.service.currentUserId
+                                              ? 'คุณเป็นเจ้าของบอร์ดนี้'
+                                              : 'บอร์ดนี้เป็นของ ${widget.task.assignedToName.isNotEmpty ? widget.task.assignedToName : "เพื่อนร่วมงาน"} (คุณถูกเพิ่มเข้ามา)',
+                                          style: const TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.w500),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -629,25 +678,34 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                 ),
               ),
 
-              // Lists PageView
+              // Lists PageView — physics จะถูก toggle โดย _cardAreaActive
+              // เมื่อนิ้วอยู่ใน Zone การ์ด: NeverScrollableScrollPhysics (PageView หยุด)
+              // เมื่อนิ้วอยู่ใน Header: PageScrollPhysics (PageView เลื่อนปกติ)
               Expanded(
                 child: _loading && _lists.isEmpty
                     ? const Center(child: CircularProgressIndicator(color: workBlue))
-                    : PageView.builder(
-                        controller: _pageController,
-                        onPageChanged: (idx) {
-                          setState(() {
-                            _currentPage = idx;
-                          });
-                        },
-                        itemCount: pageCount,
-                        itemBuilder: (context, idx) {
-                          if (idx == _lists.length) {
-                            // "+ เพิ่มรายการ" page
-                            return _buildAddListPage();
-                          }
-                          final list = _lists[idx];
-                          return _buildListPage(list, idx);
+                    : ValueListenableBuilder<bool>(
+                        valueListenable: _cardAreaActive,
+                        builder: (context, cardActive, _) {
+                          return PageView.builder(
+                            controller: _pageController,
+                            physics: cardActive
+                                ? const NeverScrollableScrollPhysics()
+                                : const PageScrollPhysics(),
+                            onPageChanged: (idx) {
+                              setState(() {
+                                _currentPage = idx;
+                              });
+                            },
+                            itemCount: pageCount,
+                            itemBuilder: (context, idx) {
+                              if (idx == _lists.length) {
+                                return _buildAddListPage();
+                              }
+                              final list = _lists[idx];
+                              return _buildListPage(list, idx);
+                            },
+                          );
                         },
                       ),
               ),
@@ -676,44 +734,39 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
             ],
           ),
 
-          // Left auto-scroll edge trigger strip (50px wide)
-          if (_isDraggingCard || _isDraggingList)
+          // Edge strips สำหรับ Column drag (เลื่อนหน้าจอตอนลาก Column)
+          if (_isDraggingList)
             Positioned(
               left: 0,
               top: 120,
               bottom: 80,
               width: 50,
-              child: DragTarget<Object>(
+              child: DragTarget<TaskListRecord>(
                 onWillAcceptWithDetails: (details) {
                   _startEdgeScroll(true);
-                  return false; // Don't accept drop, only scroll page!
+                  return false;
                 },
                 onLeave: (data) => _stopEdgeScroll(),
                 builder: (context, candidateData, rejectedData) {
-                  return Container(
-                    color: Colors.transparent, // Fully invisible to users
-                  );
+                  return Container(color: Colors.transparent);
                 },
               ),
             ),
 
-          // Right auto-scroll edge trigger strip (50px wide)
-          if (_isDraggingCard || _isDraggingList)
+          if (_isDraggingList)
             Positioned(
               right: 0,
               top: 120,
               bottom: 80,
               width: 50,
-              child: DragTarget<Object>(
+              child: DragTarget<TaskListRecord>(
                 onWillAcceptWithDetails: (details) {
                   _startEdgeScroll(false);
-                  return false; // Don't accept drop, only scroll page!
+                  return false;
                 },
                 onLeave: (data) => _stopEdgeScroll(),
                 builder: (context, candidateData, rejectedData) {
-                  return Container(
-                    color: Colors.transparent, // Fully invisible to users
-                  );
+                  return Container(color: Colors.transparent);
                 },
               ),
             ),
@@ -949,23 +1002,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   }
 
   Widget _buildListPage(TaskListRecord list, int listIdx) {
-    return DragTarget<Object>(
-      onWillAcceptWithDetails: (details) {
-        if (details.data is TaskListRecord) {
-          return (details.data as TaskListRecord).id != list.id;
-        }
-        if (details.data is TaskCardRecord) {
-          return (details.data as TaskCardRecord).listId != list.id;
-        }
-        return true;
-      },
-      onAcceptWithDetails: (details) {
-        if (details.data is TaskCardRecord) {
-          _moveCardToList(details.data as TaskCardRecord, list.id);
-        } else if (details.data is TaskListRecord) {
-          _swapLists(details.data as TaskListRecord, list);
-        }
-      },
+    // เฉพาะรับ TaskListRecord drop สำหรับสลับ Column (ไม่รับ Card ข้ามคอลัมน์)
+    return DragTarget<TaskListRecord>(
+      onWillAcceptWithDetails: (details) => details.data.id != list.id,
+      onAcceptWithDetails: (details) => _swapLists(details.data, list),
       builder: (context, candidateData, rejectedData) {
         final isOver = candidateData.isNotEmpty;
 
@@ -993,19 +1033,39 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
               ),
               const Divider(height: 1, color: Color(0xFFF1F5F9)),
 
-              // Cards inside list with compact + เพิ่มการ์ด button at the end
+              // Cards inside list — ReorderableListView สลับลำดับในคอลัมน์ได้
+              // Listener ปิด PageView physics ตอนนิ้วอยู่ใน Zone นี้
               Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
-                  itemCount: list.cards.length + 1,
-                  separatorBuilder: (context, index) => const SizedBox(height: 6),
-                  itemBuilder: (context, index) {
-                    if (index < list.cards.length) {
+                child: Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: (_) => _cardAreaActive.value = true,
+                  onPointerUp: (_) => _cardAreaActive.value = false,
+                  onPointerCancel: (_) => _cardAreaActive.value = false,
+                  child: ReorderableListView.builder(
+                    physics: const ClampingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                    itemCount: list.cards.length,
+                    onReorderItem: (oldIndex, newIndex) =>
+                        _reorderCards(list, oldIndex, newIndex),
+                    proxyDecorator: (child, index, animation) => AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, child) => Material(
+                        elevation: 4 * animation.value,
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        child: child,
+                      ),
+                      child: child,
+                    ),
+                    itemBuilder: (context, index) {
                       final card = list.cards[index];
-                      return _buildCardItem(card, listIdx);
-                    }
-                    return _buildCompactAddCardButton(list.id);
-                  },
+                      return _buildCardItem(card, listIdx, key: ValueKey(card.id));
+                    },
+                    footer: Padding(
+                      padding: const EdgeInsets.only(top: 2, bottom: 4),
+                      child: _buildCompactAddCardButton(list.id),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1014,11 +1074,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
         // Calculate 3D tilt angle for background column pages
         double pageTiltAngle = 0.0;
-        if (_isDraggingCard || _isDraggingList) {
+        if (_isDraggingList) {
           if (listIdx < _currentPage) {
-            pageTiltAngle = 0.08; // Left column page tilts RIGHT
+            pageTiltAngle = 0.08;
           } else if (listIdx > _currentPage) {
-            pageTiltAngle = -0.08; // Right column page tilts LEFT
+            pageTiltAngle = -0.08;
           }
         }
 
@@ -1027,7 +1087,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutCubic,
           child: AnimatedScale(
-            scale: (_isDraggingCard || _isDraggingList) ? 0.88 : 1.0,
+            scale: _isDraggingList ? 0.88 : 1.0,
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
             child: columnCardWidget,
@@ -1036,7 +1096,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
         return LongPressDraggable<TaskListRecord>(
           data: list,
-          delay: const Duration(milliseconds: 200),
+          // 500ms = Flutter standard kLongPressTimeout
+          // ไม่มี Card LongPressDraggable แล้ว จึงไม่ต้องตั้ง delay ยาวพิเศษ
+          delay: const Duration(milliseconds: 500),
           feedback: Material(
             type: MaterialType.transparency,
             child: _TiltingDragCard(
@@ -1076,40 +1138,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     );
   }
 
-  Widget _buildCardItem(TaskCardRecord card, int listIdx) {
-    return LongPressDraggable<TaskCardRecord>(
-      data: card,
-      maxSimultaneousDrags: 1,
-      feedback: Material(
-        type: MaterialType.transparency,
-        child: _TiltingDragCard(
-          dragXNotifier: _cardDragXNotifier,
-          child: _buildCardContent(card),
-        ),
-      ),
-      childWhenDragging: const SizedBox.shrink(),
-      onDragStarted: () {
-        final curPage = _currentPage;
-        _pageController.dispose();
-        _cardDragXNotifier.value = MediaQuery.of(context).size.width / 2;
-        setState(() {
-          _isDraggingCard = true;
-          _draggedCard = card;
-          _pageController = PageController(initialPage: curPage, viewportFraction: 0.75);
-        });
-      },
-      onDragUpdate: (details) {
-        _cardDragXNotifier.value = details.globalPosition.dx;
-      },
-      onDragEnd: (details) {
-        final curPage = _currentPage;
-        _pageController.dispose();
-        setState(() {
-          _isDraggingCard = false;
-          _draggedCard = null;
-          _pageController = PageController(initialPage: curPage, viewportFraction: 0.90);
-        });
-      },
+  // การ์ดแต่ละใบ — key สำหรับ ReorderableListView
+  Widget _buildCardItem(TaskCardRecord card, int listIdx, {required Key key}) {
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.only(bottom: 6),
       child: _buildCardContent(card),
     );
   }
@@ -1152,6 +1185,33 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     final badgeBg = _statusBgColors[card.status] ?? const Color(0xFFF1F5F9);
     final badgeText = _statusTextColors[card.status] ?? workMuted;
     final badgeLabel = _statusLabels[card.status] ?? 'รอทำ';
+
+    Color priorityBg = const Color(0xFFE2E8F0);
+    Color priorityText = const Color(0xFF64748B);
+    String priorityLabel = 'Medium';
+    
+    switch (card.priority) {
+      case 'low':
+        priorityBg = const Color(0xFFE0F2FE);
+        priorityText = const Color(0xFF0284C7);
+        priorityLabel = 'Low';
+        break;
+      case 'medium':
+        priorityBg = const Color(0xFFFEF3C7);
+        priorityText = const Color(0xFFD97706);
+        priorityLabel = 'Medium';
+        break;
+      case 'high':
+        priorityBg = const Color(0xFFFFEDD5);
+        priorityText = const Color(0xFFEA580C);
+        priorityLabel = 'High';
+        break;
+      case 'urgent':
+        priorityBg = const Color(0xFFFEE2E2);
+        priorityText = const Color(0xFFDC2626);
+        priorityLabel = 'Urgent';
+        break;
+    }
 
     return InkWell(
       onTap: () => _showCardDetailSheet(card),
@@ -1219,6 +1279,19 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                         ),
                       ),
                       const SizedBox(width: 6),
+                      if (card.priority != 'medium') // Show priority only if it's not medium to save space, or show always? Let's show always for now.
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          color: priorityBg,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          priorityLabel,
+                          style: TextStyle(color: priorityText, fontSize: 8, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                         decoration: BoxDecoration(
@@ -1352,7 +1425,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     );
 
     double pageTiltAngle = 0.0;
-    if (_isDraggingCard || _isDraggingList) {
+    if (_isDraggingList) {
       pageTiltAngle = -0.08; // Add list page on right side tilts LEFT
     }
 
@@ -1361,7 +1434,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
       child: AnimatedScale(
-        scale: (_isDraggingCard || _isDraggingList) ? 0.88 : 1.0,
+        scale: _isDraggingList ? 0.88 : 1.0,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
         child: addWidget,
@@ -1559,6 +1632,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     final descController = TextEditingController(text: widget.card.description);
     DateTime? startDate = widget.card.startDate;
     DateTime? dueDate = widget.card.dueDate;
+    String priority = widget.card.priority;
 
     final result = await showDialog<bool>(
       context: context,
@@ -1622,6 +1696,15 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                       borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                const Text('ความสำคัญ', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: workText)),
+                const SizedBox(height: 6),
+                PrioritySelector(
+                  selectedPriority: priority,
+                  onChanged: (val) {
+                    setDlgState(() => priority = val);
+                  },
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -1791,6 +1874,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
           description: descController.text.trim(),
           startDate: startDate,
           dueDate: dueDate,
+          priority: priority,
         );
         widget.onChanged();
         if (mounted) Navigator.pop(context);
@@ -2181,9 +2265,38 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              widget.card.title,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: workText),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    widget.card.title,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: workText),
+                                  ),
+                                ),
+                                if (widget.card.priority != 'medium')
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    margin: const EdgeInsets.only(left: 8),
+                                    decoration: BoxDecoration(
+                                      color: widget.card.priority == 'urgent' ? const Color(0xFFFEE2E2) :
+                                             widget.card.priority == 'high' ? const Color(0xFFFFEDD5) :
+                                             const Color(0xFFE0F2FE),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      widget.card.priority == 'urgent' ? 'Urgent' :
+                                      widget.card.priority == 'high' ? 'High' : 'Low',
+                                      style: TextStyle(
+                                        color: widget.card.priority == 'urgent' ? const Color(0xFFDC2626) :
+                                               widget.card.priority == 'high' ? const Color(0xFFEA580C) :
+                                               const Color(0xFF0284C7),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             if (widget.card.description.isNotEmpty) ...[
                               const SizedBox(height: 6),

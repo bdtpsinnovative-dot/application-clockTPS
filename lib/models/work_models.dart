@@ -156,6 +156,7 @@ class TaskRecord {
   const TaskRecord({
     required this.id,
     required this.assignedTo,
+    this.assignedToName = '',
     required this.title,
     required this.description,
     required this.dueDate,
@@ -184,6 +185,7 @@ class TaskRecord {
     return TaskRecord(
       id: json['id'] as String? ?? '',
       assignedTo: json['assigned_to'] as String? ?? '',
+      assignedToName: json['assigned_to_name'] as String? ?? '',
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       dueDate: DateTime.parse(json['due_date'] as String),
@@ -201,6 +203,7 @@ class TaskRecord {
 
   final String id;
   final String assignedTo;
+  final String assignedToName;
   final String title;
   final String description;
   final DateTime dueDate;
@@ -390,6 +393,7 @@ class TaskCardRecord {
     required this.description,
     required this.status,
     required this.sortOrder,
+    this.priority = 'medium',
     this.startDate,
     this.dueDate,
     this.subItems = const [],
@@ -415,6 +419,7 @@ class TaskCardRecord {
       description: json['description'] as String? ?? '',
       status: json['status'] as String? ?? 'pending',
       sortOrder: json['sort_order'] as int? ?? 0,
+      priority: json['priority'] as String? ?? 'medium',
       startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'].toString())?.toLocal() : null,
       dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'].toString())?.toLocal() : null,
       subItems: subs,
@@ -429,6 +434,7 @@ class TaskCardRecord {
   final String description;
   final String status; // "pending" | "in_progress" | "completed"
   final int sortOrder;
+  final String priority; // "low" | "medium" | "high" | "urgent"
   final DateTime? startDate;
   final DateTime? dueDate;
   final List<TaskSubItem> subItems;
