@@ -162,6 +162,7 @@ class TaskRecord {
     required this.dueDate,
     required this.status,
     this.assignedBy,
+    this.assignedByName,
     this.brandId,
     this.categoryId,
     this.subItems = const [],
@@ -191,6 +192,7 @@ class TaskRecord {
       dueDate: DateTime.parse(json['due_date'] as String),
       status: json['status'] as String? ?? 'pending',
       assignedBy: json['assigned_by'] as String?,
+      assignedByName: json['assigned_by_name'] as String?,
       brandId: json['brand_id'] as String?,
       categoryId: json['category_id'] as String?,
       subItems: subs,
@@ -209,6 +211,7 @@ class TaskRecord {
   final DateTime dueDate;
   final String status; // "pending" | "in_progress" | "completed"
   final String? assignedBy;
+  final String? assignedByName;
   final String? brandId;
   final String? categoryId;
   final List<TaskSubItem> subItems;

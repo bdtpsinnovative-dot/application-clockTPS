@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/app_user.dart';
@@ -187,12 +188,11 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       appBar: AppBar(
         title: const Text('รายการมอบหมายงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
-          if (widget.service.currentUser?.role != 'employee')
-            IconButton(
-              onPressed: _showCreateTaskModal,
-              icon: const Icon(Icons.add_task_rounded, color: workBlue),
-              tooltip: 'มอบหมายงานใหม่',
-            ),
+          IconButton(
+            onPressed: _showCreateTaskModal,
+            icon: const Icon(Icons.add_task_rounded, color: workBlue),
+            tooltip: 'มอบหมายงานใหม่',
+          ),
           IconButton(onPressed: _loadData, icon: const Icon(Icons.refresh_rounded, color: workMuted), tooltip: 'รีโหลด'),
         ],
       ),
