@@ -753,7 +753,17 @@ class AuthFlowService {
   }
 
   Future<void> updateFcmToken(String token) async {
-    await _authorizedPut('/api/users/me/fcm-token', data: {'fcm_token': token});
+    debugPrint('[FCM API LOG] Sending PUT /api/users/me/fcm-token with payload: {"fcm_token": "$token"}');
+    try {
+      final response = await _authorizedPut('/api/users/me/fcm-token', data: {'fcm_token': token});
+      debugPrint('[FCM API LOG] API Success response: $response');
+    } on AuthFlowException catch (e) {
+      debugPrint('[FCM API LOG] API Error (AuthFlowException): ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('[FCM API LOG] API Error (Unknown): $e');
+      rethrow;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getMyNotifications() async {

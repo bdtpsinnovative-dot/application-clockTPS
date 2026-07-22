@@ -86,6 +86,7 @@ class FcmService {
 
   Future<void> registerDevice(AuthFlowService authService) async {
     try {
+      debugPrint('[FCM LOG] registerDevice called');
       // 1. Request permissions
       final settings = await _messaging.requestPermission(
         alert: true,
@@ -97,29 +98,48 @@ class FcmService {
         sound: true,
       );
 
+      debugPrint('[FCM LOG] Permission status: ${settings.authorizationStatus}');
+
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        debugPrint('User granted notification permission');
+        debugPrint('[FCM LOG] User granted notification permission');
         
         // 2. Fetch token
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          debugPrint('[FCM LOG] Checking iOS APNS Token...');
+          final apnsToken = await _messaging.getAPNSToken();
+          debugPrint('[FCM LOG] iOS APNS Token status: ${apnsToken != null ? "Set" : "Not Set (null)"}');
+          if (apnsToken == null) {
+            debugPrint('[FCM LOG] WARNING: iOS APNS token is null! Fetching FCM token will fail with apns-token-not-set.');
+            debugPrint('[FCM LOG] Please ensure you are testing on a real iOS device (not simulator) and have enabled Push Notifications and Background Modes (Remote notifications) capabilities in Xcode.');
+          }
+        }
+
+        debugPrint('[FCM LOG] Fetching FCM token from Firebase...');
         final token = await _messaging.getToken();
+        debugPrint('[FCM LOG] FCM Token retrieved: $token');
         if (token != null) {
-          debugPrint('FCM Token: $token');
           // Send to backend
+          debugPrint('[FCM LOG] Sending FCM token to backend...');
           await authService.updateFcmToken(token);
+          debugPrint('[FCM LOG] FCM token successfully updated on backend');
+        } else {
+          debugPrint('[FCM LOG] FCM Token is null!');
         }
 
         // 3. Setup token refresh listener
         _messaging.onTokenRefresh.listen((newToken) async {
-          debugPrint('FCM Token Refreshed: $newToken');
+          debugPrint('[FCM LOG] FCM Token Refreshed: $newToken');
+          debugPrint('[FCM LOG] Sending refreshed FCM token to backend...');
           await authService.updateFcmToken(newToken);
+          debugPrint('[FCM LOG] Refreshed FCM token successfully updated on backend');
         }).onError((err) {
-          debugPrint('Failed to refresh FCM Token: $err');
+          debugPrint('[FCM LOG] Failed to refresh FCM Token: $err');
         });
       } else {
-        debugPrint('User declined or has not accepted notification permission');
+        debugPrint('[FCM LOG] User declined or has not accepted notification permission');
       }
     } catch (e) {
-      debugPrint('Failed to register device for FCM: $e');
+      debugPrint('[FCM LOG] Failed to register device for FCM: $e');
     }
   }
 }
