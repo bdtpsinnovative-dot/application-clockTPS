@@ -14,6 +14,8 @@ import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/app_loading_view.dart';
 
+import 'package:image_picker/image_picker.dart';
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
     super.key,
@@ -334,7 +336,9 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<String> _getDeviceId() async {
+    // ignore: invalid_use_of_visible_for_testing_member
     if (AuthFlowService.mockDeviceId != null) {
+      // ignore: invalid_use_of_visible_for_testing_member
       return AuthFlowService.mockDeviceId!;
     }
     final deviceInfo = DeviceInfoPlugin();
@@ -408,25 +412,47 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _clockIn() async {
     try {
+      setState(() => _submitting = true);
+      final mode = await widget.service.getCheckInMode();
+
       final position = await _determinePosition();
       final deviceId = await _getDeviceId();
 
-      if (!mounted) return;
-      final result = await Navigator.of(context).push<FaceScannerResult>(
-        MaterialPageRoute(builder: (_) => const FaceScannerPage()),
-      );
+      File? imageFile;
+      List<double> faceVector = const [];
 
-      if (result == null) return;
+      if (mode == 'selfie') {
+        // โหมดเซลฟี่: เปิดกล้องถ่ายภาพเซลฟี่
+        final picker = ImagePicker();
+        final photo = await picker.pickImage(
+          source: ImageSource.camera,
+          preferredCameraDevice: CameraDevice.front,
+        );
+        if (photo == null) {
+          setState(() => _submitting = false);
+          return;
+        }
+        imageFile = File(photo.path);
+      } else {
+        // โหมดสแกนใบหน้า: สแกนด้วย FaceScannerPage
+        if (!mounted) return;
+        setState(() => _submitting = false); // ซ่อน loading ชั่วคราวเพื่อให้สแกนหน้าได้
+        final result = await Navigator.of(context).push<FaceScannerResult>(
+          MaterialPageRoute(builder: (_) => const FaceScannerPage()),
+        );
+        if (result == null) return;
+        setState(() => _submitting = true);
+        imageFile = result.imageFile;
+        faceVector = result.faceVector;
+      }
 
-      setState(() => _submitting = true);
-
-      final photoUrl = await widget.service.uploadImage(result.imageFile);
+      final photoUrl = await widget.service.uploadImage(imageFile);
 
       await widget.service.checkIn(
         lat: position.latitude,
         lng: position.longitude,
         deviceId: deviceId,
-        faceVector: result.faceVector,
+        faceVector: faceVector,
         photoUrl: photoUrl,
       );
 
@@ -989,44 +1015,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class _QuotaBar extends StatelessWidget {
-  const _QuotaBar({
-    required this.label,
-    required this.value,
-    required this.total,
-    required this.color,
-  });
-
-  final String label;
-  final int value;
-  final int total;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-            Text('$value / $total วัน'),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(99),
-          child: LinearProgressIndicator(
-            value: total == 0 ? 0 : value / total,
-            minHeight: 8,
-            color: color,
-            backgroundColor: const Color(0xFFE2E8F0),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _ErrorStrip extends StatelessWidget {
   const _ErrorStrip({required this.message, required this.onRetry});

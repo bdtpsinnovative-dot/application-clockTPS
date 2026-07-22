@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
@@ -498,7 +497,7 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
                   boxShadow: isCurrent
                       ? [
                           BoxShadow(
-                            color: dotColor.withOpacity(0.4),
+                            color: dotColor.withValues(alpha: 0.4),
                             blurRadius: 8,
                             spreadRadius: 2,
                           ),

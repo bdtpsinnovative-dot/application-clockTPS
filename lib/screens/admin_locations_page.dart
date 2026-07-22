@@ -163,18 +163,18 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                 onPressed: () async {
                   if (formKey.currentState!.validate()) {
                     formKey.currentState!.save();
-                    Navigator.pop(context);
 
                     try {
                       await widget.service.createLocation(name: name, lat: lat, lng: lng, radius: radius);
-                      if (mounted) {
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('เพิ่มจุดพิกัดทำงานสำเร็จแล้ว 🎉'), backgroundColor: Colors.green),
                         );
                         _loadLocations();
+                        Navigator.pop(context);
                       }
                     } catch (e) {
-                      if (mounted) {
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
                         );

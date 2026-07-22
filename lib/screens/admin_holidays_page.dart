@@ -189,18 +189,18 @@ class _AdminHolidaysPageState extends State<AdminHolidaysPage> {
                     }
                     if (formKey.currentState!.validate()) {
                       formKey.currentState!.save();
-                      Navigator.pop(context);
 
                       try {
                         await widget.service.createHoliday(name: name, date: selectedDate!, numDays: numDays);
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('เพิ่มวันหยุดบริษัทสำเร็จแล้ว 🎉'), backgroundColor: Colors.green),
                           );
                           _loadHolidays();
+                          Navigator.pop(context);
                         }
                       } catch (e) {
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
                           );

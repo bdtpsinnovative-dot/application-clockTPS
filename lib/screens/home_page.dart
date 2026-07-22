@@ -35,6 +35,7 @@ class _HomePageState extends State<HomePage> {
   int _animatingSelectedIndex = 0;
   int _pendingCount = 0;
   late AppUser _currentUser;
+  String? _targetRequestId;
 
   @override
   void initState() {
@@ -70,26 +71,29 @@ class _HomePageState extends State<HomePage> {
 
   void _openMenu() => _scaffoldKey.currentState?.openDrawer();
 
-  void _selectPage(int index) {
-    if (_animatingSelectedIndex == index) return;
+  void _selectPage(int index, {String? targetRequestId}) {
+    if (_animatingSelectedIndex == index) {
+      if (targetRequestId != null) {
+        setState(() {
+          _targetRequestId = targetRequestId;
+        });
+      }
+      return;
+    }
     Navigator.maybePop(context);
     
-    // 1. Immediately slide the bottom capsule
+    // Immediately switch both capsule and page at the same time
     setState(() {
       _animatingSelectedIndex = index;
-    });
-
-    // 2. Wait for the slide to finish before rebuilding/switching pages (240ms)
-    Future.delayed(const Duration(milliseconds: 240), () {
-      if (mounted) {
-        setState(() {
-          _selectedIndex = index;
-        });
-        if (widget.user.role == 'admin') {
-          _loadPendingCount();
-        }
+      _selectedIndex = index;
+      if (targetRequestId != null) {
+        _targetRequestId = targetRequestId;
       }
     });
+
+    if (widget.user.role == 'admin') {
+      _loadPendingCount();
+    }
   }
 
   Widget _buildGlassBottomBar() {
@@ -340,12 +344,20 @@ class _HomePageState extends State<HomePage> {
                     service: widget.service,
                     onMenu: _openMenu,
                     isActive: _selectedIndex == 2,
+                    targetRequestId: _targetRequestId,
+                    onClearTargetRequest: () => setState(() {
+                      _targetRequestId = null;
+                    }),
                   )
                 : RequestsPage(
                     key: const PageStorageKey('requests'),
                     service: widget.service,
                     onMenu: _openMenu,
                     isActive: _selectedIndex == 2,
+                    targetRequestId: _targetRequestId,
+                    onClearTargetRequest: () => setState(() {
+                      _targetRequestId = null;
+                    }),
                   ),
             // Index 3: ปฏิทิน
             WorkCalendarPage(
@@ -360,6 +372,8 @@ class _HomePageState extends State<HomePage> {
               key: const PageStorageKey('notifications'),
               onMenu: _openMenu,
               isActive: _selectedIndex == 4,
+              service: widget.service,
+              onNavigateToRequests: (targetId) => _selectPage(2, targetRequestId: targetId),
             ),
             // Index 5: โปรไฟล์
             UserProfilePage(

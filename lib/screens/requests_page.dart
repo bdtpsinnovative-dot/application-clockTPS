@@ -8,7 +8,6 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
-import '../widgets/app_loading_view.dart';
 import '../widgets/work_ui.dart';
 
 class RequestsPage extends StatefulWidget {
@@ -17,11 +16,15 @@ class RequestsPage extends StatefulWidget {
     required this.service,
     required this.onMenu,
     required this.isActive,
+    this.targetRequestId,
+    this.onClearTargetRequest,
   });
 
   final AuthFlowService service;
   final VoidCallback onMenu;
   final bool isActive;
+  final String? targetRequestId;
+  final VoidCallback? onClearTargetRequest;
 
   @override
   State<RequestsPage> createState() => _RequestsPageState();
@@ -43,6 +46,33 @@ class _RequestsPageState extends State<RequestsPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
       _loadRequestsBackground();
+    } else if (widget.isActive && widget.targetRequestId != oldWidget.targetRequestId) {
+      _checkTargetRequest();
+    }
+  }
+
+  void _checkTargetRequest() {
+    if (widget.targetRequestId == null || !widget.isActive || _requests.isEmpty) return;
+
+    final targetIdx = _requests.indexWhere((r) => r.id == widget.targetRequestId);
+    if (targetIdx != -1) {
+      final target = _requests[targetIdx];
+
+      // ล้างค่า target เพื่อไม่ให้เปิดซ้ำเมื่อมีการ rebuild
+      widget.onClearTargetRequest?.call();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _RequestDetailSheet(
+            request: target,
+            service: widget.service,
+            onRefresh: _loadRequests,
+          ),
+        );
+      });
     }
   }
 
@@ -53,7 +83,10 @@ class _RequestsPageState extends State<RequestsPage> {
     });
     try {
       final requests = await widget.service.getMyRequests();
-      if (mounted) setState(() => _requests = requests);
+      if (mounted) {
+        setState(() => _requests = requests);
+        _checkTargetRequest();
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -69,6 +102,7 @@ class _RequestsPageState extends State<RequestsPage> {
           _requests = requests;
           _error = null;
         });
+        _checkTargetRequest();
       }
     } catch (_) {
       // Ignore background load errors silently
@@ -99,7 +133,7 @@ class _RequestsPageState extends State<RequestsPage> {
       child: RefreshIndicator(
         onRefresh: _loadRequests,
         child: ListView(
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.only(bottom: 100),
           children: [
             WorkHeader(
               title: 'ระบบคำขอ',
@@ -1131,7 +1165,7 @@ class _MiniWeekday extends StatelessWidget {
 }
 
 class _CreateRequestButton extends StatefulWidget {
-  const _CreateRequestButton({super.key, required this.onPressed});
+  const _CreateRequestButton({required this.onPressed});
 
   final VoidCallback onPressed;
 

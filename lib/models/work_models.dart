@@ -161,10 +161,26 @@ class TaskRecord {
     required this.dueDate,
     required this.status,
     this.assignedBy,
+    this.brandId,
+    this.categoryId,
+    this.subItems = const [],
     required this.createdAt,
+    this.cardTotal = 0,
+    this.cardDone = 0,
+    this.assigneeIds = const [],
   });
 
   factory TaskRecord.fromJson(Map<String, dynamic> json) {
+    final rawSubs = json['sub_items'];
+    final subs = rawSubs is List
+        ? rawSubs.map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>)).toList()
+        : <TaskSubItem>[];
+    
+    final rawAssignees = json['assignee_ids'];
+    final assigneeList = rawAssignees is List
+        ? rawAssignees.map((e) => e.toString()).toList()
+        : <String>[];
+
     return TaskRecord(
       id: json['id'] as String? ?? '',
       assignedTo: json['assigned_to'] as String? ?? '',
@@ -173,7 +189,13 @@ class TaskRecord {
       dueDate: DateTime.parse(json['due_date'] as String),
       status: json['status'] as String? ?? 'pending',
       assignedBy: json['assigned_by'] as String?,
+      brandId: json['brand_id'] as String?,
+      categoryId: json['category_id'] as String?,
+      subItems: subs,
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      cardTotal: (json['card_total'] as num?)?.toInt() ?? 0,
+      cardDone: (json['card_done'] as num?)?.toInt() ?? 0,
+      assigneeIds: assigneeList,
     );
   }
 
@@ -184,7 +206,299 @@ class TaskRecord {
   final DateTime dueDate;
   final String status; // "pending" | "in_progress" | "completed"
   final String? assignedBy;
+  final String? brandId;
+  final String? categoryId;
+  final List<TaskSubItem> subItems;
   final DateTime createdAt;
+  final int cardTotal;
+  final int cardDone;
+  final List<String> assigneeIds;
+}
+
+class TaskSubItem {
+  const TaskSubItem({
+    required this.id,
+    required this.taskId,
+    this.cardId,
+    required this.title,
+    required this.isDone,
+    required this.status,
+    required this.sortOrder,
+    this.startDate,
+    this.dueDate,
+    this.linkUrl,
+    this.attachmentUrl,
+    this.verificationNotes,
+    this.adminComment,
+    this.verifications = const [],
+  });
+
+  factory TaskSubItem.fromJson(Map<String, dynamic> json) {
+    final rawVerifications = json['verifications'];
+    final verificationList = rawVerifications is List
+        ? rawVerifications.map((e) => SubItemVerification.fromJson(e as Map<String, dynamic>)).toList()
+        : <SubItemVerification>[];
+
+    return TaskSubItem(
+      id: json['id'] as String? ?? '',
+      taskId: json['task_id'] as String? ?? '',
+      cardId: json['card_id'] as String?,
+      title: json['title'] as String? ?? '',
+      isDone: json['is_done'] as bool? ?? false,
+      status: json['status'] as String? ?? 'pending',
+      sortOrder: json['sort_order'] as int? ?? 0,
+      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'] as String)?.toLocal() : null,
+      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'] as String)?.toLocal() : null,
+      linkUrl: json['link_url'] as String?,
+      attachmentUrl: json['attachment_url'] as String?,
+      verificationNotes: json['verification_notes'] as String?,
+      adminComment: json['admin_comment'] as String?,
+      verifications: verificationList,
+    );
+  }
+
+  final String id;
+  final String taskId;
+  final String? cardId;
+  final String title;
+  final bool isDone;
+  final String status;
+  final int sortOrder;
+  final DateTime? startDate;
+  final DateTime? dueDate;
+  final String? linkUrl;
+  final String? attachmentUrl;
+  final String? verificationNotes;
+  final String? adminComment;
+  final List<SubItemVerification> verifications;
+
+  TaskSubItem copyWith({
+    String? id,
+    String? taskId,
+    String? cardId,
+    String? title,
+    bool? isDone,
+    String? status,
+    int? sortOrder,
+    DateTime? startDate,
+    DateTime? dueDate,
+    String? linkUrl,
+    String? attachmentUrl,
+    String? verificationNotes,
+    String? adminComment,
+    List<SubItemVerification>? verifications,
+  }) {
+    return TaskSubItem(
+      id: id ?? this.id,
+      taskId: taskId ?? this.taskId,
+      cardId: cardId ?? this.cardId,
+      title: title ?? this.title,
+      isDone: isDone ?? this.isDone,
+      status: status ?? this.status,
+      sortOrder: sortOrder ?? this.sortOrder,
+      startDate: startDate ?? this.startDate,
+      dueDate: dueDate ?? this.dueDate,
+      linkUrl: linkUrl ?? this.linkUrl,
+      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      verificationNotes: verificationNotes ?? this.verificationNotes,
+      adminComment: adminComment ?? this.adminComment,
+      verifications: verifications ?? this.verifications,
+    );
+  }
+}
+
+class SubItemVerification {
+  const SubItemVerification({
+    required this.id,
+    required this.subItemId,
+    this.verifiedBy,
+    required this.verifierName,
+    required this.round,
+    required this.status,
+    this.notes,
+    required this.createdAt,
+  });
+
+  factory SubItemVerification.fromJson(Map<String, dynamic> json) {
+    return SubItemVerification(
+      id: json['id'] as String? ?? '',
+      subItemId: json['sub_item_id'] as String? ?? '',
+      verifiedBy: json['verified_by'] as String?,
+      verifierName: json['verifier_name'] as String? ?? '',
+      round: json['round'] as int? ?? 0,
+      status: json['status'] as String? ?? '',
+      notes: json['notes'] as String?,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String).toLocal() : DateTime.now(),
+    );
+  }
+
+  final String id;
+  final String subItemId;
+  final String? verifiedBy;
+  final String verifierName;
+  final int round;
+  final String status; // "approved" | "rejected"
+  final String? notes;
+  final DateTime createdAt;
+}
+
+class TaskListRecord {
+  const TaskListRecord({
+    required this.id,
+    required this.taskId,
+    required this.name,
+    this.description = '',
+    required this.sortOrder,
+    this.startDate,
+    this.dueDate,
+    this.cards = const [],
+  });
+
+  factory TaskListRecord.fromJson(Map<String, dynamic> json) {
+    final rawCards = json['cards'];
+    final cardsList = rawCards is List
+        ? rawCards.map((e) => TaskCardRecord.fromJson(e as Map<String, dynamic>)).toList()
+        : <TaskCardRecord>[];
+
+    return TaskListRecord(
+      id: json['id'] as String? ?? '',
+      taskId: json['task_id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      sortOrder: json['sort_order'] as int? ?? 0,
+      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'] as String)?.toLocal() : null,
+      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'] as String)?.toLocal() : null,
+      cards: cardsList,
+    );
+  }
+
+  final String id;
+  final String taskId;
+  final String name;
+  final String description;
+  final int sortOrder;
+  final DateTime? startDate;
+  final DateTime? dueDate;
+  final List<TaskCardRecord> cards;
+}
+
+class TaskCardRecord {
+  const TaskCardRecord({
+    required this.id,
+    required this.listId,
+    required this.title,
+    required this.description,
+    required this.status,
+    required this.sortOrder,
+    this.startDate,
+    this.dueDate,
+    this.subItems = const [],
+    List<CardAttachment>? attachments = const [],
+    this.adminComment,
+  }) : _attachments = attachments;
+
+  factory TaskCardRecord.fromJson(Map<String, dynamic> json) {
+    final rawSubs = json['sub_items'];
+    final subs = rawSubs is List
+        ? rawSubs.map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>)).toList()
+        : <TaskSubItem>[];
+
+    final rawAttachments = json['attachments'];
+    final attachments = rawAttachments is List
+        ? rawAttachments.map((e) => CardAttachment.fromJson(e as Map<String, dynamic>)).toList()
+        : <CardAttachment>[];
+
+    return TaskCardRecord(
+      id: json['id'] as String? ?? '',
+      listId: json['list_id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      status: json['status'] as String? ?? 'pending',
+      sortOrder: json['sort_order'] as int? ?? 0,
+      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'].toString())?.toLocal() : null,
+      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'].toString())?.toLocal() : null,
+      subItems: subs,
+      attachments: attachments,
+      adminComment: json['admin_comment'] as String?,
+    );
+  }
+
+  final String id;
+  final String listId;
+  final String title;
+  final String description;
+  final String status; // "pending" | "in_progress" | "completed"
+  final int sortOrder;
+  final DateTime? startDate;
+  final DateTime? dueDate;
+  final List<TaskSubItem> subItems;
+  final List<CardAttachment>? _attachments;
+  final String? adminComment;
+  List<CardAttachment> get attachments => _attachments ?? const [];
+}
+
+/// CardAttachment represents a file/image/link attached to a task card.
+class CardAttachment {
+  const CardAttachment({
+    required this.id,
+    required this.cardId,
+    required this.url,
+    required this.name,
+    required this.type,
+    required this.createdAt,
+    this.createdBy,
+  });
+
+  factory CardAttachment.fromJson(Map<String, dynamic> json) {
+    return CardAttachment(
+      id: json['id'] as String? ?? '',
+      cardId: json['card_id'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      type: json['type'] as String? ?? 'file', // 'image' | 'file' | 'link'
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())?.toLocal() ?? DateTime.now()
+          : DateTime.now(),
+      createdBy: json['created_by'] as String?,
+    );
+  }
+
+  final String id;
+  final String cardId;
+  final String url;
+  final String name;
+  final String type; // 'image' | 'file' | 'link'
+  final DateTime createdAt;
+  final String? createdBy;
+}
+
+
+class BrandRecord {
+  const BrandRecord({required this.id, required this.name});
+
+  factory BrandRecord.fromJson(Map<String, dynamic> json) {
+    return BrandRecord(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+    );
+  }
+
+  final String id;
+  final String name;
+}
+
+class TaskCategoryRecord {
+  const TaskCategoryRecord({required this.id, required this.name});
+
+  factory TaskCategoryRecord.fromJson(Map<String, dynamic> json) {
+    return TaskCategoryRecord(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+    );
+  }
+
+  final String id;
+  final String name;
 }
 
 class AdminHistoryRecord {
@@ -229,4 +543,24 @@ class AdminHistoryRecord {
   final DateTime? checkInAt;
   final DateTime? checkOutAt;
   final DateTime createdAt;
+}
+
+class AttendanceSummary {
+  const AttendanceSummary({
+    required this.totalEmployees,
+    required this.attendedToday,
+    required this.lateToday,
+  });
+
+  factory AttendanceSummary.fromJson(Map<String, dynamic> json) {
+    return AttendanceSummary(
+      totalEmployees: json['total_employees'] as int? ?? 0,
+      attendedToday: json['attended_today'] as int? ?? 0,
+      lateToday: json['late_today'] as int? ?? 0,
+    );
+  }
+
+  final int totalEmployees;
+  final int attendedToday;
+  final int lateToday;
 }

@@ -102,7 +102,9 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<String> _getDeviceId() async {
+    // ignore: invalid_use_of_visible_for_testing_member
     if (AuthFlowService.mockDeviceId != null) {
+      // ignore: invalid_use_of_visible_for_testing_member
       return AuthFlowService.mockDeviceId!;
     }
     final deviceInfo = DeviceInfoPlugin();

@@ -201,23 +201,25 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   avatarUrl: finalAvatarUrl,
                                 );
 
-                                if (mounted) {
+                                if (context.mounted) {
                                   widget.onProfileUpdated();
-                                  Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text('อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว'),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
+                                  Navigator.pop(context);
                                 }
                               } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('เกิดข้อผิดพลาด: ${e.toString()}'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('เกิดข้อผิดพลาด: ${e.toString()}'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
                               } finally {
                                 setModalState(() {
                                   saving = false;

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/app_loading_view.dart';
 import '../services/fcm_service.dart';
+import 'admin_websites_page.dart';
+import 'admin_tasks_page.dart';
+
 
 class MainDashboardPage extends StatefulWidget {
   const MainDashboardPage({
@@ -32,9 +32,9 @@ class MainDashboardPage extends StatefulWidget {
 class _MainDashboardPageState extends State<MainDashboardPage> {
   bool _loading = true;
   AttendanceRecord? _todayAttendance;
-  List<LeaveBalanceRecord> _leaveBalances = [];
-  List<HolidayRecord> _holidays = [];
-  List<TaskRecord> _myTasks = [];
+  int _totalEmployees = 0;
+  int _attendedToday = 0;
+  int _lateToday = 0;
 
   @override
   void initState() {
@@ -59,30 +59,21 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
 
     try {
       final now = DateTime.now();
-      final year = now.year;
 
       final results = await Future.wait([
         widget.service.getAttendance(now),
-        widget.service.getLeaveBalances(year),
-        widget.service.getHolidays(year),
-        widget.service.getMyTasks(),
+        widget.service.getAttendanceSummary(now),
       ]);
 
       if (mounted) {
         setState(() {
           _todayAttendance = results[0] as AttendanceRecord?;
-          _leaveBalances = results[1] as List<LeaveBalanceRecord>;
-          
-          final allHols = results[2] as List<HolidayRecord>;
-          // กรองเอาเฉพาะวันหยุดที่กำลังจะถึง
-          final today = DateTime(now.year, now.month, now.day);
-          _holidays = allHols.where((h) => h.date.isAfter(today) || h.date.isAtSameMomentAs(today)).toList();
-          _holidays.sort((a, b) => a.date.compareTo(b.date));
-          if (_holidays.length > 3) {
-            _holidays = _holidays.sublist(0, 3);
-          }
 
-          _myTasks = results[3] as List<TaskRecord>;
+          final summary = results[1] as AttendanceSummary;
+          _totalEmployees = summary.totalEmployees;
+          _attendedToday = summary.attendedToday;
+          _lateToday = summary.lateToday;
+
           _loading = false;
         });
       }
@@ -99,28 +90,20 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
   Future<void> _loadDataBackground() async {
     try {
       final now = DateTime.now();
-      final year = now.year;
 
       final results = await Future.wait([
         widget.service.getAttendance(now),
-        widget.service.getLeaveBalances(year),
-        widget.service.getHolidays(year),
-        widget.service.getMyTasks(),
+        widget.service.getAttendanceSummary(now),
       ]);
 
       if (mounted) {
         setState(() {
           _todayAttendance = results[0] as AttendanceRecord?;
-          _leaveBalances = results[1] as List<LeaveBalanceRecord>;
-          
-          final allHols = results[2] as List<HolidayRecord>;
-          final today = DateTime(now.year, now.month, now.day);
-          _holidays = allHols.where((h) => h.date.isAfter(today) || h.date.isAtSameMomentAs(today)).toList();
-          _holidays.sort((a, b) => a.date.compareTo(b.date));
-          if (_holidays.length > 3) {
-            _holidays = _holidays.sublist(0, 3);
-          }
-          _myTasks = results[3] as List<TaskRecord>;
+
+          final summary = results[1] as AttendanceSummary;
+          _totalEmployees = summary.totalEmployees;
+          _attendedToday = summary.attendedToday;
+          _lateToday = summary.lateToday;
         });
       }
     } catch (_) {}
@@ -386,27 +369,26 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                     ),
                     const SizedBox(height: 12),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         _buildCircularMenu(
-                          label: 'ประวัติเวลา',
-                          icon: Icons.history_toggle_off_rounded,
-                          onTap: () => widget.onSelectTab(3),
+                          label: 'มอบหมายงาน',
+                          icon: Icons.task_alt_rounded,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AdminTasksPage(service: widget.service),
+                            ),
+                          ),
                         ),
+                        const SizedBox(width: 24),
                         _buildCircularMenu(
-                          label: 'ปฏิทินงาน',
-                          icon: Icons.calendar_month_rounded,
-                          onTap: () => widget.onSelectTab(3),
-                        ),
-                        _buildCircularMenu(
-                          label: 'กล่องคำขอ',
-                          icon: Icons.assignment_rounded,
-                          onTap: () => widget.onSelectTab(2),
-                        ),
-                        _buildCircularMenu(
-                          label: 'แก้ไขข้อมูล',
-                          icon: Icons.manage_accounts_rounded,
-                          onTap: () => widget.onSelectTab(5),
+                          label: 'เว็บไซต์บริษัท',
+                          icon: Icons.language_rounded,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const CompanyWebsitesPage()),
+                          ),
                         ),
                       ],
                     ),
@@ -414,325 +396,24 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 ),
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // 4. Leave Balance Quotas (สไตล์ To-Do / Grid)
+            const SizedBox(height: 20),
             _StaggeredFadeIn(
               delayIndex: 3,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: WorkCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const WorkCardTitle(
-                        icon: Icons.analytics_rounded,
-                        title: 'โควต้าวันลาคงเหลือปีนี้',
-                      ),
-                      const SizedBox(height: 16),
-                      if (_leaveBalances.isEmpty)
-                        const Center(
-                          child: Text(
-                            'ไม่มีโควต้าการลาสำหรับปีนี้',
-                            style: TextStyle(color: workMuted, fontSize: 13),
-                          ),
-                        )
-                      else
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            childAspectRatio: 1.1,
-                          ),
-                          itemCount: _leaveBalances.length,
-                          itemBuilder: (context, index) {
-                            final b = _leaveBalances[index];
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFF1F5F9)),
-                              ),
-                              padding: const EdgeInsets.all(8),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    b.leaveType,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: workText,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${b.remaining.toInt()} / ${b.quota.toInt()}',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: workBlue,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    'คงเหลือ (วัน)',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: workMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ),
+                child: _buildTodayCompanySummaryCard(),
               ),
             ),
-
-            const SizedBox(height: 20),
-
-            // 4.5. Assigned Tasks (งานที่ได้รับมอบหมาย)
-            _StaggeredFadeIn(
-              delayIndex: 4,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: WorkCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const WorkCardTitle(
-                        icon: Icons.task_alt_rounded,
-                        title: 'งานที่ได้รับมอบหมาย (My Tasks)',
-                        color: Color(0xFF10B981),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_myTasks.isEmpty)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Text(
-                              'ไม่มีงานค้างสำหรับคุณในวันนี้ 🎉',
-                              style: TextStyle(color: workMuted, fontSize: 13),
-                            ),
-                          ),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _myTasks.length,
-                          separatorBuilder: (context, index) => const Divider(height: 12, color: Color(0xFFF1F5F9)),
-                          itemBuilder: (context, index) {
-                            final t = _myTasks[index];
-                            
-                            Color statusColor;
-                            String statusText;
-                            if (t.status == 'in_progress') {
-                              statusColor = const Color(0xFFEA580C);
-                              statusText = 'กำลังทำ';
-                            } else if (t.status == 'completed') {
-                              statusColor = const Color(0xFF10B981);
-                              statusText = 'เสร็จสิ้น';
-                            } else {
-                              statusColor = const Color(0xFF94A3B8);
-                              statusText = 'รอทำ';
-                            }
-
-                            return InkWell(
-                              onTap: () => _showTaskDetailsBottomSheet(t),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            t.title,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'ส่ง: ${DateFormat('dd MMM yy').format(t.dueDate)}',
-                                            style: const TextStyle(fontSize: 10, color: workMuted),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        statusText,
-                                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 5. เว็บไซต์ของบริษัท
-            _StaggeredFadeIn(
-              delayIndex: 5,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.language_rounded, color: workBlue, size: 18),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'เว็บไซต์ของบริษัท',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w900,
-                            color: workText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 185,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      physics: const BouncingScrollPhysics(),
-                      children: [
-                        _buildBannerCard(
-                          imagePath: 'assets/images/banner_zenslab.webp',
-                          url: 'https://www.zen-slab.com',
-                          title: 'Zen Slab',
-                          description: 'เราเริ่มต้นจากแก่นแท้ของต้นไม้ คุณค่าที่สำคัญที่สุดคือความเป็นธรรมชาติ...',
-                        ),
-                        _buildBannerCard(
-                          imagePath: 'assets/images/banner_wallcraft.webp',
-                          url: 'https://wallcraftthailand.com',
-                          title: 'Wallcraft Thailand',
-                          description: 'Wallcraft ศูนย์รวมสินค้าผนังและระแนงไม้คุณภาพสูง',
-                        ),
-                        _buildBannerCard(
-                          imagePath: 'assets/images/banner_terrahome.webp',
-                          url: 'https://terrahome-studio.com',
-                          title: 'Terra Home Studio',
-                          description: 'ของตกแต่งบ้าน ดีไซน์มินิมอล สไตล์ wabi-sabi',
-                        ),
-                        _buildBannerCard(
-                          imagePath: 'assets/images/banner_emberash.webp',
-                          url: 'https://emberandashliving.vercel.app/',
-                          title: 'Ember & Ash Living',
-                          description: 'เฟอร์นิเจอร์ดีไซน์พรีเมียม สไตล์โมเดิร์นร่วมสมัย',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 100),
-                ],
-              ),
-            ),
+            const SizedBox(height: 100),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
 
-  Widget _buildBannerCard({
-    required String imagePath,
-    required String url,
-    required String title,
-    required String description,
-  }) {
-    return GestureDetector(
-      onTap: () => _launchUrl(url),
-      child: Container(
-        width: 175,
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 110,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x08000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.asset(
-                  imagePath,
-                  width: 175,
-                  height: 110,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: workText,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 10.5,
-                color: workMuted,
-                height: 1.3,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
+
 
   Widget _buildQuickActionCard({
     required String title,
@@ -846,107 +527,89 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
     );
   }
 
-  void _showTaskDetailsBottomSheet(TaskRecord task) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'รายละเอียดงาน',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: workText),
+
+
+  Widget _buildTodayCompanySummaryCard() {
+    return WorkCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const WorkCardTitle(
+            icon: Icons.donut_large_rounded,
+            title: 'สรุปการมาทำงานวันนี้',
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildAttendanceStatBox(
+                  label: 'พนักงานทั้งหมด',
+                  value: '$_totalEmployees',
+                  color: workText,
                 ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded, color: workMuted),
+              ),
+              Expanded(
+                child: _buildAttendanceStatBox(
+                  label: 'มาทำงานแล้ว',
+                  value: '$_attendedToday',
+                  color: const Color(0xFF10B981),
                 ),
-              ],
-            ),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            const SizedBox(height: 14),
-            Text(
-              task.title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: workText),
-            ),
-            if (task.description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                task.description,
-                style: const TextStyle(fontSize: 12, color: workMuted),
+              ),
+              Expanded(
+                child: _buildAttendanceStatBox(
+                  label: 'มาสายวันนี้',
+                  value: '$_lateToday',
+                  color: const Color(0xFFF59E0B),
+                ),
               ),
             ],
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const Icon(Icons.calendar_month_rounded, size: 14, color: workMuted),
-                const SizedBox(width: 6),
-                Text(
-                  'กำหนดส่ง: ${DateFormat('dd MMMM yyyy', 'th').format(task.dueDate)}',
-                  style: const TextStyle(fontSize: 12, color: workText, fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (task.status != 'completed') ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    final nextStatus = task.status == 'pending' ? 'in_progress' : 'completed';
-                    try {
-                      await widget.service.updateTaskStatus(task.id, nextStatus);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('อัปเดตสถานะงานสำเร็จ'), backgroundColor: Colors.green),
-                      );
-                      _loadData();
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('อัปเดตสถานะงานล้มเหลว: $e'), backgroundColor: Colors.red),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: task.status == 'pending' ? const Color(0xFFEA580C) : const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: Text(
-                    task.status == 'pending' ? 'เริ่มทำงาน (Start Task)' : 'เสร็จสิ้นงาน (Complete Task)',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ] else ...[
-              const Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'งานนี้เสร็จสมบูรณ์แล้ว',
-                    style: TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+
+  Widget _buildAttendanceStatBox({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: workMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
+
+
+
 
 // ─── Premium Animation Helper Widgets ───
 

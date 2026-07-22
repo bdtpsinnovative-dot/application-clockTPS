@@ -120,7 +120,7 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
       child: RefreshIndicator(
         onRefresh: _handleRefresh,
         child: ListView(
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.only(bottom: 110),
           children: [
             WorkHeader(
               title: 'ปฏิทินตารางงาน',
@@ -480,7 +480,7 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
 
   String _formatTime(DateTime? dateTime) {
     if (dateTime == null) return '--:--';
-    return DateFormat('HH:mm').format(dateTime) + ' น.';
+    return '${DateFormat('HH:mm').format(dateTime)} น.';
   }
 }
 

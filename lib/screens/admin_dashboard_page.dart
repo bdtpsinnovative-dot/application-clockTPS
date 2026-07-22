@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/app_user.dart';
 import '../models/work_models.dart';
@@ -12,6 +11,7 @@ import 'admin_locations_page.dart';
 import 'admin_holidays_page.dart';
 import 'admin_attendance_history_page.dart';
 import 'admin_tasks_page.dart';
+import 'admin_websites_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({
@@ -52,8 +52,6 @@ class _MainStat {
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _loading = true;
   _MainStat? _stats;
-  List<AppUser> _allActiveUsers = [];
-  List<AttendanceRecord> _todayAtts = [];
 
   @override
   void initState() {
@@ -102,8 +100,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             lateToday: lateAtts.length,
             pendingRequestsCount: pendingReqs.length,
           );
-          _allActiveUsers = activeUsers;
-          _todayAtts = todayAtts;
           _loading = false;
         });
       }
@@ -144,8 +140,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             lateToday: lateAtts.length,
             pendingRequestsCount: pendingReqs.length,
           );
-          _allActiveUsers = activeUsers;
-          _todayAtts = todayAtts;
         });
       }
     } catch (_) {}
@@ -468,11 +462,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               MaterialPageRoute(builder: (context) => AdminTasksPage(service: widget.service)),
                             ),
                           ),
-                          // Empty placeholder to balance the alignment
-                          const Opacity(
-                            opacity: 0,
-                            child: IgnorePointer(
-                              child: SizedBox(width: 60, height: 60),
+                          _buildCircularMenu(
+                            label: 'เว็บไซต์บริษัท',
+                            icon: Icons.language_rounded,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const CompanyWebsitesPage()),
                             ),
                           ),
                         ],
@@ -523,186 +518,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                        const SizedBox(height: 12),
-                        // รายชื่อพนักงานพร้อมสถานะวันนี้
-                        ..._allActiveUsers.map((user) {
-                          // หา attendance record ที่ตรงกับ user id
-                          AttendanceRecord? att;
-                          try {
-                            att = _todayAtts.firstWhere((a) => a.userId == user.id);
-                          } catch (_) {
-                            att = null;
-                          }
-                          final hasCheckedIn = att != null;
-                          final isLate = att?.status == 'late';
-                          final hasCheckedOut = att?.checkOutAt != null;
-
-                          String statusLabel;
-                          Color statusColor;
-                          IconData statusIcon;
-
-                          if (!hasCheckedIn) {
-                            statusLabel = 'ยังไม่เข้างาน';
-                            statusColor = const Color(0xFF94A3B8);
-                            statusIcon = Icons.remove_circle_outline_rounded;
-                          } else if (hasCheckedOut) {
-                            statusLabel = 'เสร็จสิ้น';
-                            statusColor = const Color(0xFF10B981);
-                            statusIcon = Icons.check_circle_rounded;
-                          } else if (isLate) {
-                            statusLabel = 'มาสาย';
-                            statusColor = const Color(0xFFF59E0B);
-                            statusIcon = Icons.warning_amber_rounded;
-                          } else {
-                            statusLabel = 'เข้างานแล้ว';
-                            statusColor = workBlue;
-                            statusIcon = Icons.login_rounded;
-                          }
-
-                          final avatarUrl = user.avatarUrl;
-                          final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
-                          final httpAvatarUrl = hasAvatar
-                              ? (avatarUrl.startsWith('r2://')
-                                  ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                                  : avatarUrl)
-                              : '';
-
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: const Color(0xFFE2E8F0),
-                                  backgroundImage: hasAvatar ? NetworkImage(httpAvatarUrl) : null,
-                                  child: !hasAvatar
-                                      ? Text(
-                                          (user.firstName.isNotEmpty ? user.firstName[0] : '?').toUpperCase(),
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: workMuted),
-                                        )
-                                      : null,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${user.firstName} ${user.lastName}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                          color: workText,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      Text(
-                                        user.position.isNotEmpty ? user.position : user.role,
-                                        style: const TextStyle(fontSize: 11, color: workMuted),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(statusIcon, size: 12, color: statusColor),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        statusLabel,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: statusColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
                       ],
                     ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 20),
-
-              // เว็บไซต์ของบริษัท
-              _StaggeredFadeIn(
-                delayIndex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.language_rounded, color: workBlue, size: 18),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'เว็บไซต์ของบริษัท',
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w900,
-                              color: workText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 185,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        children: [
-                          _buildBrandBannerCard(
-                            imagePath: 'assets/images/banner_zenslab.webp',
-                            url: 'https://www.zen-slab.com',
-                            title: 'Zen Slab',
-                            description: 'เราเริ่มต้นจากแก่นแท้ของต้นไม้ คุณค่าที่สำคัญที่สุดของมันคือความเป็นธรรมชาติ...',
-                          ),
-                          _buildBrandBannerCard(
-                            imagePath: 'assets/images/banner_wallcraft.webp',
-                            url: 'https://wallcraftthailand.com',
-                            title: 'Wallcraft Thailand',
-                            description: 'Wallcraft ศูนย์รวมสินค้าผนัง ผนังตกแต่งบ้าน และระแนงไม้คุณภาพสูง ดีไซน์ทันสมัย',
-                          ),
-                          _buildBrandBannerCard(
-                            imagePath: 'assets/images/banner_terrahome.webp',
-                            url: 'https://terrahome-studio.com',
-                            title: 'Terra Home Studio',
-                            description: 'ค้นพบของตกแต่งบ้านและแจกันเซรามิกดีไซน์มินิมอล สไตล์ wabi-sabi และ Nordic',
-                          ),
-                          _buildBrandBannerCard(
-                            imagePath: 'assets/images/banner_emberash.webp',
-                            url: 'https://emberandashliving.vercel.app/',
-                            title: 'Ember & Ash Living',
-                            description: 'แบรนด์เฟอร์นิเจอร์ดีไซน์พรีเมียม สไตล์โมเดิร์นร่วมสมัย ยกระดับความสุขในการใช้ชีวิต',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 100),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -909,100 +731,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Future<void> _launchUrl(String urlString) async {
-    final Uri url = Uri.parse(urlString);
-    try {
-      // 1. Try launching in external application mode (explicitly Chrome/Safari browser app)
-      final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
-      if (!launched) {
-        // 2. Fallback to platform default in-app/external configuration
-        final fallbackLaunched = await launchUrl(url, mode: LaunchMode.platformDefault);
-        if (!fallbackLaunched) {
-          // 3. Last resort direct launch
-          await launchUrl(url);
-        }
-      }
-    } catch (_) {
-      try {
-        // Fallback to basic launch in case of exceptions
-        await launchUrl(url);
-      } catch (err) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('ไม่สามารถเปิดลิงก์: $urlString ได้')),
-          );
-        }
-      }
-    }
-  }
-
-  Widget _buildBrandBannerCard({
-    required String imagePath,
-    required String url,
-    required String title,
-    required String description,
-  }) {
-    return GestureDetector(
-      onTap: () => _launchUrl(url),
-      child: Container(
-        width: 175,
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Rounded corners image card
-            Container(
-              height: 110,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x08000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.asset(
-                  imagePath,
-                  width: 175,
-                  height: 110,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Brand Title
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: workText,
-              ),
-            ),
-            const SizedBox(height: 3),
-            // Brand Description
-            Text(
-              description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 10.5,
-                color: workMuted,
-                height: 1.3,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

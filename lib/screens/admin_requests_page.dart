@@ -12,11 +12,15 @@ class AdminRequestsPage extends StatefulWidget {
     required this.service,
     required this.onMenu,
     required this.isActive,
+    this.targetRequestId,
+    this.onClearTargetRequest,
   });
 
   final AuthFlowService service;
   final VoidCallback onMenu;
   final bool isActive;
+  final String? targetRequestId;
+  final VoidCallback? onClearTargetRequest;
 
   @override
   State<AdminRequestsPage> createState() => _AdminRequestsPageState();
@@ -39,6 +43,42 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
       _loadRequestsBackground();
+    } else if (widget.isActive && widget.targetRequestId != oldWidget.targetRequestId) {
+      _checkTargetRequest();
+    }
+  }
+
+  Future<void> _checkTargetRequest() async {
+    if (widget.targetRequestId == null || !widget.isActive) return;
+
+    // 1. ลองหาในลิสต์คำขอที่รอนุมัติก่อน
+    var targetIdx = _requests.indexWhere((r) => r.id == widget.targetRequestId);
+    WorkRequestRecord? target;
+
+    if (targetIdx != -1) {
+      target = _requests[targetIdx];
+    } else {
+      // 2. ถ้าไม่พบ (อาจถูกอนุมัติหรือปฏิเสธไปแล้ว) ให้ลองดึงข้อมูลคำขอทั้งหมดมาหา
+      try {
+        final allReqs = await widget.service.getAdminAllRequests();
+        targetIdx = allReqs.indexWhere((r) => r.id == widget.targetRequestId);
+        if (targetIdx != -1) {
+          target = allReqs[targetIdx];
+        }
+      } catch (_) {}
+    }
+
+    if (target != null) {
+      final targetUser = _userMap[target.userId];
+
+      // ล้างค่า target เพื่อไม่ให้เปิดซ้ำเมื่อมีการ rebuild
+      widget.onClearTargetRequest?.call();
+
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showRequestDetailsBottomSheet(target!, targetUser);
+        });
+      }
     }
   }
 
@@ -64,6 +104,7 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
           _requests = reqs;
           _loading = false;
         });
+        _checkTargetRequest();
       }
     } catch (e) {
       if (mounted) {
@@ -90,6 +131,7 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
           _userMap = {for (var u in users) u.id: u};
           _requests = reqs;
         });
+        _checkTargetRequest();
       }
     } catch (_) {}
   }
@@ -353,42 +395,67 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                   ],
                   const SizedBox(height: 24),
                   // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _handleAction(r, 'rejected');
-                          },
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.red),
-                            foregroundColor: Colors.red,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                  if (r.status == 'pending') ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _handleAction(r, 'rejected');
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.red),
+                              foregroundColor: Colors.red,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text('ปฏิเสธคำขอ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                           ),
-                          child: const Text('ปฏิเสธคำขอ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _handleAction(r, 'approved');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: workBlue,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text('อนุมัติคำขอ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Center(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: r.status == 'approved' ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: r.status == 'approved' ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+                          ),
+                        ),
+                        child: Text(
+                          r.status == 'approved' ? '✓ คำขอนี้ได้รับการอนุมัติเรียบร้อยแล้ว' : '✗ คำขอนี้ได้รับการปฏิเสธเรียบร้อยแล้ว',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: r.status == 'approved' ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _handleAction(r, 'approved');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: workBlue,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          child: const Text('อนุมัติคำขอ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -426,7 +493,7 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
       child: RefreshIndicator(
         onRefresh: _loadRequests,
         child: ListView(
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.only(bottom: 100),
           children: [
             WorkHeader(
               title: 'จัดการคำขออนุมัติ',
