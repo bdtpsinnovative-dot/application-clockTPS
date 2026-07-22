@@ -297,6 +297,36 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
               Text(task.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: workMuted)),
             ],
 
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    task.assignedTo == widget.service.currentUserId ? Icons.star_rounded : Icons.group_rounded,
+                    size: 11,
+                    color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    task.assignedTo == widget.service.currentUserId
+                        ? 'คุณเป็นเจ้าของบอร์ด'
+                        : 'บอร์ดของ ${task.assignedToName.isNotEmpty ? task.assignedToName : "เพื่อนร่วมงาน"} (คุณเข้าร่วม)',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Progress: การ์ดงาน (Kanban) or รายการย่อย
             Builder(
               builder: (context) {
