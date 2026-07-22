@@ -236,16 +236,12 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     final isEmployee = widget.service.currentUser?.role == 'employee';
     final currentUser = widget.service.currentUser;
     // Multiple assignees mapping
-    final assignees = task.subItems.isNotEmpty && task.status == 'completed'
-        ? <AppUser>[]
-        : (isEmployee && currentUser != null
-            ? [currentUser]
-            : _users.where((u) {
-                if (task.subItems.isNotEmpty) {
-                  // Standard field or assignees list mapping
-                }
-                return u.id == task.assignedTo;
-              }).toList());
+    final assignees = _users.where((u) {
+      if (task.assigneeIds.isNotEmpty) {
+        return task.assigneeIds.contains(u.id);
+      }
+      return u.id == task.assignedTo;
+    }).toList();
 
     return GestureDetector(
       onTap: () {
@@ -1006,7 +1002,10 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final user     = widget.userMap[widget.task.assignedTo];
+    final assignees = widget.task.assigneeIds.isNotEmpty 
+        ? widget.task.assigneeIds.map((id) => widget.userMap[id]).where((u) => u != null).cast<AppUser>().toList()
+        : [widget.userMap[widget.task.assignedTo]].where((u) => u != null).cast<AppUser>().toList();
+    final assigneesText = assignees.isEmpty ? 'ไม่ระบุ' : assignees.map((u) => u.firstName).join(', ');
     final brand    = widget.task.brandId != null ? widget.brandMap[widget.task.brandId] : null;
     final category = widget.task.categoryId != null ? widget.catMap[widget.task.categoryId] : null;
     final meta     = widget.statusConfig[widget.task.status]!;
@@ -1077,7 +1076,7 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
                 Expanded(child: _infoCard(
                   icon: Icons.person_rounded,
                   label: 'ผู้รับผิดชอบ',
-                  value: user?.fullName ?? 'ไม่ระบุ',
+                  value: assigneesText,
                 )),
                 const SizedBox(width: 12),
                 Expanded(child: _infoCard(
