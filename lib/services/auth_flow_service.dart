@@ -602,6 +602,21 @@ class AuthFlowService {
     await _authorizedPatch('/api/tasks/$id/status', data: {'status': status});
   }
 
+  Future<List<TaskEvent>> fetchTaskEvents(String taskId) async {
+    final response = await _authorizedGet('/api/tasks/$taskId/events');
+    final data = response['data'];
+    if (data is List) {
+      return data.map((e) => TaskEvent.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<TaskEvent> addTaskComment(String taskId, String content) async {
+    final response = await _authorizedPost('/api/tasks/$taskId/events', data: {'content': content});
+    return TaskEvent.fromJson(response['data'] as Map<String, dynamic>);
+  }
+
+
   Future<void> toggleTaskSubItem(String id, String status) async {
     await _authorizedPatch('/api/tasks/sub-items/$id/toggle', data: {'status': status});
   }
@@ -756,7 +771,7 @@ class AuthFlowService {
   }
 
   Future<void> deleteTask(String id) async {
-    await _authorizedDelete('/admin/tasks/$id');
+    await _authorizedDelete('/api/tasks/$id');
   }
 
   Future<void> updateFcmToken(String token) async {

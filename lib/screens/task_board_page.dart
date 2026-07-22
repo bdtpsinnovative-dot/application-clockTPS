@@ -647,7 +647,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          widget.task.assignedTo == widget.service.currentUserId
+                                          widget.task.assignedBy == widget.service.currentUserId
                                               ? Icons.star_rounded
                                               : Icons.group_rounded,
                                           size: 12,
@@ -655,9 +655,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          widget.task.assignedTo == widget.service.currentUserId
+                                          widget.task.assignedBy == widget.service.currentUserId
                                               ? 'คุณเป็นเจ้าของบอร์ดนี้'
-                                              : 'บอร์ดนี้เป็นของ ${widget.task.assignedToName.isNotEmpty ? widget.task.assignedToName : "เพื่อนร่วมงาน"} (คุณถูกเพิ่มเข้ามา)',
+                                              : 'บอร์ดนี้เป็นของ ${widget.task.assignedByName?.isNotEmpty == true ? widget.task.assignedByName : "เพื่อนร่วมงาน"} (คุณถูกเพิ่มเข้ามา)',
                                           style: const TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.w500),
                                         ),
                                       ],

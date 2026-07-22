@@ -301,26 +301,26 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                color: task.assignedBy == widget.service.currentUserId ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    task.assignedTo == widget.service.currentUserId ? Icons.star_rounded : Icons.group_rounded,
+                    task.assignedBy == widget.service.currentUserId ? Icons.star_rounded : Icons.group_rounded,
                     size: 11,
-                    color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                    color: task.assignedBy == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    task.assignedTo == widget.service.currentUserId
+                    task.assignedBy == widget.service.currentUserId
                         ? 'คุณเป็นเจ้าของบอร์ด'
-                        : 'บอร์ดของ ${task.assignedToName.isNotEmpty ? task.assignedToName : "เพื่อนร่วมงาน"} (คุณเข้าร่วม)',
+                        : 'บอร์ดของ ${task.assignedByName?.isNotEmpty == true ? task.assignedByName : "เพื่อนร่วมงาน"} (คุณเข้าร่วม)',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                      color: task.assignedBy == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -922,7 +922,7 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
 }
 
 // ─── Task Detail Bottom Sheet ────────────────────────────────────
-class _TaskDetailSheet extends StatelessWidget {
+class _TaskDetailSheet extends StatefulWidget {
   const _TaskDetailSheet({
     required this.task,
     required this.userMap,
@@ -942,158 +942,340 @@ class _TaskDetailSheet extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
+  State<_TaskDetailSheet> createState() => _TaskDetailSheetState();
+}
+
+class _TaskDetailSheetState extends State<_TaskDetailSheet> {
+  final _commentController = TextEditingController();
+  List<TaskEvent> _events = [];
+  bool _isLoadingEvents = true;
+  bool _isPostingComment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadEvents() async {
+    try {
+      final authSvc = Provider.of<AuthFlowService>(context, listen: false);
+      final events = await authSvc.fetchTaskEvents(widget.task.id);
+      if (mounted) {
+        setState(() {
+          _events = events;
+          _isLoadingEvents = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingEvents = false);
+      }
+    }
+  }
+
+  Future<void> _postComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _isPostingComment = true);
+    try {
+      final authSvc = Provider.of<AuthFlowService>(context, listen: false);
+      final newEvent = await authSvc.addTaskComment(widget.task.id, text);
+      if (mounted) {
+        setState(() {
+          _events.add(newEvent);
+          _commentController.clear();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPostingComment = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final user     = userMap[task.assignedTo];
-    final brand    = task.brandId != null ? brandMap[task.brandId] : null;
-    final category = task.categoryId != null ? catMap[task.categoryId] : null;
-    final meta     = statusConfig[task.status]!;
-    final isOverdue = task.status != 'completed' && task.dueDate.isBefore(DateTime.now());
+    final user     = widget.userMap[widget.task.assignedTo];
+    final brand    = widget.task.brandId != null ? widget.brandMap[widget.task.brandId] : null;
+    final category = widget.task.categoryId != null ? widget.catMap[widget.task.categoryId] : null;
+    final meta     = widget.statusConfig[widget.task.status]!;
+    final isOverdue = widget.task.status != 'completed' && widget.task.dueDate.isBefore(DateTime.now());
     const otherStatuses = ['pending', 'in_progress', 'completed'];
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Handle bar
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)))),
-          const SizedBox(height: 16),
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
 
-          // Tags
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              // Status tag
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: meta.bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: meta.border)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: meta.color)),
-                  const SizedBox(width: 6),
-                  Text(meta.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: meta.color)),
-                ]),
-              ),
-              if (brand != null)
+            // Tags
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                // Status tag
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
+                  decoration: BoxDecoration(color: meta.bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: meta.border)),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.label_outline_rounded, size: 12, color: workBlue),
-                    const SizedBox(width: 4),
-                    Text(brand.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workBlue)),
+                    Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: meta.color)),
+                    const SizedBox(width: 6),
+                    Text(meta.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: meta.color)),
                   ]),
                 ),
-              if (category != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFDE68A))),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.folder_outlined, size: 12, color: Color(0xFFB45309)),
-                    const SizedBox(width: 4),
-                    Text(category.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
-                  ]),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Title
-          Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: workText)),
-          if (task.description.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(task.description, style: const TextStyle(fontSize: 14, color: workMuted, height: 1.6)),
-          ],
-          const SizedBox(height: 16),
-
-          // Assignee + Due date
-          Row(
-            children: [
-              Expanded(child: _infoCard(
-                icon: Icons.person_rounded,
-                label: 'ผู้รับผิดชอบ',
-                value: user?.fullName ?? 'ไม่ระบุ',
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: _infoCard(
-                icon: isOverdue ? Icons.warning_amber_rounded : Icons.calendar_month_rounded,
-                label: 'กำหนดส่ง',
-                value: DateFormat('dd MMMM yyyy', 'th').format(task.dueDate),
-                valueColor: isOverdue ? Colors.red : workText,
-                iconColor: isOverdue ? Colors.red : workBlue,
-              )),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Sub-items checklist
-          if (task.subItems.isNotEmpty) ...[
-            const Text('CHECKLIST', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-            const SizedBox(height: 8),
-            ...task.subItems.map((item) => Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
-              child: Row(
-                children: [
-                  Icon(
-                    item.isDone ? Icons.check_circle_rounded : Icons.circle_outlined,
-                    color: item.isDone ? const Color(0xFF22C55E) : const Color(0xFFCBD5E1),
-                    size: 18,
+                if (brand != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.label_outline_rounded, size: 12, color: workBlue),
+                      const SizedBox(width: 4),
+                      Text(brand.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workBlue)),
+                    ]),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(
-                    item.title,
-                    style: TextStyle(fontSize: 13, color: item.isDone ? workMuted : workText, decoration: item.isDone ? TextDecoration.lineThrough : null),
-                  )),
-                ],
-              ),
-            )),
-            const SizedBox(height: 12),
-          ],
+                if (category != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFDE68A))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.folder_outlined, size: 12, color: Color(0xFFB45309)),
+                      const SizedBox(width: 4),
+                      Text(category.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+                    ]),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
 
-          // Change status
-          const Text('เปลี่ยนสถานะ', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: otherStatuses.where((s) => s != task.status).map((s) {
-              final m = statusConfig[s]!;
-              return OutlinedButton(
-                onPressed: () => onChangeStatus(s),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: m.color,
-                  side: BorderSide(color: m.border, width: 1.5),
-                  backgroundColor: m.bg,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            // Title
+            Text(widget.task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: workText)),
+            if (widget.task.description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(widget.task.description, style: const TextStyle(fontSize: 14, color: workMuted, height: 1.6)),
+            ],
+            const SizedBox(height: 16),
+
+            // Assignee + Due date
+            Row(
+              children: [
+                Expanded(child: _infoCard(
+                  icon: Icons.person_rounded,
+                  label: 'ผู้รับผิดชอบ',
+                  value: user?.fullName ?? 'ไม่ระบุ',
+                )),
+                const SizedBox(width: 12),
+                Expanded(child: _infoCard(
+                  icon: isOverdue ? Icons.warning_amber_rounded : Icons.calendar_month_rounded,
+                  label: 'กำหนดส่ง',
+                  value: DateFormat('dd MMMM yyyy', 'th').format(widget.task.dueDate),
+                  valueColor: isOverdue ? Colors.red : workText,
+                  iconColor: isOverdue ? Colors.red : workBlue,
+                )),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Sub-items checklist
+            if (widget.task.subItems.isNotEmpty) ...[
+              const Text('CHECKLIST', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+              const SizedBox(height: 8),
+              ...widget.task.subItems.map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+                child: Row(
+                  children: [
+                    Icon(
+                      item.isDone ? Icons.check_circle_rounded : Icons.circle_outlined,
+                      color: item.isDone ? const Color(0xFF22C55E) : const Color(0xFFCBD5E1),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(
+                      item.title,
+                      style: TextStyle(fontSize: 13, color: item.isDone ? workMuted : workText, decoration: item.isDone ? TextDecoration.lineThrough : null),
+                    )),
+                  ],
                 ),
-                child: Text('→ ${m.label}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 20),
+              )),
+              const SizedBox(height: 12),
+            ],
 
-          // Delete
-          const Divider(color: Color(0xFFF1F5F9)),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline_rounded, size: 18),
-              label: const Text('ลบงานนี้', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Color(0xFFFECACA)),
-                backgroundColor: const Color(0xFFFEF2F2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+            // Change status
+            const Text('เปลี่ยนสถานะ', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: otherStatuses.where((s) => s != widget.task.status).map((s) {
+                final m = widget.statusConfig[s]!;
+                return OutlinedButton(
+                  onPressed: () => widget.onChangeStatus(s),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: m.color,
+                    side: BorderSide(color: m.border, width: 1.5),
+                    backgroundColor: m.bg,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
+                  child: Text('→ ${m.label}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+
+            // Timeline & Comments
+            const Divider(color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 12),
+            const Text('TIMELINE & COMMENTS', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+            const SizedBox(height: 12),
+            
+            if (_isLoadingEvents)
+              const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(strokeWidth: 2)))
+            else if (_events.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Text('ยังไม่มีประวัติการพูดคุย', style: TextStyle(color: workMuted, fontSize: 13))))
+            else
+              Container(
+                constraints: const BoxConstraints(maxHeight: 250),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _events.length,
+                  itemBuilder: (context, index) {
+                    final ev = _events[index];
+                    final isSystem = ev.eventType == 'system';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 28, height: 28,
+                            decoration: BoxDecoration(
+                              color: isSystem ? const Color(0xFFE2E8F0) : const Color(0xFFDBEAFE),
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: isSystem
+                              ? const Icon(Icons.smart_toy_rounded, size: 14, color: Color(0xFF64748B))
+                              : (ev.userAvatarUrl != null
+                                  ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(ev.userAvatarUrl!, width: 28, height: 28, fit: BoxFit.cover))
+                                  : Text(ev.userFirstName?.isNotEmpty == true ? ev.userFirstName![0] : '?', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workBlue))),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: isSystem ? 0 : 12, vertical: isSystem ? 4 : 10),
+                              decoration: BoxDecoration(
+                                color: isSystem ? Colors.transparent : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(isSystem ? 'ระบบ' : (ev.userFirstName ?? 'Unknown'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workText)),
+                                      Text(DateFormat('dd MMM HH:mm', 'th').format(ev.createdAt), style: const TextStyle(fontSize: 10, color: workMuted)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    ev.content ?? '',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isSystem ? workMuted : workText,
+                                      fontStyle: isSystem ? FontStyle.italic : FontStyle.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+            // Comment Input
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    decoration: InputDecoration(
+                      hintText: 'พิมพ์คอมเมนต์หรืออัปเดตงาน...',
+                      hintStyle: const TextStyle(fontSize: 13, color: workMuted),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: workBlue, width: 1.5)),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    maxLines: null,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _postComment(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: _isPostingComment ? null : _postComment,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: _isPostingComment ? workMuted : workBlue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: _isPostingComment
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Delete
+            const Divider(color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: widget.onDelete,
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                label: const Text('ลบงานนี้', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Color(0xFFFECACA)),
+                  backgroundColor: const Color(0xFFFEF2F2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

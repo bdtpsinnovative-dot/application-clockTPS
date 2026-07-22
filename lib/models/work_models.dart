@@ -478,6 +478,49 @@ class CardAttachment {
   final String? createdBy;
 }
 
+class TaskEvent {
+  const TaskEvent({
+    required this.id,
+    required this.taskId,
+    required this.userId,
+    required this.eventType,
+    required this.action,
+    this.content,
+    required this.createdAt,
+    this.userFirstName,
+    this.userLastName,
+    this.userAvatarUrl,
+  });
+
+  factory TaskEvent.fromJson(Map<String, dynamic> json) {
+    return TaskEvent(
+      id: json['id'] as String? ?? '',
+      taskId: json['task_id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
+      eventType: json['event_type'] as String? ?? '',
+      action: json['action'] as String? ?? '',
+      content: json['content'] as String?,
+      createdAt: json['created_at'] != null 
+          ? DateTime.tryParse(json['created_at'].toString())?.toLocal() ?? DateTime.now()
+          : DateTime.now(),
+      userFirstName: json['user_first_name'] as String?,
+      userLastName: json['user_last_name'] as String?,
+      userAvatarUrl: json['user_avatar_url'] as String?,
+    );
+  }
+
+  final String id;
+  final String taskId;
+  final String userId;
+  final String eventType;
+  final String action;
+  final String? content;
+  final DateTime createdAt;
+  final String? userFirstName;
+  final String? userLastName;
+  final String? userAvatarUrl;
+}
+
 
 class BrandRecord {
   const BrandRecord({required this.id, required this.name});
