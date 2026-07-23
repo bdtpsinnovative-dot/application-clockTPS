@@ -637,31 +637,31 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                       ),
                                     ),
                                   const SizedBox(height: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          widget.task.assignedBy == widget.service.currentUserId
-                                              ? Icons.star_rounded
-                                              : Icons.group_rounded,
-                                          size: 12,
-                                          color: Colors.white,
+                                  Builder(
+                                    builder: (context) {
+                                      final currentUserId = widget.service.currentUserId;
+                                      final isOwner = widget.task.assignedBy != null && widget.task.assignedBy!.isNotEmpty
+                                          ? widget.task.assignedBy == currentUserId
+                                          : widget.task.assignedTo == currentUserId;
+
+                                      return Tooltip(
+                                        message: isOwner
+                                            ? 'เจ้าของบอร์ด'
+                                            : 'บอร์ดของ ${widget.task.assignedByName?.isNotEmpty == true ? widget.task.assignedByName : "เพื่อนร่วมงาน"}',
+                                        child: Container(
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.25),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            isOwner ? Icons.star_rounded : Icons.group_rounded,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          widget.task.assignedBy == widget.service.currentUserId
-                                              ? 'คุณเป็นเจ้าของบอร์ดนี้'
-                                              : 'บอร์ดนี้เป็นของ ${widget.task.assignedByName?.isNotEmpty == true ? widget.task.assignedByName : "เพื่อนร่วมงาน"} (คุณถูกเพิ่มเข้ามา)',
-                                          style: const TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.w500),
-                                        ),
-                                      ],
-                                    ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),

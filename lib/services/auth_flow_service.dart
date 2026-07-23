@@ -40,7 +40,7 @@ class AuthFlowService {
 
   bool get hasSession => _accessToken?.isNotEmpty ?? false;
   String get currentUserEmail => _email ?? '';
-  String get currentUserId => _authId ?? '';
+  String get currentUserId => _currentAppUser?.id ?? _authId ?? '';
   String get baseUrl => AppConfig.apiBaseUrl;
   AppUser? get currentUser => _currentAppUser;
 

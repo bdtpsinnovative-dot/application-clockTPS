@@ -219,6 +219,44 @@ class TaskRecord {
   final int cardTotal;
   final int cardDone;
   final List<String> assigneeIds;
+
+  TaskRecord copyWith({
+    String? id,
+    String? assignedTo,
+    String? assignedToName,
+    String? title,
+    String? description,
+    DateTime? dueDate,
+    String? status,
+    String? assignedBy,
+    String? assignedByName,
+    String? brandId,
+    String? categoryId,
+    List<TaskSubItem>? subItems,
+    DateTime? createdAt,
+    int? cardTotal,
+    int? cardDone,
+    List<String>? assigneeIds,
+  }) {
+    return TaskRecord(
+      id: id ?? this.id,
+      assignedTo: assignedTo ?? this.assignedTo,
+      assignedToName: assignedToName ?? this.assignedToName,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      dueDate: dueDate ?? this.dueDate,
+      status: status ?? this.status,
+      assignedBy: assignedBy ?? this.assignedBy,
+      assignedByName: assignedByName ?? this.assignedByName,
+      brandId: brandId ?? this.brandId,
+      categoryId: categoryId ?? this.categoryId,
+      subItems: subItems ?? this.subItems,
+      createdAt: createdAt ?? this.createdAt,
+      cardTotal: cardTotal ?? this.cardTotal,
+      cardDone: cardDone ?? this.cardDone,
+      assigneeIds: assigneeIds ?? this.assigneeIds,
+    );
+  }
 }
 
 class TaskSubItem {

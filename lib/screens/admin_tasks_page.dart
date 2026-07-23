@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/app_user.dart';
@@ -7,7 +6,6 @@ import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/work_ui.dart';
 import 'package:hr_management/widgets/app_loading_view.dart';
 import 'package:hr_management/screens/task_board_page.dart';
-
 
 // ─── Status config ───────────────────────────────────────────────
 const _statusConfig = {
@@ -41,6 +39,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   Map<String, AppUser>      _userMap    = {};
   Map<String, BrandRecord>  _brandMap   = {};
   Map<String, TaskCategoryRecord> _catMap = {};
+  int    _selectedTabIndex = 0; // 0: งานที่เราสร้าง, 1: งานที่เข้าร่วม
   bool   _loading = true;
   String? _error;
 
@@ -54,11 +53,17 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     setState(() { _loading = true; _error = null; });
     try {
       final isEmployee = widget.service.currentUser?.role == 'employee';
+      
+      final tasksFuture  = isEmployee ? widget.service.getMyTasks() : widget.service.getAdminTasks();
+      final usersFuture  = widget.service.getAdminUsers().catchError((_) => <AppUser>[]);
+      final brandsFuture = widget.service.getBrands().catchError((_) => <BrandRecord>[]);
+      final catsFuture   = widget.service.getTaskCategories().catchError((_) => <TaskCategoryRecord>[]);
+
       final results = await Future.wait([
-        isEmployee ? widget.service.getMyTasks() : widget.service.getAdminTasks(),
-        isEmployee ? Future.value(<AppUser>[]) : widget.service.getAdminUsers(),
-        widget.service.getBrands(),
-        widget.service.getTaskCategories(),
+        tasksFuture,
+        usersFuture,
+        brandsFuture,
+        catsFuture,
       ]);
 
       final tasks  = results[0] as List<TaskRecord>;
@@ -126,8 +131,6 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     }
   }
 
-
-
   // ─── Create task modal sheet (โมดูล) ──────────────────────────────
   void _showCreateTaskModal() {
     showModalBottomSheet(
@@ -140,17 +143,21 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         brands: _brands,
         categories: _categories,
         onSubmit: (title, desc, assignees, due, brand, category, cardNames) async {
-          // 1. สร้างงานก่อน
+          final currentUserId = widget.service.currentUserId;
+          final finalAssignees = List<String>.from(assignees);
+          if (currentUserId.isNotEmpty && !finalAssignees.contains(currentUserId)) {
+            finalAssignees.add(currentUserId);
+          }
+
           final task = await widget.service.createTask(
             title: title,
             description: desc,
-            assignedTo: assignees.isNotEmpty ? assignees.first : '',
+            assignedTo: finalAssignees.isNotEmpty ? finalAssignees.first : currentUserId,
             brandId: brand,
             categoryId: category,
             dueDate: due,
-            assigneeIds: assignees,
+            assigneeIds: finalAssignees,
           );
-          // 2. ถ้ามีการ์ดงาน → สร้าง list ตั้งต้นแล้วใส่การ์ดเข้าไป
           final validCards = cardNames.where((n) => n.trim().isNotEmpty).toList();
           if (validCards.isNotEmpty) {
             final list = await widget.service.createTaskList(task.id, 'งานทั้งหมด');
@@ -183,6 +190,16 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       );
     }
 
+    final currentUserId = widget.service.currentUserId;
+    final createdTasks = _tasks.where((t) {
+      if (t.assignedBy != null && t.assignedBy!.isNotEmpty) {
+        return t.assignedBy == currentUserId;
+      }
+      return t.assignedTo == currentUserId;
+    }).toList();
+    final joinedTasks  = _tasks.where((t) => !createdTasks.contains(t)).toList();
+    final activeList   = _selectedTabIndex == 0 ? createdTasks : joinedTasks;
+
     return Scaffold(
       backgroundColor: workBackground,
       appBar: AppBar(
@@ -191,33 +208,135 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           IconButton(
             onPressed: _showCreateTaskModal,
             icon: const Icon(Icons.add_task_rounded, color: workBlue),
-            tooltip: 'มอบหมายงานใหม่',
+            tooltip: 'สร้างงานใหม่',
           ),
           IconButton(onPressed: _loadData, icon: const Icon(Icons.refresh_rounded, color: workMuted), tooltip: 'รีโหลด'),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: _tasks.isEmpty
-            ? const Center(
-                child: Text(
-                  'ยังไม่มีงานมอบหมายในตอนนี้',
-                  style: TextStyle(color: workMuted, fontSize: 13),
+      body: Column(
+        children: [
+          // ── Tab Bar Toggle ──
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedTabIndex = 0),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: _selectedTabIndex == 0
+                            ? const [BoxShadow(color: Color(0x10000000), blurRadius: 4, offset: Offset(0, 2))]
+                            : [],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.edit_note_rounded,
+                            size: 18,
+                            color: _selectedTabIndex == 0 ? workBlue : workMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'สร้างเอง (${createdTasks.length})',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _selectedTabIndex == 0 ? FontWeight.bold : FontWeight.w500,
+                              color: _selectedTabIndex == 0 ? workText : workMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              )
-            : ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                itemCount: _tasks.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final t = _tasks[index];
-                  return _buildDraggableTaskCard(t);
-                },
-              ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedTabIndex = 1),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: _selectedTabIndex == 1
+                            ? const [BoxShadow(color: Color(0x10000000), blurRadius: 4, offset: Offset(0, 2))]
+                            : [],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.group_rounded,
+                            size: 18,
+                            color: _selectedTabIndex == 1 ? workBlue : workMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'เข้าร่วม (${joinedTasks.length})',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _selectedTabIndex == 1 ? FontWeight.bold : FontWeight.w500,
+                              color: _selectedTabIndex == 1 ? workText : workMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadData,
+              child: activeList.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _selectedTabIndex == 0 ? Icons.note_add_outlined : Icons.group_off_outlined,
+                            size: 40,
+                            color: workMuted,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _selectedTabIndex == 0
+                                ? 'ยังไม่มีงานที่คุณสร้าง'
+                                : 'ยังไม่มีงานที่เข้าร่วม',
+                            style: const TextStyle(color: workMuted, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      itemCount: activeList.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final t = activeList[index];
+                        return _buildDraggableTaskCard(t);
+                      },
+                    ),
+            ),
+          ),
+        ],
       ),
     );
-
   }
 
   // ─── Kanban board ───────────────────────────────────────────────
@@ -232,9 +351,11 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     final brand    = task.brandId != null ? _brandMap[task.brandId] : null;
     final category = task.categoryId != null ? _catMap[task.categoryId] : null;
     final isOverdue = task.status != 'completed' && task.dueDate.isBefore(DateTime.now());
+    final currentUserId = widget.service.currentUserId;
+    final isOwner = task.assignedBy != null && task.assignedBy!.isNotEmpty
+        ? task.assignedBy == currentUserId
+        : task.assignedTo == currentUserId;
 
-    final isEmployee = widget.service.currentUser?.role == 'employee';
-    final currentUser = widget.service.currentUser;
     // Multiple assignees mapping
     final assignees = _users.where((u) {
       if (task.assigneeIds.isNotEmpty) {
@@ -269,8 +390,51 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tags row
+            // Top Row: Title (Left) + Owner Icon Badge (Top Right)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    task.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: workText),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: isOwner
+                      ? 'เจ้าของบอร์ด'
+                      : 'บอร์ดของ ${task.assignedByName?.isNotEmpty == true ? task.assignedByName : "เพื่อนร่วมงาน"}',
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: isOwner ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isOwner ? Icons.star_rounded : Icons.group_rounded,
+                      size: 14,
+                      color: isOwner ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Description
+            if (task.description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                task.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: workMuted),
+              ),
+            ],
+
+            // Tags row (Brand & Category)
             if (brand != null || category != null) ...[
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 4,
@@ -281,47 +445,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                     _buildTag(category.name, const Color(0xFFFEF3C7), const Color(0xFFB45309), const Color(0xFFFDE68A)),
                 ],
               ),
-              const SizedBox(height: 6),
             ],
-
-            // Title
-            Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText)),
-
-            // Description
-            if (task.description.isNotEmpty) ...[
-              const SizedBox(height: 3),
-              Text(task.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: workMuted)),
-            ],
-
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: task.assignedBy == widget.service.currentUserId ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    task.assignedBy == widget.service.currentUserId ? Icons.star_rounded : Icons.group_rounded,
-                    size: 11,
-                    color: task.assignedBy == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    task.assignedBy == widget.service.currentUserId
-                        ? 'คุณเป็นเจ้าของบอร์ด'
-                        : 'บอร์ดของ ${task.assignedByName?.isNotEmpty == true ? task.assignedByName : "เพื่อนร่วมงาน"} (คุณเข้าร่วม)',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: task.assignedBy == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
             // Progress: การ์ดงาน (Kanban) or รายการย่อย
             Builder(
@@ -422,53 +546,59 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Render overlapping avatars for assignees
-                Row(
-                  children: [
-                    if (assignees.isEmpty)
-                      const Icon(Icons.person_outline_rounded, size: 16, color: workMuted)
-                    else
-                      SizedBox(
-                        height: 24,
-                        width: 24.0 + (assignees.length - 1) * 12.0,
-                        child: Stack(
-                          children: List.generate(assignees.length, (index) {
-                            final u = assignees[index];
-                            final avatarUrl = u.avatarUrl;
-                            final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
-                            final resolvedAvatar = hasAvatar
-                                ? (avatarUrl.startsWith('r2://')
-                                    ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                                    : avatarUrl)
-                                : null;
+                Expanded(
+                  child: Row(
+                    children: [
+                      if (assignees.isEmpty)
+                        const Icon(Icons.person_outline_rounded, size: 16, color: workMuted)
+                      else
+                        SizedBox(
+                          height: 24,
+                          width: 24.0 + (assignees.length - 1) * 12.0,
+                          child: Stack(
+                            children: List.generate(assignees.length, (index) {
+                              final u = assignees[index];
+                              final avatarUrl = u.avatarUrl;
+                              final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
+                              final resolvedAvatar = hasAvatar
+                                  ? (avatarUrl.startsWith('r2://')
+                                      ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
+                                      : avatarUrl)
+                                  : null;
 
-                            return Positioned(
-                              left: index * 12.0,
-                              child: Container(
-                                width: 22, height: 22,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFFEFF6FF),
-                                  border: Border.all(color: Colors.white, width: 1.5),
-                                  image: resolvedAvatar != null
-                                      ? DecorationImage(image: NetworkImage(resolvedAvatar), fit: BoxFit.cover)
+                              return Positioned(
+                                left: index * 12.0,
+                                child: Container(
+                                  width: 22, height: 22,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFFEFF6FF),
+                                    border: Border.all(color: Colors.white, width: 1.5),
+                                    image: resolvedAvatar != null
+                                        ? DecorationImage(image: NetworkImage(resolvedAvatar), fit: BoxFit.cover)
+                                        : null,
+                                  ),
+                                  child: resolvedAvatar == null
+                                      ? const Icon(Icons.person_rounded, size: 10, color: workBlue)
                                       : null,
                                 ),
-                                child: resolvedAvatar == null
-                                    ? const Icon(Icons.person_rounded, size: 10, color: workBlue)
-                                    : null,
-                              ),
-                            );
-                          }),
+                              );
+                            }),
+                          ),
+                        ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          assignees.length == 1
+                              ? assignees.first.firstName
+                              : (assignees.length > 1 ? '${assignees.length} คน' : 'ไม่ระบุ'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, color: workText, fontWeight: FontWeight.w500),
                         ),
                       ),
-                    const SizedBox(width: 6),
-                    Text(
-                      assignees.length == 1
-                          ? assignees.first.firstName
-                          : (assignees.length > 1 ? '${assignees.length} คน' : 'ไม่ระบุ'),
-                      style: const TextStyle(fontSize: 11, color: workText, fontWeight: FontWeight.w500),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Row(
                   children: [
@@ -921,6 +1051,7 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
 class _TaskDetailSheet extends StatefulWidget {
   const _TaskDetailSheet({
     required this.task,
+    required this.service,
     required this.userMap,
     required this.brandMap,
     required this.catMap,
@@ -930,6 +1061,7 @@ class _TaskDetailSheet extends StatefulWidget {
   });
 
   final TaskRecord task;
+  final AuthFlowService service;
   final Map<String, AppUser> userMap;
   final Map<String, BrandRecord> brandMap;
   final Map<String, TaskCategoryRecord> catMap;
@@ -961,8 +1093,7 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
 
   Future<void> _loadEvents() async {
     try {
-      final authSvc = Provider.of<AuthFlowService>(context, listen: false);
-      final events = await authSvc.fetchTaskEvents(widget.task.id);
+      final events = await widget.service.fetchTaskEvents(widget.task.id);
       if (mounted) {
         setState(() {
           _events = events;
@@ -981,8 +1112,7 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
     if (text.isEmpty) return;
     setState(() => _isPostingComment = true);
     try {
-      final authSvc = Provider.of<AuthFlowService>(context, listen: false);
-      final newEvent = await authSvc.addTaskComment(widget.task.id, text);
+      final newEvent = await widget.service.addTaskComment(widget.task.id, text);
       if (mounted) {
         setState(() {
           _events.add(newEvent);
