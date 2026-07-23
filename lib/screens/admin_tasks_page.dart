@@ -5,13 +5,28 @@ import 'package:hr_management/models/app_user.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/work_ui.dart';
 import 'package:hr_management/widgets/app_loading_view.dart';
-import 'package:hr_management/screens/task_board_page.dart';
+import 'package:hr_management/screens/subtask_board_page.dart';
 
 // ─── Status config ───────────────────────────────────────────────
 const _statusConfig = {
-  'pending':     _StatusMeta('รอทำ',      Color(0xFF64748B), Color(0xFFF1F5F9), Color(0xFFCBD5E1)),
-  'in_progress': _StatusMeta('กำลังทำ',   Color(0xFFEA580C), Color(0xFFFFF7ED), Color(0xFFFED7AA)),
-  'completed':   _StatusMeta('เสร็จสิ้น', Color(0xFF16A34A), Color(0xFFF0FDF4), Color(0xFFBBF7D0)),
+  'pending': _StatusMeta(
+    'รอทำ',
+    Color(0xFF64748B),
+    Color(0xFFF1F5F9),
+    Color(0xFFCBD5E1),
+  ),
+  'in_progress': _StatusMeta(
+    'กำลังทำ',
+    Color(0xFFEA580C),
+    Color(0xFFFFF7ED),
+    Color(0xFFFED7AA),
+  ),
+  'completed': _StatusMeta(
+    'เสร็จสิ้น',
+    Color(0xFF16A34A),
+    Color(0xFFF0FDF4),
+    Color(0xFFBBF7D0),
+  ),
 };
 
 class _StatusMeta {
@@ -32,15 +47,15 @@ class AdminTasksPage extends StatefulWidget {
 }
 
 class _AdminTasksPageState extends State<AdminTasksPage> {
-  List<TaskRecord> _tasks     = [];
-  List<AppUser>   _users      = [];
-  List<BrandRecord>         _brands     = [];
-  List<TaskCategoryRecord>  _categories = [];
-  Map<String, AppUser>      _userMap    = {};
-  Map<String, BrandRecord>  _brandMap   = {};
+  List<TaskRecord> _tasks = [];
+  List<AppUser> _users = [];
+  List<BrandRecord> _brands = [];
+  List<TaskCategoryRecord> _categories = [];
+  Map<String, AppUser> _userMap = {};
+  Map<String, BrandRecord> _brandMap = {};
   Map<String, TaskCategoryRecord> _catMap = {};
-  int    _selectedTabIndex = 0; // 0: งานที่เราสร้าง, 1: งานที่เข้าร่วม
-  bool   _loading = true;
+  int _selectedTabIndex = 0; // 0: งานที่เราสร้าง, 1: งานที่เข้าร่วม
+  bool _loading = true;
   String? _error;
 
   @override
@@ -50,14 +65,27 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   }
 
   Future<void> _loadData() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final isEmployee = widget.service.currentUser?.role == 'employee';
-      
-      final tasksFuture  = isEmployee ? widget.service.getMyTasks() : widget.service.getAdminTasks();
-      final usersFuture  = widget.service.getAdminUsers().catchError((_) => <AppUser>[]);
-      final brandsFuture = widget.service.getBrands().catchError((_) => <BrandRecord>[]);
-      final catsFuture   = widget.service.getTaskCategories().catchError((_) => <TaskCategoryRecord>[]);
+
+      final tasksFuture = isEmployee
+          ? widget.service.getMyTasks()
+          : widget.service.getAdminTasks();
+      final usersFuture =
+          (isEmployee
+                  ? widget.service.getActiveUsers()
+                  : widget.service.getAdminUsers())
+              .catchError((_) => <AppUser>[]);
+      final brandsFuture = widget.service.getBrands().catchError(
+        (_) => <BrandRecord>[],
+      );
+      final catsFuture = widget.service.getTaskCategories().catchError(
+        (_) => <TaskCategoryRecord>[],
+      );
 
       final results = await Future.wait([
         tasksFuture,
@@ -66,29 +94,39 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         catsFuture,
       ]);
 
-      final tasks  = results[0] as List<TaskRecord>;
-      final users  = (results[1] as List<AppUser>).where((u) => u.status == 'active').toList();
+      final tasks = results[0] as List<TaskRecord>;
+      final users = (results[1] as List<AppUser>)
+          .where((u) => u.status == 'active')
+          .toList();
       final brands = results[2] as List<BrandRecord>;
-      final cats   = results[3] as List<TaskCategoryRecord>;
+      final cats = results[3] as List<TaskCategoryRecord>;
 
-      final Map<String, AppUser>          userMap  = {for (final u in users)  u.id: u};
-      final Map<String, BrandRecord>      brandMap = {for (final b in brands) b.id: b};
-      final Map<String, TaskCategoryRecord> catMap = {for (final c in cats)   c.id: c};
+      final Map<String, AppUser> userMap = {for (final u in users) u.id: u};
+      final Map<String, BrandRecord> brandMap = {
+        for (final b in brands) b.id: b,
+      };
+      final Map<String, TaskCategoryRecord> catMap = {
+        for (final c in cats) c.id: c,
+      };
 
       if (mounted) {
         setState(() {
-          _tasks      = tasks;
-          _users      = users;
-          _brands     = brands;
+          _tasks = tasks;
+          _users = users;
+          _brands = brands;
           _categories = cats;
-          _userMap    = userMap;
-          _brandMap   = brandMap;
-          _catMap     = catMap;
-          _loading    = false;
+          _userMap = userMap;
+          _brandMap = brandMap;
+          _catMap = catMap;
+          _loading = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
     }
   }
 
@@ -100,7 +138,10 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         title: const Text('ยืนยันการลบงาน'),
         content: Text('ต้องการลบงาน "${task.title}" หรือไม่?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -113,11 +154,22 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     try {
       await widget.service.deleteTask(task.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ลบงานสำเร็จ'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ลบงานสำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
+        );
         _loadData();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ลบงานล้มเหลว: $e'), backgroundColor: Colors.red));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ลบงานล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
     }
   }
 
@@ -127,8 +179,44 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       await widget.service.updateTaskStatus(task.id, newStatus);
       if (mounted) _loadData();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('เปลี่ยนสถานะล้มเหลว: $e'), backgroundColor: Colors.red));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เปลี่ยนสถานะล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
     }
+  }
+
+  void _showTaskDetails(TaskRecord task) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.92,
+        child: _TaskDetailSheet(
+          task: task,
+          service: widget.service,
+          userMap: _userMap,
+          brandMap: _brandMap,
+          catMap: _catMap,
+          statusConfig: _statusConfig,
+          onChangeStatus: (status) async {
+            await _changeStatus(task, status);
+            if (mounted) Navigator.pop(context);
+          },
+          onDelete: () async {
+            Navigator.pop(context);
+            await _deleteTask(task);
+          },
+        ),
+      ),
+    );
   }
 
   // ─── Create task modal sheet (โมดูล) ──────────────────────────────
@@ -137,36 +225,30 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => _CreateTaskModal(
         users: _users,
         brands: _brands,
         categories: _categories,
-        onSubmit: (title, desc, assignees, due, brand, category, cardNames) async {
-          final currentUserId = widget.service.currentUserId;
-          final finalAssignees = List<String>.from(assignees);
-          if (currentUserId.isNotEmpty && !finalAssignees.contains(currentUserId)) {
-            finalAssignees.add(currentUserId);
-          }
-
-          final task = await widget.service.createTask(
-            title: title,
-            description: desc,
-            assignedTo: finalAssignees.isNotEmpty ? finalAssignees.first : currentUserId,
-            brandId: brand,
-            categoryId: category,
-            dueDate: due,
-            assigneeIds: finalAssignees,
-          );
-          final validCards = cardNames.where((n) => n.trim().isNotEmpty).toList();
-          if (validCards.isNotEmpty) {
-            final list = await widget.service.createTaskList(task.id, 'งานทั้งหมด');
-            for (final cardName in validCards) {
-              await widget.service.createTaskCard(list.id, cardName.trim());
-            }
-          }
-          _loadData();
-        },
+        onSubmit:
+            (title, desc, assignees, due, brand, category, cardNames) async {
+              final validCards = cardNames
+                  .where((n) => n.trim().isNotEmpty)
+                  .toList();
+              await widget.service.createTask(
+                title: title,
+                description: desc,
+                assignedTo: assignees.isNotEmpty ? assignees.first : '',
+                brandId: brand,
+                categoryId: category,
+                dueDate: due,
+                assigneeIds: assignees,
+                subItems: validCards,
+              );
+              _loadData();
+            },
       ),
     );
   }
@@ -182,9 +264,15 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           children: [
             const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.red),
             const SizedBox(height: 12),
-            Text('โหลดข้อมูลล้มเหลว: $_error', style: const TextStyle(color: workText)),
+            Text(
+              'โหลดข้อมูลล้มเหลว: $_error',
+              style: const TextStyle(color: workText),
+            ),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadData, child: const Text('ลองอีกครั้ง')),
+            ElevatedButton(
+              onPressed: _loadData,
+              child: const Text('ลองอีกครั้ง'),
+            ),
           ],
         ),
       );
@@ -197,20 +285,27 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       }
       return t.assignedTo == currentUserId;
     }).toList();
-    final joinedTasks  = _tasks.where((t) => !createdTasks.contains(t)).toList();
-    final activeList   = _selectedTabIndex == 0 ? createdTasks : joinedTasks;
+    final joinedTasks = _tasks.where((t) => !createdTasks.contains(t)).toList();
+    final activeList = _selectedTabIndex == 0 ? createdTasks : joinedTasks;
 
     return Scaffold(
       backgroundColor: workBackground,
       appBar: AppBar(
-        title: const Text('รายการมอบหมายงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text(
+          'รายการมอบหมายงาน',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         actions: [
           IconButton(
             onPressed: _showCreateTaskModal,
             icon: const Icon(Icons.add_task_rounded, color: workBlue),
             tooltip: 'สร้างงานใหม่',
           ),
-          IconButton(onPressed: _loadData, icon: const Icon(Icons.refresh_rounded, color: workMuted), tooltip: 'รีโหลด'),
+          IconButton(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh_rounded, color: workMuted),
+            tooltip: 'รีโหลด',
+          ),
         ],
       ),
       body: Column(
@@ -232,10 +327,18 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
+                        color: _selectedTabIndex == 0
+                            ? Colors.white
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: _selectedTabIndex == 0
-                            ? const [BoxShadow(color: Color(0x10000000), blurRadius: 4, offset: Offset(0, 2))]
+                            ? const [
+                                BoxShadow(
+                                  color: Color(0x10000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ]
                             : [],
                       ),
                       child: Row(
@@ -244,15 +347,21 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                           Icon(
                             Icons.edit_note_rounded,
                             size: 18,
-                            color: _selectedTabIndex == 0 ? workBlue : workMuted,
+                            color: _selectedTabIndex == 0
+                                ? workBlue
+                                : workMuted,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             'สร้างเอง (${createdTasks.length})',
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: _selectedTabIndex == 0 ? FontWeight.bold : FontWeight.w500,
-                              color: _selectedTabIndex == 0 ? workText : workMuted,
+                              fontWeight: _selectedTabIndex == 0
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
+                              color: _selectedTabIndex == 0
+                                  ? workText
+                                  : workMuted,
                             ),
                           ),
                         ],
@@ -267,10 +376,18 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
+                        color: _selectedTabIndex == 1
+                            ? Colors.white
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: _selectedTabIndex == 1
-                            ? const [BoxShadow(color: Color(0x10000000), blurRadius: 4, offset: Offset(0, 2))]
+                            ? const [
+                                BoxShadow(
+                                  color: Color(0x10000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ]
                             : [],
                       ),
                       child: Row(
@@ -279,15 +396,21 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                           Icon(
                             Icons.group_rounded,
                             size: 18,
-                            color: _selectedTabIndex == 1 ? workBlue : workMuted,
+                            color: _selectedTabIndex == 1
+                                ? workBlue
+                                : workMuted,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             'เข้าร่วม (${joinedTasks.length})',
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: _selectedTabIndex == 1 ? FontWeight.bold : FontWeight.w500,
-                              color: _selectedTabIndex == 1 ? workText : workMuted,
+                              fontWeight: _selectedTabIndex == 1
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
+                              color: _selectedTabIndex == 1
+                                  ? workText
+                                  : workMuted,
                             ),
                           ),
                         ],
@@ -298,7 +421,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
               ],
             ),
           ),
-          
+
           Expanded(
             child: RefreshIndicator(
               onRefresh: _loadData,
@@ -308,7 +431,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            _selectedTabIndex == 0 ? Icons.note_add_outlined : Icons.group_off_outlined,
+                            _selectedTabIndex == 0
+                                ? Icons.note_add_outlined
+                                : Icons.group_off_outlined,
                             size: 40,
                             color: workMuted,
                           ),
@@ -317,7 +442,10 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                             _selectedTabIndex == 0
                                 ? 'ยังไม่มีงานที่คุณสร้าง'
                                 : 'ยังไม่มีงานที่เข้าร่วม',
-                            style: const TextStyle(color: workMuted, fontSize: 13),
+                            style: const TextStyle(
+                              color: workMuted,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -326,7 +454,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                       itemCount: activeList.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final t = activeList[index];
                         return _buildDraggableTaskCard(t);
@@ -341,16 +470,15 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
 
   // ─── Kanban board ───────────────────────────────────────────────
 
-
   Widget _buildDraggableTaskCard(TaskRecord task) {
     return _buildTaskCardContent(task);
   }
 
-
   Widget _buildTaskCardContent(TaskRecord task) {
-    final brand    = task.brandId != null ? _brandMap[task.brandId] : null;
+    final brand = task.brandId != null ? _brandMap[task.brandId] : null;
     final category = task.categoryId != null ? _catMap[task.categoryId] : null;
-    final isOverdue = task.status != 'completed' && task.dueDate.isBefore(DateTime.now());
+    final isOverdue =
+        task.status != 'completed' && task.dueDate.isBefore(DateTime.now());
     final currentUserId = widget.service.currentUserId;
     final isOwner = task.assignedBy != null && task.assignedBy!.isNotEmpty
         ? task.assignedBy == currentUserId
@@ -365,11 +493,12 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     }).toList();
 
     return GestureDetector(
+      onLongPress: () => _showTaskDetails(task),
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => TaskBoardPage(
+            builder: (_) => SubtaskBoardPage(
               task: task,
               service: widget.service,
               onRefreshNeeded: _loadData,
@@ -385,7 +514,13 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFF1F5F9)),
-          boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 8, offset: Offset(0, 2))],
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x05000000),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,7 +532,11 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 Expanded(
                   child: Text(
                     task.title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: workText),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: workText,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -408,13 +547,17 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                   child: Container(
                     padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                      color: isOwner ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                      color: isOwner
+                          ? const Color(0xFFFEF2F2)
+                          : const Color(0xFFF1F5F9),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       isOwner ? Icons.star_rounded : Icons.group_rounded,
                       size: 14,
-                      color: isOwner ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                      color: isOwner
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF64748B),
                     ),
                   ),
                 ),
@@ -440,9 +583,19 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 runSpacing: 4,
                 children: [
                   if (brand != null)
-                    _buildTag(brand.name, const Color(0xFFEFF6FF), workBlue, const Color(0xFFBFDBFE)),
+                    _buildTag(
+                      brand.name,
+                      const Color(0xFFEFF6FF),
+                      workBlue,
+                      const Color(0xFFBFDBFE),
+                    ),
                   if (category != null)
-                    _buildTag(category.name, const Color(0xFFFEF3C7), const Color(0xFFB45309), const Color(0xFFFDE68A)),
+                    _buildTag(
+                      category.name,
+                      const Color(0xFFFEF3C7),
+                      const Color(0xFFB45309),
+                      const Color(0xFFFDE68A),
+                    ),
                 ],
               ),
             ],
@@ -463,11 +616,18 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.view_kanban_rounded, size: 12, color: workMuted),
+                              const Icon(
+                                Icons.view_kanban_rounded,
+                                size: 12,
+                                color: workMuted,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '${task.cardDone}/${task.cardTotal} การ์ด',
-                                style: const TextStyle(fontSize: 10.5, color: workMuted),
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: workMuted,
+                                ),
                               ),
                             ],
                           ),
@@ -476,7 +636,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: isAllDone ? const Color(0xFF10B981) : workBlue,
+                              color: isAllDone
+                                  ? const Color(0xFF10B981)
+                                  : workBlue,
                             ),
                           ),
                         ],
@@ -506,17 +668,28 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.checklist_rounded, size: 12, color: workMuted),
+                              const Icon(
+                                Icons.checklist_rounded,
+                                size: 12,
+                                color: workMuted,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '$doneCount/$totalCount รายการ',
-                                style: const TextStyle(fontSize: 10.5, color: workMuted),
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: workMuted,
+                                ),
                               ),
                             ],
                           ),
                           Text(
                             '$pct%',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: workBlue),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: workBlue,
+                            ),
                           ),
                         ],
                       ),
@@ -549,9 +722,23 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 Expanded(
                   child: Row(
                     children: [
-                      if (assignees.isEmpty)
-                        const Icon(Icons.person_outline_rounded, size: 16, color: workMuted)
-                      else
+                      if (assignees.isEmpty) ...[
+                        // fallback: ใช้ข้อมูลจาก task โดยตรง (กรณี _users โหลดไม่ได้)
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFEFF6FF),
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: const Icon(
+                            Icons.person_rounded,
+                            size: 10,
+                            color: workBlue,
+                          ),
+                        ),
+                      ] else
                         SizedBox(
                           height: 24,
                           width: 24.0 + (assignees.length - 1) * 12.0,
@@ -559,27 +746,43 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                             children: List.generate(assignees.length, (index) {
                               final u = assignees[index];
                               final avatarUrl = u.avatarUrl;
-                              final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
+                              final hasAvatar =
+                                  avatarUrl != null &&
+                                  avatarUrl.trim().isNotEmpty;
                               final resolvedAvatar = hasAvatar
                                   ? (avatarUrl.startsWith('r2://')
-                                      ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                                      : avatarUrl)
+                                        ? avatarUrl.replaceFirst(
+                                            'r2://',
+                                            'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+                                          )
+                                        : avatarUrl)
                                   : null;
 
                               return Positioned(
                                 left: index * 12.0,
                                 child: Container(
-                                  width: 22, height: 22,
+                                  width: 22,
+                                  height: 22,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: const Color(0xFFEFF6FF),
-                                    border: Border.all(color: Colors.white, width: 1.5),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 1.5,
+                                    ),
                                     image: resolvedAvatar != null
-                                        ? DecorationImage(image: NetworkImage(resolvedAvatar), fit: BoxFit.cover)
+                                        ? DecorationImage(
+                                            image: NetworkImage(resolvedAvatar),
+                                            fit: BoxFit.cover,
+                                          )
                                         : null,
                                   ),
                                   child: resolvedAvatar == null
-                                      ? const Icon(Icons.person_rounded, size: 10, color: workBlue)
+                                      ? const Icon(
+                                          Icons.person_rounded,
+                                          size: 10,
+                                          color: workBlue,
+                                        )
                                       : null,
                                 ),
                               );
@@ -591,10 +794,19 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         child: Text(
                           assignees.length == 1
                               ? assignees.first.firstName
-                              : (assignees.length > 1 ? '${assignees.length} คน' : 'ไม่ระบุ'),
+                              : assignees.length > 1
+                              ? '${assignees.length} คน'
+                              // fallback: ดึงชื่อจาก task โดยตรง
+                              : (task.assignedToName.isNotEmpty
+                                    ? task.assignedToName
+                                    : 'ไม่ระบุ'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11, color: workText, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: workText,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
@@ -602,12 +814,21 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 ),
                 Row(
                   children: [
-                    Icon(isOverdue ? Icons.warning_amber_rounded : Icons.calendar_month_rounded,
-                        size: 12, color: isOverdue ? Colors.red : workMuted),
+                    Icon(
+                      isOverdue
+                          ? Icons.warning_amber_rounded
+                          : Icons.calendar_month_rounded,
+                      size: 12,
+                      color: isOverdue ? Colors.red : workMuted,
+                    ),
                     const SizedBox(width: 3),
                     Text(
                       DateFormat('dd MMM yy').format(task.dueDate),
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: isOverdue ? Colors.red : workMuted),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: isOverdue ? Colors.red : workMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -622,8 +843,15 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   Widget _buildTag(String label, Color bg, Color fg, Color border) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: border)),
-      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+      ),
     );
   }
 }
@@ -640,7 +868,16 @@ class _CreateTaskModal extends StatefulWidget {
   final List<AppUser> users;
   final List<BrandRecord> brands;
   final List<TaskCategoryRecord> categories;
-  final Function(String, String, List<String>, DateTime, String?, String?, List<String>) onSubmit;
+  final Function(
+    String,
+    String,
+    List<String>,
+    DateTime,
+    String?,
+    String?,
+    List<String>,
+  )
+  onSubmit;
 
   @override
   State<_CreateTaskModal> createState() => _CreateTaskModalState();
@@ -650,13 +887,14 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
   String? _formBrand;
   String? _formCategory;
   final List<String> _formAssignees = [];
-  String  _formTitle    = '';
-  String  _formDesc     = '';
-  DateTime _formDue     = DateTime.now().add(const Duration(days: 1));
+  String _formTitle = '';
+  String _formDesc = '';
+  DateTime _formDue = DateTime.now().add(const Duration(days: 1));
   final List<TextEditingController> _subControllers = [];
   bool _formLoading = false;
 
-  void _addSubItem() => setState(() => _subControllers.add(TextEditingController()));
+  void _addSubItem() =>
+      setState(() => _subControllers.add(TextEditingController()));
   void _removeSubItem(int i) {
     _subControllers[i].dispose();
     setState(() => _subControllers.removeAt(i));
@@ -671,7 +909,12 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        16,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -700,12 +943,20 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                 const SizedBox(width: 8),
                 const Text(
                   'มอบหมายงานใหม่',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: workText),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    color: workText,
+                  ),
                 ),
                 const Spacer(),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded, color: workMuted, size: 20),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: workMuted,
+                    size: 20,
+                  ),
                   style: IconButton.styleFrom(
                     backgroundColor: const Color(0xFFF1F5F9),
                     padding: const EdgeInsets.all(8),
@@ -719,33 +970,62 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
             // ── Row 1: Brand + Category ──
             Row(
               children: [
-                Expanded(child: _buildDropdown(
-                  label: 'แบรนด์',
-                  icon: Icons.label_outline_rounded,
-                  value: _formBrand,
-                  items: <DropdownMenuItem<String?>>[
-                    const DropdownMenuItem<String?>(value: null, child: Text('— ไม่ระบุ —')),
-                    ...widget.brands.map((b) => DropdownMenuItem<String?>(value: b.id, child: Text(b.name, style: const TextStyle(fontSize: 13)))),
-                  ],
-                  onChanged: (v) => setState(() => _formBrand = v),
-                )),
+                Expanded(
+                  child: _buildDropdown(
+                    label: 'แบรนด์',
+                    icon: Icons.label_outline_rounded,
+                    value: _formBrand,
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('— ไม่ระบุ —'),
+                      ),
+                      ...widget.brands.map(
+                        (b) => DropdownMenuItem<String?>(
+                          value: b.id,
+                          child: Text(
+                            b.name,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _formBrand = v),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDropdown(
-                  label: 'หมวดหมู่',
-                  icon: Icons.folder_outlined,
-                  value: _formCategory,
-                  items: <DropdownMenuItem<String?>>[
-                    const DropdownMenuItem<String?>(value: null, child: Text('— ไม่ระบุ —')),
-                    ...widget.categories.map((c) => DropdownMenuItem<String?>(value: c.id, child: Text(c.name, style: const TextStyle(fontSize: 13)))),
-                  ],
-                  onChanged: (v) => setState(() => _formCategory = v),
-                )),
+                Expanded(
+                  child: _buildDropdown(
+                    label: 'หมวดหมู่',
+                    icon: Icons.folder_outlined,
+                    value: _formCategory,
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('— ไม่ระบุ —'),
+                      ),
+                      ...widget.categories.map(
+                        (c) => DropdownMenuItem<String?>(
+                          value: c.id,
+                          child: Text(
+                            c.name,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _formCategory = v),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
 
             // ── Row 2: Multi-assignee Selector Horizontal list with Avatars ──
-            _fieldLabel('ผู้รับผิดชอบ * (เลือกได้มากกว่า 1 คน)', Icons.people_outline_rounded),
+            _fieldLabel(
+              'ผู้รับผิดชอบ (เลือกได้มากกว่า 1 คน)',
+              Icons.people_outline_rounded,
+            ),
             const SizedBox(height: 4),
             SizedBox(
               height: 72,
@@ -755,10 +1035,14 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                 itemBuilder: (context, i) {
                   final u = widget.users[i];
                   final isSelected = _formAssignees.contains(u.id);
-                  final resolvedAvatar = u.avatarUrl != null && u.avatarUrl!.trim().isNotEmpty
+                  final resolvedAvatar =
+                      u.avatarUrl != null && u.avatarUrl!.trim().isNotEmpty
                       ? (u.avatarUrl!.startsWith('r2://')
-                          ? u.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                          : u.avatarUrl)
+                            ? u.avatarUrl!.replaceFirst(
+                                'r2://',
+                                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+                              )
+                            : u.avatarUrl)
                       : null;
 
                   return GestureDetector(
@@ -773,17 +1057,34 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
-                      margin: const EdgeInsets.only(right: 10, top: 2, bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      margin: const EdgeInsets.only(
+                        right: 10,
+                        top: 2,
+                        bottom: 6,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                        color: isSelected
+                            ? const Color(0xFFEFF6FF)
+                            : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isSelected ? workBlue : const Color(0xFFE2E8F0),
+                          color: isSelected
+                              ? workBlue
+                              : const Color(0xFFE2E8F0),
                           width: isSelected ? 1.5 : 1,
                         ),
                         boxShadow: isSelected
-                            ? const [BoxShadow(color: Color(0x0F2563EB), blurRadius: 6, offset: Offset(0, 2))]
+                            ? const [
+                                BoxShadow(
+                                  color: Color(0x0F2563EB),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
+                                ),
+                              ]
                             : null,
                       ),
                       child: Row(
@@ -792,9 +1093,19 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                           Stack(
                             children: [
                               CircleAvatar(
-                                backgroundImage: resolvedAvatar != null ? NetworkImage(resolvedAvatar) : null,
+                                backgroundImage: resolvedAvatar != null
+                                    ? NetworkImage(resolvedAvatar)
+                                    : null,
                                 radius: 16,
-                                child: resolvedAvatar == null ? Text(u.firstName[0], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)) : null,
+                                child: resolvedAvatar == null
+                                    ? Text(
+                                        u.firstName[0],
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
                               ),
                               if (isSelected)
                                 Positioned(
@@ -802,10 +1113,17 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                                   bottom: 0,
                                   child: Container(
                                     padding: const EdgeInsets.all(1.5),
-                                    decoration: const BoxDecoration(color: workBlue, shape: BoxShape.circle),
-                                    child: const Icon(Icons.check, size: 7, color: Colors.white),
+                                    decoration: const BoxDecoration(
+                                      color: workBlue,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      size: 7,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                )
+                                ),
                             ],
                           ),
                           const SizedBox(width: 8),
@@ -813,8 +1131,21 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(u.fullName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workText)),
-                              Text(u.position.isEmpty ? '-' : u.position, style: const TextStyle(fontSize: 9, color: workMuted)),
+                              Text(
+                                u.fullName,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: workText,
+                                ),
+                              ),
+                              Text(
+                                u.position.isEmpty ? '-' : u.position,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: workMuted,
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -824,7 +1155,29 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                 },
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
+            // Hint: ถ้าไม่เลือก งานจะถูกมอบหมายให้ตัวเอง
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: const [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 13,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'หากไม่เลือก งานจะถูกมอบหมายให้คุณอัตโนมัติ',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF94A3B8),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
             // ── Row 3: Due date ──
             Column(
@@ -853,8 +1206,20 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(child: Text(DateFormat('dd MMMM yyyy', 'th').format(_formDue), style: const TextStyle(fontSize: 13.5, color: workText))),
-                        const Icon(Icons.calendar_month_rounded, color: workBlue, size: 18),
+                        Expanded(
+                          child: Text(
+                            DateFormat('dd MMMM yyyy', 'th').format(_formDue),
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              color: workText,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.calendar_month_rounded,
+                          color: workBlue,
+                          size: 18,
+                        ),
                       ],
                     ),
                   ),
@@ -887,19 +1252,38 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
             // ── Cards (การ์ดงาน) ──
             Row(
               children: [
-                const Icon(Icons.view_kanban_rounded, color: workBlue, size: 16),
+                const Icon(
+                  Icons.view_kanban_rounded,
+                  color: workBlue,
+                  size: 16,
+                ),
                 const SizedBox(width: 6),
-                const Text('การ์ดงาน', style: TextStyle(fontSize: 12, color: workText, fontWeight: FontWeight.bold)),
+                const Text(
+                  'การ์ดงาน',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: workText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: _addSubItem,
                   icon: const Icon(Icons.add_rounded, size: 16),
-                  label: const Text('+ เพิ่มการ์ดงาน', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    '+ เพิ่มการ์ดงาน',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                   style: TextButton.styleFrom(
                     foregroundColor: workBlue,
                     backgroundColor: const Color(0xFFEFF6FF),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -907,35 +1291,59 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
               ],
             ),
             const SizedBox(height: 10),
-            ...List.generate(_subControllers.length, (i) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Container(
-                    width: 24, height: 24,
-                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
-                    child: Center(child: Text('${i + 1}', style: const TextStyle(fontSize: 10, color: workBlue, fontWeight: FontWeight.bold))),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: TextField(
-                    controller: _subControllers[i],
-                    decoration: _inputDeco('ชื่อการ์ดงาน / สิ่งที่ต้องทำ...'),
-                    style: const TextStyle(fontSize: 13),
-                  )),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    onPressed: () => _removeSubItem(i),
-                    icon: const Icon(Icons.close_rounded, color: workMuted, size: 16),
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      padding: const EdgeInsets.all(6),
+            ...List.generate(
+              _subControllers.length,
+              (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${i + 1}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: workBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _subControllers[i],
+                        decoration: _inputDeco(
+                          'ชื่อการ์ดงาน / สิ่งที่ต้องทำ...',
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      onPressed: () => _removeSubItem(i),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: workMuted,
+                        size: 16,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        padding: const EdgeInsets.all(6),
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
               ),
-            )),
+            ),
             const SizedBox(height: 24),
 
             // ── Submit ──
@@ -954,43 +1362,67 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     color: Color(0x3F2563EB),
                     blurRadius: 10,
                     offset: Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: ElevatedButton(
-                onPressed: _formLoading ? null : () async {
-                  if (_formTitle.trim().isEmpty || _formAssignees.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณากรอกชื่องานและเลือกผู้รับผิดชอบอย่างน้อย 1 คน')));
-                    return;
-                  }
-                  setState(() => _formLoading = true);
-                  try {
-                    final subItems = _subControllers.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList();
-                    await widget.onSubmit(
-                      _formTitle,
-                      _formDesc,
-                      _formAssignees,
-                      _formDue,
-                      _formBrand,
-                      _formCategory,
-                      subItems,
-                    );
-                    if (mounted) Navigator.pop(context);
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
-                  } finally {
-                    if (mounted) setState(() => _formLoading = false);
-                  }
-                },
+                onPressed: _formLoading
+                    ? null
+                    : () async {
+                        if (_formTitle.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('กรุณากรอกชื่องาน')),
+                          );
+                          return;
+                        }
+                        setState(() => _formLoading = true);
+                        try {
+                          final subItems = _subControllers
+                              .map((c) => c.text.trim())
+                              .where((s) => s.isNotEmpty)
+                              .toList();
+                          await widget.onSubmit(
+                            _formTitle,
+                            _formDesc,
+                            _formAssignees,
+                            _formDue,
+                            _formBrand,
+                            _formCategory,
+                            subItems,
+                          );
+                          if (mounted) Navigator.pop(context);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+                          );
+                        } finally {
+                          if (mounted) setState(() => _formLoading = false);
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 child: _formLoading
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('มอบหมายงาน', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'มอบหมายงาน',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -1013,7 +1445,9 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
         const SizedBox(height: 4),
         DropdownButtonFormField<T>(
           value: value,
-          decoration: _inputDeco('').copyWith(contentPadding: const EdgeInsets.symmetric(horizontal: 16)),
+          decoration: _inputDeco('').copyWith(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          ),
           isExpanded: true,
           items: items,
           onChanged: onChanged,
@@ -1028,7 +1462,14 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
       children: [
         Icon(icon, size: 14, color: workBlue),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 12, color: workMuted, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: workMuted,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }
@@ -1040,9 +1481,18 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: workBlue, width: 1.5)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: workBlue, width: 1.5),
+      ),
     );
   }
 }
@@ -1076,13 +1526,18 @@ class _TaskDetailSheet extends StatefulWidget {
 class _TaskDetailSheetState extends State<_TaskDetailSheet> {
   final _commentController = TextEditingController();
   List<TaskEvent> _events = [];
+  List<TaskSubItem> _subItems = [];
   bool _isLoadingEvents = true;
+  bool _isLoadingSubItems = true;
+  bool _isAddingSubItem = false;
   bool _isPostingComment = false;
 
   @override
   void initState() {
     super.initState();
+    _subItems = List<TaskSubItem>.from(widget.task.subItems);
     _loadEvents();
+    _loadSubItems();
   }
 
   @override
@@ -1107,12 +1562,85 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
     }
   }
 
+  Future<void> _loadSubItems() async {
+    try {
+      final items = await widget.service.getTaskSubItems(widget.task.id);
+      if (mounted) {
+        setState(() {
+          _subItems = items;
+          _isLoadingSubItems = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingSubItems = false);
+    }
+  }
+
+  Future<void> _addSubItem() async {
+    final controller = TextEditingController();
+    final title = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('เพิ่มงานย่อย'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'ชื่องานย่อย'),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('เพิ่ม'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (title == null || title.isEmpty || !mounted) return;
+
+    setState(() => _isAddingSubItem = true);
+    try {
+      final item = await widget.service.createTaskSubItem(
+        widget.task.id,
+        title,
+      );
+      if (mounted) setState(() => _subItems.add(item));
+    } finally {
+      if (mounted) setState(() => _isAddingSubItem = false);
+    }
+  }
+
+  Future<void> _toggleSubItem(TaskSubItem item) async {
+    final nextStatus = item.isDone ? 'pending' : 'completed';
+    await widget.service.toggleTaskSubItem(item.id, nextStatus);
+    if (!mounted) return;
+
+    setState(() {
+      final index = _subItems.indexWhere((value) => value.id == item.id);
+      if (index != -1) {
+        _subItems[index] = item.copyWith(
+          status: nextStatus,
+          isDone: nextStatus == 'completed',
+        );
+      }
+    });
+  }
+
   Future<void> _postComment() async {
     final text = _commentController.text.trim();
     if (text.isEmpty) return;
     setState(() => _isPostingComment = true);
     try {
-      final newEvent = await widget.service.addTaskComment(widget.task.id, text);
+      final newEvent = await widget.service.addTaskComment(
+        widget.task.id,
+        text,
+      );
       if (mounted) {
         setState(() {
           _events.add(newEvent);
@@ -1121,7 +1649,9 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) {
@@ -1132,25 +1662,52 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final assignees = widget.task.assigneeIds.isNotEmpty 
-        ? widget.task.assigneeIds.map((id) => widget.userMap[id]).where((u) => u != null).cast<AppUser>().toList()
-        : [widget.userMap[widget.task.assignedTo]].where((u) => u != null).cast<AppUser>().toList();
-    final assigneesText = assignees.isEmpty ? 'ไม่ระบุ' : assignees.map((u) => u.firstName).join(', ');
-    final brand    = widget.task.brandId != null ? widget.brandMap[widget.task.brandId] : null;
-    final category = widget.task.categoryId != null ? widget.catMap[widget.task.categoryId] : null;
-    final meta     = widget.statusConfig[widget.task.status]!;
-    final isOverdue = widget.task.status != 'completed' && widget.task.dueDate.isBefore(DateTime.now());
+    final assignees = widget.task.assigneeIds.isNotEmpty
+        ? widget.task.assigneeIds
+              .map((id) => widget.userMap[id])
+              .where((u) => u != null)
+              .cast<AppUser>()
+              .toList()
+        : [
+            widget.userMap[widget.task.assignedTo],
+          ].where((u) => u != null).cast<AppUser>().toList();
+    final assigneesText = assignees.isEmpty
+        ? (widget.task.assignedToName.isNotEmpty
+              ? widget.task.assignedToName
+              : 'ไม่ระบุ')
+        : assignees.map((u) => u.firstName).join(', ');
+    final brand = widget.task.brandId != null
+        ? widget.brandMap[widget.task.brandId]
+        : null;
+    final category = widget.task.categoryId != null
+        ? widget.catMap[widget.task.categoryId]
+        : null;
+    final meta = widget.statusConfig[widget.task.status]!;
+    final isOverdue =
+        widget.task.status != 'completed' &&
+        widget.task.dueDate.isBefore(DateTime.now());
     const otherStatuses = ['pending', 'in_progress', 'completed'];
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Handle bar
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)))),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
 
             // Tags
@@ -1160,125 +1717,322 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
               children: [
                 // Status tag
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: meta.bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: meta.border)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: meta.color)),
-                    const SizedBox(width: 6),
-                    Text(meta.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: meta.color)),
-                  ]),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: meta.bg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: meta.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: meta.color,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        meta.label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: meta.color,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 if (brand != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.label_outline_rounded, size: 12, color: workBlue),
-                      const SizedBox(width: 4),
-                      Text(brand.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workBlue)),
-                    ]),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.label_outline_rounded,
+                          size: 12,
+                          color: workBlue,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          brand.name,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: workBlue,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 if (category != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFDE68A))),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.folder_outlined, size: 12, color: Color(0xFFB45309)),
-                      const SizedBox(width: 4),
-                      Text(category.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
-                    ]),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.folder_outlined,
+                          size: 12,
+                          color: Color(0xFFB45309),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          category.name,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
               ],
             ),
             const SizedBox(height: 14),
 
             // Title
-            Text(widget.task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: workText)),
+            Text(
+              widget.task.title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: workText,
+              ),
+            ),
             if (widget.task.description.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(widget.task.description, style: const TextStyle(fontSize: 14, color: workMuted, height: 1.6)),
+              Text(
+                widget.task.description,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: workMuted,
+                  height: 1.6,
+                ),
+              ),
             ],
             const SizedBox(height: 16),
 
             // Assignee + Due date
             Row(
               children: [
-                Expanded(child: _infoCard(
-                  icon: Icons.person_rounded,
-                  label: 'ผู้รับผิดชอบ',
-                  value: assigneesText,
-                )),
+                Expanded(
+                  child: _infoCard(
+                    icon: Icons.person_rounded,
+                    label: 'ผู้รับผิดชอบ',
+                    value: assigneesText,
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _infoCard(
-                  icon: isOverdue ? Icons.warning_amber_rounded : Icons.calendar_month_rounded,
-                  label: 'กำหนดส่ง',
-                  value: DateFormat('dd MMMM yyyy', 'th').format(widget.task.dueDate),
-                  valueColor: isOverdue ? Colors.red : workText,
-                  iconColor: isOverdue ? Colors.red : workBlue,
-                )),
+                Expanded(
+                  child: _infoCard(
+                    icon: isOverdue
+                        ? Icons.warning_amber_rounded
+                        : Icons.calendar_month_rounded,
+                    label: 'กำหนดส่ง',
+                    value: DateFormat(
+                      'dd MMMM yyyy',
+                      'th',
+                    ).format(widget.task.dueDate),
+                    valueColor: isOverdue ? Colors.red : workText,
+                    iconColor: isOverdue ? Colors.red : workBlue,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
 
-            // Sub-items checklist
-            if (widget.task.subItems.isNotEmpty) ...[
-              const Text('CHECKLIST', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-              const SizedBox(height: 8),
-              ...widget.task.subItems.map((item) => Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
-                child: Row(
-                  children: [
-                    Icon(
-                      item.isDone ? Icons.check_circle_rounded : Icons.circle_outlined,
-                      color: item.isDone ? const Color(0xFF22C55E) : const Color(0xFFCBD5E1),
-                      size: 18,
+            // งานย่อยของ Task (ใช้ข้อมูลชุดเดียวกับหน้า Admin web)
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'งานย่อย',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: workText,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(
-                      item.title,
-                      style: TextStyle(fontSize: 13, color: item.isDone ? workMuted : workText, decoration: item.isDone ? TextDecoration.lineThrough : null),
-                    )),
-                  ],
+                  ),
                 ),
-              )),
+                IconButton(
+                  onPressed: _isAddingSubItem ? null : _addSubItem,
+                  tooltip: 'เพิ่มงานย่อย',
+                  icon: _isAddingSubItem
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.add_circle_outline_rounded,
+                          color: workBlue,
+                        ),
+                ),
+              ],
+            ),
+            if (_isLoadingSubItems)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (_subItems.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'ยังไม่มีงานย่อย',
+                  style: TextStyle(fontSize: 13, color: workMuted),
+                ),
+              )
+            else ...[
+              const SizedBox(height: 8),
+              ..._subItems.map(
+                (item) => InkWell(
+                  onTap: () => _toggleSubItem(item),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          item.isDone
+                              ? Icons.check_circle_rounded
+                              : Icons.circle_outlined,
+                          color: item.isDone
+                              ? const Color(0xFF22C55E)
+                              : const Color(0xFFCBD5E1),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: item.isDone ? workMuted : workText,
+                              decoration: item.isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 12),
             ],
 
             // Change status
-            const Text('เปลี่ยนสถานะ', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+            const Text(
+              'เปลี่ยนสถานะ',
+              style: TextStyle(
+                fontSize: 11,
+                color: workMuted,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: otherStatuses.where((s) => s != widget.task.status).map((s) {
-                final m = widget.statusConfig[s]!;
-                return OutlinedButton(
-                  onPressed: () => widget.onChangeStatus(s),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: m.color,
-                    side: BorderSide(color: m.border, width: 1.5),
-                    backgroundColor: m.bg,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  ),
-                  child: Text('→ ${m.label}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                );
-              }).toList(),
+              children: otherStatuses.where((s) => s != widget.task.status).map(
+                (s) {
+                  final m = widget.statusConfig[s]!;
+                  return OutlinedButton(
+                    onPressed: () => widget.onChangeStatus(s),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: m.color,
+                      side: BorderSide(color: m.border, width: 1.5),
+                      backgroundColor: m.bg,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                    ),
+                    child: Text(
+                      '→ ${m.label}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                },
+              ).toList(),
             ),
             const SizedBox(height: 20),
 
             // Timeline & Comments
             const Divider(color: Color(0xFFF1F5F9)),
             const SizedBox(height: 12),
-            const Text('TIMELINE & COMMENTS', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+            const Text(
+              'TIMELINE & COMMENTS',
+              style: TextStyle(
+                fontSize: 11,
+                color: workMuted,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
             const SizedBox(height: 12),
-            
+
             if (_isLoadingEvents)
-              const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(strokeWidth: 2)))
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
             else if (_events.isEmpty)
-              const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Text('ยังไม่มีประวัติการพูดคุย', style: TextStyle(color: workMuted, fontSize: 13))))
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Text(
+                    'ยังไม่มีประวัติการพูดคุย',
+                    style: TextStyle(color: workMuted, fontSize: 13),
+                  ),
+                ),
+              )
             else
               Container(
                 constraints: const BoxConstraints(maxHeight: 250),
@@ -1294,34 +2048,84 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            width: 28, height: 28,
+                            width: 28,
+                            height: 28,
                             decoration: BoxDecoration(
-                              color: isSystem ? const Color(0xFFE2E8F0) : const Color(0xFFDBEAFE),
+                              color: isSystem
+                                  ? const Color(0xFFE2E8F0)
+                                  : const Color(0xFFDBEAFE),
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
                             child: isSystem
-                              ? const Icon(Icons.smart_toy_rounded, size: 14, color: Color(0xFF64748B))
-                              : (ev.userAvatarUrl != null
-                                  ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(ev.userAvatarUrl!, width: 28, height: 28, fit: BoxFit.cover))
-                                  : Text(ev.userFirstName?.isNotEmpty == true ? ev.userFirstName![0] : '?', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workBlue))),
+                                ? const Icon(
+                                    Icons.smart_toy_rounded,
+                                    size: 14,
+                                    color: Color(0xFF64748B),
+                                  )
+                                : (ev.userAvatarUrl != null
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          child: Image.network(
+                                            ev.userAvatarUrl!,
+                                            width: 28,
+                                            height: 28,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                      : Text(
+                                          ev.userFirstName?.isNotEmpty == true
+                                              ? ev.userFirstName![0]
+                                              : '?',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: workBlue,
+                                          ),
+                                        )),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: isSystem ? 0 : 12, vertical: isSystem ? 4 : 10),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSystem ? 0 : 12,
+                                vertical: isSystem ? 4 : 10,
+                              ),
                               decoration: BoxDecoration(
-                                color: isSystem ? Colors.transparent : const Color(0xFFF8FAFC),
+                                color: isSystem
+                                    ? Colors.transparent
+                                    : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(isSystem ? 'ระบบ' : (ev.userFirstName ?? 'Unknown'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workText)),
-                                      Text(DateFormat('dd MMM HH:mm', 'th').format(ev.createdAt), style: const TextStyle(fontSize: 10, color: workMuted)),
+                                      Text(
+                                        isSystem
+                                            ? 'ระบบ'
+                                            : (ev.userFirstName ?? 'Unknown'),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: workText,
+                                        ),
+                                      ),
+                                      Text(
+                                        DateFormat(
+                                          'dd MMM HH:mm',
+                                          'th',
+                                        ).format(ev.createdAt),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: workMuted,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 2),
@@ -1330,7 +2134,9 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: isSystem ? workMuted : workText,
-                                      fontStyle: isSystem ? FontStyle.italic : FontStyle.normal,
+                                      fontStyle: isSystem
+                                          ? FontStyle.italic
+                                          : FontStyle.normal,
                                     ),
                                   ),
                                 ],
@@ -1353,11 +2159,29 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
                     controller: _commentController,
                     decoration: InputDecoration(
                       hintText: 'พิมพ์คอมเมนต์หรืออัปเดตงาน...',
-                      hintStyle: const TextStyle(fontSize: 13, color: workMuted),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: workBlue, width: 1.5)),
+                      hintStyle: const TextStyle(
+                        fontSize: 13,
+                        color: workMuted,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: workBlue,
+                          width: 1.5,
+                        ),
+                      ),
                     ),
                     style: const TextStyle(fontSize: 13),
                     maxLines: null,
@@ -1370,15 +2194,27 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
                   onTap: _isPostingComment ? null : _postComment,
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    width: 44, height: 44,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: _isPostingComment ? workMuted : workBlue,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
                     child: _isPostingComment
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                   ),
                 ),
               ],
@@ -1393,12 +2229,17 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
               child: OutlinedButton.icon(
                 onPressed: widget.onDelete,
                 icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text('ลบงานนี้', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'ลบงานนี้',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.red,
                   side: const BorderSide(color: Color(0xFFFECACA)),
                   backgroundColor: const Color(0xFFFEF2F2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
@@ -1409,19 +2250,43 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
     );
   }
 
-  Widget _infoCard({required IconData icon, required String label, required String value, Color? valueColor, Color? iconColor}) {
+  Widget _infoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+    Color? iconColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, size: 13, color: iconColor ?? workBlue),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(fontSize: 11, color: workMuted)),
-        ]),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: valueColor ?? workText)),
-      ]),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 13, color: iconColor ?? workBlue),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: workMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: valueColor ?? workText,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

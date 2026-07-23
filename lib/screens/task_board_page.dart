@@ -172,7 +172,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   Future<void> _scrollLoop(bool isLeft) async {
     while (_scrolling && mounted) {
       final targetPage = _currentPage + (isLeft ? -1 : 1);
-      final pageCount = _lists.length + 1;
+      final pageCount = _lists.length;
       
       if (targetPage >= 0 && targetPage < pageCount) {
         await _pageController.animateToPage(
@@ -538,6 +538,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         await widget.service.createTaskCard(
           listId,
           titleController.text.trim(),
+          taskId: widget.task.id,
           description: descController.text.trim(),
           priority: priority,
           startDate: startDate,
@@ -586,7 +587,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final pageCount = _lists.length + 1; // last page is "+ เพิ่มรายการ"
+    final pageCount = _lists.length; // No "Add list" page anymore
 
     return Scaffold(
       backgroundColor: workBackground,

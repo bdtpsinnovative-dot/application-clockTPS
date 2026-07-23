@@ -149,10 +149,7 @@ class AuthFlowService {
       }
 
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          file.path,
-          contentType: mediaType,
-        ),
+        'file': await MultipartFile.fromFile(file.path, contentType: mediaType),
       });
 
       // ใช้ authorizedGet ถ้า Endpoint เป็น Private หรือไม่ใช้ก็ได้ถ้าเปิด Public
@@ -301,9 +298,9 @@ class AuthFlowService {
       '/api/leaves/quota',
       queryParameters: {'year': year},
     );
-    return _listData(response)
-        .map(LeaveBalanceRecord.fromJson)
-        .toList(growable: false);
+    return _listData(
+      response,
+    ).map(LeaveBalanceRecord.fromJson).toList(growable: false);
   }
 
   Future<void> createRequest({
@@ -328,8 +325,8 @@ class AuthFlowService {
         'leave_type': type,
         'duration': duration,
         'reason': reason.trim(),
-        'medical_cert_url':? medicalCertUrl,
-        'swap_date':? swapDate == null ? null : _dateValue(swapDate),
+        'medical_cert_url': ?medicalCertUrl,
+        'swap_date': ?swapDate == null ? null : _dateValue(swapDate),
       },
     );
   }
@@ -358,8 +355,8 @@ class AuthFlowService {
         'leave_type': type,
         'duration': duration,
         'reason': reason.trim(),
-        'medical_cert_url':? medicalCertUrl,
-        'swap_date':? swapDate == null ? null : _dateValue(swapDate),
+        'medical_cert_url': ?medicalCertUrl,
+        'swap_date': ?swapDate == null ? null : _dateValue(swapDate),
       },
     );
   }
@@ -393,10 +390,7 @@ class AuthFlowService {
   }
 
   Future<void> bindDevice(String deviceId) async {
-    await _authorizedPut(
-      '/api/users/me/device',
-      data: {'device_id': deviceId},
-    );
+    await _authorizedPut('/api/users/me/device', data: {'device_id': deviceId});
   }
 
   // --- Admin API Methods ---
@@ -427,17 +421,31 @@ class AuthFlowService {
         .toList(growable: false);
   }
 
+  Future<List<AppUser>> getActiveUsers() async {
+    final response = await _authorizedGet('/api/users/active');
+    final data = response['data'];
+    if (data is! List) return const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(AppUser.fromJson)
+        .toList(growable: false);
+  }
+
   Future<List<WorkRequestRecord>> getAdminPendingRequests() async {
     final response = await _authorizedGet('/admin/requests/pending');
     final data = response['data'];
     if (data is! Map<String, dynamic>) return const [];
-    
+
     final leavesList = data['leaves'] as List? ?? [];
     final offsiteList = data['offsite'] as List? ?? [];
 
     final requests = <WorkRequestRecord>[
-      ...leavesList.whereType<Map<String, dynamic>>().map(WorkRequestRecord.leave),
-      ...offsiteList.whereType<Map<String, dynamic>>().map(WorkRequestRecord.offsite),
+      ...leavesList.whereType<Map<String, dynamic>>().map(
+        WorkRequestRecord.leave,
+      ),
+      ...offsiteList.whereType<Map<String, dynamic>>().map(
+        WorkRequestRecord.offsite,
+      ),
     ];
     requests.sort((a, b) => b.date.compareTo(a.date));
     return requests;
@@ -447,13 +455,17 @@ class AuthFlowService {
     final response = await _authorizedGet('/admin/requests/all');
     final data = response['data'];
     if (data is! Map<String, dynamic>) return const [];
-    
+
     final leavesList = data['leaves'] as List? ?? [];
     final offsiteList = data['offsite'] as List? ?? [];
 
     final requests = <WorkRequestRecord>[
-      ...leavesList.whereType<Map<String, dynamic>>().map(WorkRequestRecord.leave),
-      ...offsiteList.whereType<Map<String, dynamic>>().map(WorkRequestRecord.offsite),
+      ...leavesList.whereType<Map<String, dynamic>>().map(
+        WorkRequestRecord.leave,
+      ),
+      ...offsiteList.whereType<Map<String, dynamic>>().map(
+        WorkRequestRecord.offsite,
+      ),
     ];
     requests.sort((a, b) => b.date.compareTo(a.date));
     return requests;
@@ -479,7 +491,11 @@ class AuthFlowService {
     );
     final data = response['data'];
     if (data is! Map<String, dynamic>) {
-      return const AttendanceSummary(totalEmployees: 0, attendedToday: 0, lateToday: 0);
+      return const AttendanceSummary(
+        totalEmployees: 0,
+        attendedToday: 0,
+        lateToday: 0,
+      );
     }
     return AttendanceSummary.fromJson(data);
   }
@@ -502,11 +518,17 @@ class AuthFlowService {
   }
 
   Future<void> updateLeaveStatusAdmin(String id, String status) async {
-    await _authorizedPatch('/admin/leaves/$id/status', data: {'status': status});
+    await _authorizedPatch(
+      '/admin/leaves/$id/status',
+      data: {'status': status},
+    );
   }
 
   Future<void> updateOffsiteStatusAdmin(String id, String status) async {
-    await _authorizedPatch('/admin/offsite/$id/status', data: {'status': status});
+    await _authorizedPatch(
+      '/admin/offsite/$id/status',
+      data: {'status': status},
+    );
   }
 
   Future<void> disableUser(String id) async {
@@ -523,12 +545,15 @@ class AuthFlowService {
     required double lng,
     required double radius,
   }) async {
-    await _authorizedPost('/admin/locations', data: {
-      'name': name,
-      'latitude': lat,
-      'longitude': lng,
-      'radius_m': radius,
-    });
+    await _authorizedPost(
+      '/admin/locations',
+      data: {
+        'name': name,
+        'latitude': lat,
+        'longitude': lng,
+        'radius_m': radius,
+      },
+    );
   }
 
   Future<void> deleteLocation(String id) async {
@@ -540,11 +565,10 @@ class AuthFlowService {
     required DateTime date,
     required int numDays,
   }) async {
-    await _authorizedPost('/admin/holidays', data: {
-      'name': name,
-      'date': _dateValue(date),
-      'num_days': numDays,
-    });
+    await _authorizedPost(
+      '/admin/holidays',
+      data: {'name': name, 'date': _dateValue(date), 'num_days': numDays},
+    );
   }
 
   Future<void> deleteHoliday(String id) async {
@@ -554,25 +578,35 @@ class AuthFlowService {
   Future<List<TaskRecord>> getAdminTasks() async {
     final response = await _authorizedGet('/admin/tasks');
     final data = response['data'] as List? ?? [];
-    return data.map((json) => TaskRecord.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => TaskRecord.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<TaskRecord>> getMyTasks() async {
     final response = await _authorizedGet('/api/tasks');
     final data = response['data'] as List? ?? [];
-    return data.map((json) => TaskRecord.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => TaskRecord.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<BrandRecord>> getBrands() async {
     final response = await _authorizedGet('/api/brands');
     final data = response['data'] as List? ?? [];
-    return data.map((json) => BrandRecord.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => BrandRecord.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<TaskCategoryRecord>> getTaskCategories() async {
     final response = await _authorizedGet('/api/task-categories');
     final data = response['data'] as List? ?? [];
-    return data.map((json) => TaskCategoryRecord.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map(
+          (json) => TaskCategoryRecord.fromJson(json as Map<String, dynamic>),
+        )
+        .toList();
   }
 
   Future<TaskRecord> createTask({
@@ -585,16 +619,21 @@ class AuthFlowService {
     List<String>? subItems,
     List<String>? assigneeIds,
   }) async {
-    final response = await _authorizedPost('/admin/tasks', data: {
-      'title': title,
-      'description': description,
-      'assigned_to': assignedTo,
-      'due_date': _dateValue(dueDate),
-      if (brandId != null && brandId.isNotEmpty) 'brand_id': brandId,
-      if (categoryId != null && categoryId.isNotEmpty) 'category_id': categoryId,
-      if (subItems != null && subItems.isNotEmpty) 'sub_items': subItems,
-      if (assigneeIds != null && assigneeIds.isNotEmpty) 'assignee_ids': assigneeIds,
-    });
+    final response = await _authorizedPost(
+      '/api/tasks',
+      data: {
+        'title': title,
+        'description': description,
+        'assigned_to': assignedTo,
+        'due_date': _dateValue(dueDate),
+        if (brandId != null && brandId.isNotEmpty) 'brand_id': brandId,
+        if (categoryId != null && categoryId.isNotEmpty)
+          'category_id': categoryId,
+        if (subItems != null && subItems.isNotEmpty) 'sub_items': subItems,
+        if (assigneeIds != null && assigneeIds.isNotEmpty)
+          'assignee_ids': assigneeIds,
+      },
+    );
     return TaskRecord.fromJson(response['data'] as Map<String, dynamic>);
   }
 
@@ -606,34 +645,57 @@ class AuthFlowService {
     final response = await _authorizedGet('/api/tasks/$taskId/events');
     final data = response['data'];
     if (data is List) {
-      return data.map((e) => TaskEvent.fromJson(e as Map<String, dynamic>)).toList();
+      return data
+          .map((e) => TaskEvent.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     return [];
   }
 
   Future<TaskEvent> addTaskComment(String taskId, String content) async {
-    final response = await _authorizedPost('/api/tasks/$taskId/events', data: {'content': content});
+    final response = await _authorizedPost(
+      '/api/tasks/$taskId/events',
+      data: {'content': content},
+    );
     return TaskEvent.fromJson(response['data'] as Map<String, dynamic>);
   }
 
-
   Future<void> toggleTaskSubItem(String id, String status) async {
-    await _authorizedPatch('/api/tasks/sub-items/$id/toggle', data: {'status': status});
+    await _authorizedPatch(
+      '/api/tasks/sub-items/$id/toggle',
+      data: {'status': status},
+    );
   }
 
   Future<TaskSubItem> createTaskSubItem(String taskId, String title) async {
-    final response = await _authorizedPost('/api/tasks/$taskId/sub-items', data: {'title': title});
+    final response = await _authorizedPost(
+      '/api/tasks/$taskId/sub-items',
+      data: {'title': title},
+    );
     return TaskSubItem.fromJson(response['data'] as Map<String, dynamic>);
+  }
+
+  Future<List<TaskSubItem>> getTaskSubItems(String taskId) async {
+    final response = await _authorizedGet('/api/tasks/$taskId/sub-items');
+    final data = response['data'] as List? ?? [];
+    return data
+        .map((json) => TaskSubItem.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<TaskListRecord>> getTrelloBoard(String taskId) async {
     final response = await _authorizedGet('/api/tasks/$taskId/trello');
     final data = response['data'] as List? ?? [];
-    return data.map((json) => TaskListRecord.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => TaskListRecord.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   Future<TaskListRecord> createTaskList(String taskId, String name) async {
-    final response = await _authorizedPost('/api/tasks/$taskId/lists', data: {'name': name});
+    final response = await _authorizedPost(
+      '/api/tasks/$taskId/lists',
+      data: {'name': name},
+    );
     return TaskListRecord.fromJson(response['data'] as Map<String, dynamic>);
   }
 
@@ -649,30 +711,39 @@ class AuthFlowService {
     DateTime? startDate,
     DateTime? dueDate,
   }) async {
-    await _authorizedPatch('/api/tasks/lists/$listId', data: {
-      'name':? name,
-      'description':? description,
-      'sort_order':? sortOrder,
-      'start_date': startDate?.toUtc().toIso8601String(),
-      'due_date': dueDate?.toUtc().toIso8601String(),
-    });
+    await _authorizedPatch(
+      '/api/tasks/lists/$listId',
+      data: {
+        'name': ?name,
+        'description': ?description,
+        'sort_order': ?sortOrder,
+        'start_date': startDate?.toUtc().toIso8601String(),
+        'due_date': dueDate?.toUtc().toIso8601String(),
+      },
+    );
   }
 
   Future<TaskCardRecord> createTaskCard(
     String listId,
     String title, {
+    required String taskId,
     String description = '',
     String priority = 'medium',
     DateTime? startDate,
     DateTime? dueDate,
   }) async {
-    final response = await _authorizedPost('/api/tasks/lists/$listId/cards', data: {
-      'title': title,
-      'description': description,
-      'priority': priority,
-      if (startDate != null) 'start_date': startDate.toUtc().toIso8601String(),
-      if (dueDate != null) 'due_date': dueDate.toUtc().toIso8601String(),
-    });
+    final response = await _authorizedPost(
+      '/api/tasks/lists/$listId/cards',
+      data: {
+        'title': title,
+        'task_id': taskId,
+        'description': description,
+        'priority': priority,
+        if (startDate != null)
+          'start_date': startDate.toUtc().toIso8601String(),
+        if (dueDate != null) 'due_date': dueDate.toUtc().toIso8601String(),
+      },
+    );
     return TaskCardRecord.fromJson(response['data'] as Map<String, dynamic>);
   }
 
@@ -688,17 +759,20 @@ class AuthFlowService {
     DateTime? dueDate,
     String? adminComment,
   }) async {
-    await _authorizedPatch('/api/tasks/cards/$cardId', data: {
-      'title':? title,
-      'description':? description,
-      'status':? status,
-      'list_id':? listId,
-      'sort_order':? sortOrder,
-      'priority':? priority,
-      'start_date': startDate?.toUtc().toIso8601String(),
-      'due_date': dueDate?.toUtc().toIso8601String(),
-      'admin_comment':? adminComment,
-    });
+    await _authorizedPatch(
+      '/api/tasks/cards/$cardId',
+      data: {
+        'title': ?title,
+        'description': ?description,
+        'status': ?status,
+        'list_id': ?listId,
+        'sort_order': ?sortOrder,
+        'priority': ?priority,
+        'start_date': startDate?.toUtc().toIso8601String(),
+        'due_date': dueDate?.toUtc().toIso8601String(),
+        'admin_comment': ?adminComment,
+      },
+    );
   }
 
   Future<void> deleteTaskCard(String cardId) async {
@@ -706,7 +780,10 @@ class AuthFlowService {
   }
 
   Future<TaskSubItem> createCardSubItem(String cardId, String title) async {
-    final response = await _authorizedPost('/api/tasks/cards/$cardId/sub-items', data: {'title': title});
+    final response = await _authorizedPost(
+      '/api/tasks/cards/$cardId/sub-items',
+      data: {'title': title},
+    );
     return TaskSubItem.fromJson(response['data'] as Map<String, dynamic>);
   }
 
@@ -720,34 +797,39 @@ class AuthFlowService {
     String? verificationNotes,
     String? adminComment,
   }) async {
-    await _authorizedPatch('/api/tasks/sub-items/$subItemId/detail', data: {
-      'title': title,
-      'start_date': startDate?.toUtc().toIso8601String(),
-      'due_date': dueDate?.toUtc().toIso8601String(),
-      'link_url':? linkUrl,
-      'attachment_url':? attachmentUrl,
-      'verification_notes':? verificationNotes,
-      'admin_comment':? adminComment,
-    });
+    await _authorizedPatch(
+      '/api/tasks/sub-items/$subItemId/detail',
+      data: {
+        'title': title,
+        'start_date': startDate?.toUtc().toIso8601String(),
+        'due_date': dueDate?.toUtc().toIso8601String(),
+        'link_url': ?linkUrl,
+        'attachment_url': ?attachmentUrl,
+        'verification_notes': ?verificationNotes,
+        'admin_comment': ?adminComment,
+      },
+    );
   }
 
   Future<void> deleteTaskSubItem(String id) async {
     await _authorizedDelete('/api/tasks/sub-items/$id');
   }
 
-  Future<void> createSubItemVerification(String subItemId, {
+  Future<void> createSubItemVerification(
+    String subItemId, {
     required String status,
     required String notes,
   }) async {
-    await _authorizedPost('/api/tasks/sub-items/$subItemId/verifications', data: {
-      'status': status,
-      'notes': notes,
-    });
+    await _authorizedPost(
+      '/api/tasks/sub-items/$subItemId/verifications',
+      data: {'status': status, 'notes': notes},
+    );
   }
 
   // ─────────────────── Card Attachments ───────────────────
 
-  Future<CardAttachment> createCardAttachment(String cardId, {
+  Future<CardAttachment> createCardAttachment(
+    String cardId, {
     required String url,
     required String name,
     required String type, // 'image' | 'file' | 'link'
@@ -760,10 +842,14 @@ class AuthFlowService {
   }
 
   Future<List<CardAttachment>> listCardAttachments(String cardId) async {
-    final response = await _authorizedGet('/api/tasks/cards/$cardId/attachments');
+    final response = await _authorizedGet(
+      '/api/tasks/cards/$cardId/attachments',
+    );
     final data = response['data'];
     if (data is! List) return const [];
-    return data.map((e) => CardAttachment.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => CardAttachment.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> deleteCardAttachment(String attachmentId) async {
@@ -775,9 +861,14 @@ class AuthFlowService {
   }
 
   Future<void> updateFcmToken(String token) async {
-    debugPrint('[FCM API LOG] Sending PUT /api/users/me/fcm-token with payload: {"fcm_token": "$token"}');
+    debugPrint(
+      '[FCM API LOG] Sending PUT /api/users/me/fcm-token with payload: {"fcm_token": "$token"}',
+    );
     try {
-      final response = await _authorizedPut('/api/users/me/fcm-token', data: {'fcm_token': token});
+      final response = await _authorizedPut(
+        '/api/users/me/fcm-token',
+        data: {'fcm_token': token},
+      );
       debugPrint('[FCM API LOG] API Success response: $response');
     } on AuthFlowException catch (e) {
       debugPrint('[FCM API LOG] API Error (AuthFlowException): ${e.message}');
@@ -817,7 +908,7 @@ class AuthFlowService {
         'lng': lng,
         'device_id': deviceId,
         'face_vector': faceVector,
-        'photo_url':? photoUrl,
+        'photo_url': ?photoUrl,
       },
     );
     final data = response['data'];
@@ -834,11 +925,7 @@ class AuthFlowService {
   }) async {
     final response = await _authorizedPost(
       '/api/attendance/checkout',
-      data: {
-        'lat':? lat,
-        'lng':? lng,
-        'photo_url':? photoUrl,
-      },
+      data: {'lat': ?lat, 'lng': ?lng, 'photo_url': ?photoUrl},
     );
     final data = response['data'];
     if (data is Map<String, dynamic>) {
