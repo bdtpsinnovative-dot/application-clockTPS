@@ -58,25 +58,17 @@ class _BoardDockButton extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: active
-                ? const Color(0xFFEFF6FF)
-                : const Color(0xFFF8FAFC),
+            color: active ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(11),
             border: Border.all(
-              color: active
-                  ? const Color(0xFFBFDBFE)
-                  : const Color(0xFFE2E8F0),
+              color: active ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
             ),
           ),
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              Icon(
-                icon,
-                size: 18,
-                color: active ? workBlue : workMuted,
-              ),
+              Icon(icon, size: 18, color: active ? workBlue : workMuted),
               if (badge != null)
                 Positioned(
                   top: -4,
@@ -138,14 +130,10 @@ Color _deadlineColor(DateTime? dueDate, {required bool isCompleted}) {
   return workMuted;
 }
 
-double boardViewportFraction(bool compactMode) =>
-    compactMode ? 0.72 : 0.90;
+double boardViewportFraction(bool compactMode) => compactMode ? 0.72 : 0.90;
 
 class BoardKeyboardDismissRegion extends StatelessWidget {
-  const BoardKeyboardDismissRegion({
-    super.key,
-    required this.child,
-  });
+  const BoardKeyboardDismissRegion({super.key, required this.child});
 
   final Widget child;
 
@@ -202,9 +190,7 @@ class BoardPageIndicator extends StatelessWidget {
               width: active ? 14 : 5,
               height: 5,
               decoration: BoxDecoration(
-                color: active
-                    ? workBlue
-                    : workMuted.withValues(alpha: 0.32),
+                color: active ? workBlue : workMuted.withValues(alpha: 0.32),
                 borderRadius: BorderRadius.circular(3),
               ),
             );
@@ -291,36 +277,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     try {
       final boardLists = await widget.service.getTrelloBoard(widget.task.id);
       if (mounted) {
-        // เรียงลำดับตามความสำคัญ (ด่วนสุดอยู่บนสุด) และนำ Completed ขึ้นบนสุดตามที่ขอ
+        // ลำดับจากผู้ใช้เป็น source of truth เพื่อให้การลากเรียงคงอยู่หลังรีโหลด
         for (var list in boardLists) {
-          list.cards.sort((a, b) {
-            // ดัน Completed ขึ้นบนสุด
-            if (a.status == 'completed' && b.status != 'completed') return -1;
-            if (b.status == 'completed' && a.status != 'completed') return 1;
-
-            // ให้ความสำคัญกับ Priority
-            int getPriorityVal(String p) {
-              switch (p) {
-                case 'urgent':
-                  return 4;
-                case 'high':
-                  return 3;
-                case 'medium':
-                  return 2;
-                case 'low':
-                  return 1;
-                default:
-                  return 0;
-              }
-            }
-
-            final pA = getPriorityVal(a.priority);
-            final pB = getPriorityVal(b.priority);
-            if (pA != pB) return pB.compareTo(pA);
-
-            // ถ้าเท่ากันก็เรียงตาม sort_order (ลำดับปกติ)
-            return a.sortOrder.compareTo(b.sortOrder);
-          });
+          list.cards.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
         }
 
         setState(() {
@@ -521,15 +480,17 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setDlgState) {
-          final dueDateIsPast =
-              dueDate != null && isWorkDatePast(dueDate!);
+          final dueDateIsPast = dueDate != null && isWorkDatePast(dueDate!);
           if (loadingMembers) {
             loadingMembers = false;
-            widget.service.getTaskMembers(widget.task.id).then((members) {
-              setDlgState(() {
-                allMembers = members;
-              });
-            }).catchError((_) {});
+            widget.service
+                .getTaskMembers(widget.task.id)
+                .then((members) {
+                  setDlgState(() {
+                    allMembers = members;
+                  });
+                })
+                .catchError((_) {});
           }
           return Padding(
             padding: EdgeInsets.only(
@@ -683,7 +644,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                         itemCount: allMembers.length,
                         itemBuilder: (context, index) {
                           final member = allMembers[index];
-                          final isSelected = selectedAssignees.any((m) => m.id == member.id);
+                          final isSelected = selectedAssignees.any(
+                            (m) => m.id == member.id,
+                          );
                           return Padding(
                             padding: const EdgeInsets.only(right: 12),
                             child: Tooltip(
@@ -692,7 +655,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                 onTap: () {
                                   setDlgState(() {
                                     if (isSelected) {
-                                      selectedAssignees.removeWhere((m) => m.id == member.id);
+                                      selectedAssignees.removeWhere(
+                                        (m) => m.id == member.id,
+                                      );
                                     } else {
                                       selectedAssignees.add(member);
                                     }
@@ -704,19 +669,30 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: isSelected ? workBlue : Colors.transparent,
+                                          color: isSelected
+                                              ? workBlue
+                                              : Colors.transparent,
                                           width: 2,
                                         ),
                                       ),
                                       child: CircleAvatar(
                                         radius: 20,
-                                        backgroundImage: member.avatarUrl != null && member.avatarUrl!.isNotEmpty
+                                        backgroundImage:
+                                            member.avatarUrl != null &&
+                                                member.avatarUrl!.isNotEmpty
                                             ? NetworkImage(member.avatarUrl!)
                                             : null,
-                                        child: member.avatarUrl == null || member.avatarUrl!.isEmpty
+                                        child:
+                                            member.avatarUrl == null ||
+                                                member.avatarUrl!.isEmpty
                                             ? Text(
-                                                member.firstName.isNotEmpty ? member.firstName[0] : '?',
-                                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                                member.firstName.isNotEmpty
+                                                    ? member.firstName[0]
+                                                    : '?',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               )
                                             : null,
                                       ),
@@ -891,8 +867,8 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                           color: dueDateIsPast
                                               ? const Color(0xFFDC2626)
                                               : dueDate != null
-                                                  ? workText
-                                                  : workMuted,
+                                              ? workText
+                                              : workMuted,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -1144,9 +1120,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     );
   }
 
-  Widget _buildBoardBottomDock({
-    required int filterCount,
-  }) {
+  Widget _buildBoardBottomDock({required int filterCount}) {
     return Align(
       alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
@@ -1195,8 +1169,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           color: workMuted,
                           size: 18,
                         ),
-                        prefixIconConstraints:
-                            const BoxConstraints(minWidth: 35),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 35,
+                        ),
                         suffixIcon: _cardSearchQuery.isEmpty
                             ? null
                             : IconButton(
@@ -1282,17 +1257,19 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     final isListFilterActive = _selectedListIds.isNotEmpty;
     final pageCount = filteredLists.length + (isListFilterActive ? 0 : 1);
 
-    final hasActiveFilters = _cardSearchQuery.isNotEmpty ||
+    final hasActiveFilters =
+        _cardSearchQuery.isNotEmpty ||
         _selectedListIds.isNotEmpty ||
         _selectedCardStatus != null;
-    final boardFilterCount = (_selectedListIds.isNotEmpty ? 1 : 0) +
+    final boardFilterCount =
+        (_selectedListIds.isNotEmpty ? 1 : 0) +
         (_selectedCardStatus != null ? 1 : 0);
     final selectedListLabel = _selectedListIds.isEmpty
         ? null
         : _lists
-            .where((list) => _selectedListIds.contains(list.id))
-            .map((list) => list.name)
-            .join(', ');
+              .where((list) => _selectedListIds.contains(list.id))
+              .map((list) => list.name)
+              .join(', ');
     final selectedStatusLabel = _selectedCardStatus == null
         ? null
         : _statusLabels[_selectedCardStatus!];
@@ -1301,431 +1278,448 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       body: BoardKeyboardDismissRegion(
         child: Stack(
           children: [
-          Column(
-            children: [
-              // Gradient Header
-              Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [workBlue, workSky],
-                  ),
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+            Column(
+              children: [
+                // Gradient Header
+                Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [workBlue, workSky],
                     ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(
-                                Icons.arrow_back_ios_rounded,
-                                color: Colors.white,
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              IconButton(
+                                onPressed: () => Navigator.pop(context),
+                                icon: const Icon(
+                                  Icons.arrow_back_ios_rounded,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.task.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 17,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  if (widget.task.description.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 2),
-                                      child: Text(
-                                        widget.task.description,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.white70,
-                                        ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      widget.task.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 17,
+                                        color: Colors.white,
                                       ),
                                     ),
-                                  const SizedBox(height: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          isBoardCreator
-                                              ? Icons.star_rounded
-                                              : Icons.group_rounded,
-                                          size: 12,
-                                          color: Colors.white,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          isBoardCreator
-                                              ? 'คุณเป็นเจ้าของบอร์ดนี้'
-                                              : 'บอร์ดนี้เป็นของ $boardCreatorName (คุณถูกเพิ่มเข้ามา)',
+                                    if (widget.task.description.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          widget.task.description,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            fontSize: 10.5,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w500,
+                                            fontSize: 12,
+                                            color: Colors.white70,
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: _loadBoard,
-                              icon: const Icon(
-                                Icons.refresh_rounded,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Compact search and filters
-              if (!_useBottomBoardTools && _lists.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 5),
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        height: 42,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _cardSearchController,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _cardSearchQuery = value.trim();
-                                  });
-                                },
-                                textInputAction: TextInputAction.search,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: workText,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'ค้นหาชื่อการ์ด...',
-                                  hintStyle: const TextStyle(
-                                    color: workMuted,
-                                    fontSize: 12.5,
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.search_rounded,
-                                    color: workMuted,
-                                    size: 18,
-                                  ),
-                                  prefixIconConstraints: const BoxConstraints(
-                                    minWidth: 38,
-                                  ),
-                                  suffixIcon: _cardSearchQuery.isNotEmpty
-                                      ? IconButton(
-                                          visualDensity: VisualDensity.compact,
-                                          icon: const Icon(
-                                            Icons.close_rounded,
-                                            color: workMuted,
-                                            size: 17,
+                                      ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isBoardCreator
+                                                ? Icons.star_rounded
+                                                : Icons.group_rounded,
+                                            size: 12,
+                                            color: Colors.white,
                                           ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _cardSearchQuery = '';
-                                              _cardSearchController.clear();
-                                            });
-                                          },
-                                        )
-                                      : null,
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 9,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFE2E8F0),
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(
-                                      color: workBlue,
-                                      width: 1.25,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            InkWell(
-                              onTap: _showBoardFilterBottomSheet,
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                height: 42,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 11,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: boardFilterCount > 0
-                                      ? const Color(0xFFEFF6FF)
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: boardFilterCount > 0
-                                        ? const Color(0xFFBFDBFE)
-                                        : const Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.tune_rounded,
-                                      size: 17,
-                                      color: boardFilterCount > 0
-                                          ? workBlue
-                                          : workMuted,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      boardFilterCount > 0
-                                          ? 'กรอง $boardFilterCount'
-                                          : 'กรอง',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: boardFilterCount > 0
-                                            ? workBlue
-                                            : workText,
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            isBoardCreator
+                                                ? 'คุณเป็นเจ้าของบอร์ดนี้'
+                                                : 'บอร์ดนี้เป็นของ $boardCreatorName (คุณถูกเพิ่มเข้ามา)',
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                              IconButton(
+                                onPressed: _loadBoard,
+                                icon: const Icon(
+                                  Icons.refresh_rounded,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      if (hasActiveFilters) ...[
-                        const SizedBox(height: 5),
+                    ),
+                  ),
+                ),
+
+                // Compact search and filters
+                if (!_useBottomBoardTools && _lists.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 5),
+                    child: Column(
+                      children: [
                         SizedBox(
-                          height: 26,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
+                          height: 42,
+                          child: Row(
                             children: [
-                              if (selectedListLabel != null)
-                                _buildActiveBoardFilter(
-                                  icon: Icons.view_column_outlined,
-                                  label: selectedListLabel,
-                                  onRemove: () {
-                                    setState(() => _selectedListIds = []);
-                                  },
-                                ),
-                              if (selectedStatusLabel != null)
-                                _buildActiveBoardFilter(
-                                  icon: Icons.flag_outlined,
-                                  label: selectedStatusLabel,
-                                  onRemove: () {
+                              Expanded(
+                                child: TextField(
+                                  controller: _cardSearchController,
+                                  onChanged: (value) {
                                     setState(() {
-                                      _selectedCardStatus = null;
+                                      _cardSearchQuery = value.trim();
                                     });
                                   },
-                                ),
-                              if (_cardSearchQuery.isNotEmpty)
-                                _buildActiveBoardFilter(
-                                  icon: Icons.search_rounded,
-                                  label: '“$_cardSearchQuery”',
-                                  onRemove: () {
-                                    setState(() {
-                                      _cardSearchQuery = '';
-                                      _cardSearchController.clear();
-                                    });
-                                  },
-                                ),
-                              TextButton(
-                                onPressed: _clearAllBoardFilters,
-                                style: TextButton.styleFrom(
-                                  foregroundColor: workMuted,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
+                                  textInputAction: TextInputAction.search,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: workText,
                                   ),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
+                                  decoration: InputDecoration(
+                                    hintText: 'ค้นหาชื่อการ์ด...',
+                                    hintStyle: const TextStyle(
+                                      color: workMuted,
+                                      fontSize: 12.5,
+                                    ),
+                                    prefixIcon: const Icon(
+                                      Icons.search_rounded,
+                                      color: workMuted,
+                                      size: 18,
+                                    ),
+                                    prefixIconConstraints: const BoxConstraints(
+                                      minWidth: 38,
+                                    ),
+                                    suffixIcon: _cardSearchQuery.isNotEmpty
+                                        ? IconButton(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            icon: const Icon(
+                                              Icons.close_rounded,
+                                              color: workMuted,
+                                              size: 17,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _cardSearchQuery = '';
+                                                _cardSearchController.clear();
+                                              });
+                                            },
+                                          )
+                                        : null,
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 9,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFE2E8F0),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                        color: workBlue,
+                                        width: 1.25,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                child: const Text(
-                                  'ล้างทั้งหมด',
-                                  style: TextStyle(fontSize: 10.5),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: _showBoardFilterBottomSheet,
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  height: 42,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 11,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: boardFilterCount > 0
+                                        ? const Color(0xFFEFF6FF)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: boardFilterCount > 0
+                                          ? const Color(0xFFBFDBFE)
+                                          : const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.tune_rounded,
+                                        size: 17,
+                                        color: boardFilterCount > 0
+                                            ? workBlue
+                                            : workMuted,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        boardFilterCount > 0
+                                            ? 'กรอง $boardFilterCount'
+                                            : 'กรอง',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: boardFilterCount > 0
+                                              ? workBlue
+                                              : workText,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                ),
-
-              // Lists PageView — physics จะถูก toggle โดย _cardAreaActive
-              // เมื่อนิ้วอยู่ใน Zone การ์ด: NeverScrollableScrollPhysics (PageView หยุด)
-              // เมื่อนิ้วอยู่ใน Header: PageScrollPhysics (PageView เลื่อนปกติ)
-              Expanded(
-                child: _loading && _lists.isEmpty
-                    ? TaskBoardSkeleton(
-                        viewportFraction:
-                            boardViewportFraction(_isCompactMode),
-                      )
-                    : filteredLists.isEmpty && isListFilterActive
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                        if (hasActiveFilters) ...[
+                          const SizedBox(height: 5),
+                          SizedBox(
+                            height: 26,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
                               children: [
-                                Icon(Icons.filter_list_off_rounded, size: 48, color: workMuted.withOpacity(0.5)),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'ไม่พบรายการที่ตรงตามตัวกรอง',
-                                  style: TextStyle(color: workMuted, fontSize: 13.5, fontWeight: FontWeight.w500),
-                                ),
-                                const SizedBox(height: 16),
-                                OutlinedButton(
-                                  onPressed: _clearAllBoardFilters,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: workBlue,
-                                    side: const BorderSide(color: workBlue),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                if (selectedListLabel != null)
+                                  _buildActiveBoardFilter(
+                                    icon: Icons.view_column_outlined,
+                                    label: selectedListLabel,
+                                    onRemove: () {
+                                      setState(() => _selectedListIds = []);
+                                    },
                                   ),
-                                  child: const Text('ล้างตัวกรองทั้งหมด', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                if (selectedStatusLabel != null)
+                                  _buildActiveBoardFilter(
+                                    icon: Icons.flag_outlined,
+                                    label: selectedStatusLabel,
+                                    onRemove: () {
+                                      setState(() {
+                                        _selectedCardStatus = null;
+                                      });
+                                    },
+                                  ),
+                                if (_cardSearchQuery.isNotEmpty)
+                                  _buildActiveBoardFilter(
+                                    icon: Icons.search_rounded,
+                                    label: '“$_cardSearchQuery”',
+                                    onRemove: () {
+                                      setState(() {
+                                        _cardSearchQuery = '';
+                                        _cardSearchController.clear();
+                                      });
+                                    },
+                                  ),
+                                TextButton(
+                                  onPressed: _clearAllBoardFilters,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: workMuted,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'ล้างทั้งหมด',
+                                    style: TextStyle(fontSize: 10.5),
+                                  ),
                                 ),
                               ],
                             ),
-                          )
-                        : Builder(
-                            builder: (context) {
-                              return PageView.builder(
-                                controller: _pageController,
-                                physics: const PageScrollPhysics(),
-                                onPageChanged: (idx) {
-                                  setState(() {
-                                    _currentPage = idx;
-                                  });
-                                },
-                                itemCount: pageCount,
-                                itemBuilder: (context, idx) {
-                                  if (idx == filteredLists.length) {
-                                    return _buildAddListPage();
-                                  }
-                                  final list = filteredLists[idx];
-                                  return _buildListPage(list, idx);
-                                },
-                              );
-                            },
                           ),
-              ),
+                        ],
+                      ],
+                    ),
+                  ),
 
-              // Page indicators (Dots)
-              if (!_useBottomBoardTools && pageCount > 1)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: BoardPageIndicator(
-                    currentPage: _currentPage,
-                    pageCount: pageCount,
+                // Lists PageView — physics จะถูก toggle โดย _cardAreaActive
+                // เมื่อนิ้วอยู่ใน Zone การ์ด: NeverScrollableScrollPhysics (PageView หยุด)
+                // เมื่อนิ้วอยู่ใน Header: PageScrollPhysics (PageView เลื่อนปกติ)
+                Expanded(
+                  child: _loading && _lists.isEmpty
+                      ? TaskBoardSkeleton(
+                          viewportFraction: boardViewportFraction(
+                            _isCompactMode,
+                          ),
+                        )
+                      : filteredLists.isEmpty && isListFilterActive
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.filter_list_off_rounded,
+                                size: 48,
+                                color: workMuted.withOpacity(0.5),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'ไม่พบรายการที่ตรงตามตัวกรอง',
+                                style: TextStyle(
+                                  color: workMuted,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              OutlinedButton(
+                                onPressed: _clearAllBoardFilters,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: workBlue,
+                                  side: const BorderSide(color: workBlue),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'ล้างตัวกรองทั้งหมด',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Builder(
+                          builder: (context) {
+                            return PageView.builder(
+                              controller: _pageController,
+                              physics: const PageScrollPhysics(),
+                              onPageChanged: (idx) {
+                                setState(() {
+                                  _currentPage = idx;
+                                });
+                              },
+                              itemCount: pageCount,
+                              itemBuilder: (context, idx) {
+                                if (idx == filteredLists.length) {
+                                  return _buildAddListPage();
+                                }
+                                final list = filteredLists[idx];
+                                return _buildListPage(list, idx);
+                              },
+                            );
+                          },
+                        ),
+                ),
+
+                // Page indicators (Dots)
+                if (!_useBottomBoardTools && pageCount > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: BoardPageIndicator(
+                      currentPage: _currentPage,
+                      pageCount: pageCount,
+                    ),
+                  ),
+              ],
+            ),
+
+            if (_useBottomBoardTools && _lists.isNotEmpty && pageCount > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: MediaQuery.paddingOf(context).bottom + 68,
+                child: IgnorePointer(
+                  child: Center(
+                    child: BoardPageIndicator(
+                      currentPage: _currentPage,
+                      pageCount: pageCount,
+                    ),
                   ),
                 ),
-            ],
-          ),
+              ),
 
-          if (_useBottomBoardTools &&
-              _lists.isNotEmpty &&
-              pageCount > 1)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: MediaQuery.paddingOf(context).bottom + 68,
-              child: IgnorePointer(
-                child: Center(
-                  child: BoardPageIndicator(
-                    currentPage: _currentPage,
-                    pageCount: pageCount,
-                  ),
+            if (_useBottomBoardTools && _lists.isNotEmpty)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildBoardBottomDock(filterCount: boardFilterCount),
+              ),
+
+            // Edge strips สำหรับ Column drag (เลื่อนหน้าจอตอนลาก Column)
+            if (_isDraggingList)
+              Positioned(
+                left: 0,
+                top: 120,
+                bottom: 80,
+                width: 50,
+                child: DragTarget<TaskListRecord>(
+                  onWillAcceptWithDetails: (details) {
+                    _startEdgeScroll(true);
+                    return false;
+                  },
+                  onLeave: (data) => _stopEdgeScroll(),
+                  builder: (context, candidateData, rejectedData) {
+                    return Container(color: Colors.transparent);
+                  },
                 ),
               ),
-            ),
 
-          if (_useBottomBoardTools && _lists.isNotEmpty)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _buildBoardBottomDock(
-                filterCount: boardFilterCount,
+            if (_isDraggingList)
+              Positioned(
+                right: 0,
+                top: 120,
+                bottom: 80,
+                width: 50,
+                child: DragTarget<TaskListRecord>(
+                  onWillAcceptWithDetails: (details) {
+                    _startEdgeScroll(false);
+                    return false;
+                  },
+                  onLeave: (data) => _stopEdgeScroll(),
+                  builder: (context, candidateData, rejectedData) {
+                    return Container(color: Colors.transparent);
+                  },
+                ),
               ),
-            ),
-
-          // Edge strips สำหรับ Column drag (เลื่อนหน้าจอตอนลาก Column)
-          if (_isDraggingList)
-            Positioned(
-              left: 0,
-              top: 120,
-              bottom: 80,
-              width: 50,
-              child: DragTarget<TaskListRecord>(
-                onWillAcceptWithDetails: (details) {
-                  _startEdgeScroll(true);
-                  return false;
-                },
-                onLeave: (data) => _stopEdgeScroll(),
-                builder: (context, candidateData, rejectedData) {
-                  return Container(color: Colors.transparent);
-                },
-              ),
-            ),
-
-          if (_isDraggingList)
-            Positioned(
-              right: 0,
-              top: 120,
-              bottom: 80,
-              width: 50,
-              child: DragTarget<TaskListRecord>(
-                onWillAcceptWithDetails: (details) {
-                  _startEdgeScroll(false);
-                  return false;
-                },
-                onLeave: (data) => _stopEdgeScroll(),
-                builder: (context, candidateData, rejectedData) {
-                  return Container(color: Colors.transparent);
-                },
-              ),
-            ),
           ],
         ),
       ),
@@ -1902,9 +1896,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                 if (_hasInvalidDateRange(startDate, dueDate)) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text(
-                        'วันที่สิ้นสุดต้องไม่อยู่ก่อนวันที่เริ่ม',
-                      ),
+                      content: Text('วันที่สิ้นสุดต้องไม่อยู่ก่อนวันที่เริ่ม'),
                     ),
                   );
                   return;
@@ -1957,10 +1949,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     final pct = totalCards == 0 ? 0 : (doneCards / totalCards * 100).toInt();
     final dateLabel = _formatDateRange(list.startDate, list.dueDate);
     final isCompleted = totalCards > 0 && doneCards == totalCards;
-    final dateColor = _deadlineColor(
-      list.dueDate,
-      isCompleted: isCompleted,
-    );
+    final dateColor = _deadlineColor(list.dueDate, isCompleted: isCompleted);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2147,15 +2136,22 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
               Expanded(
                 child: Builder(
                   builder: (context) {
-                    final hasActiveFilters = _cardSearchQuery.isNotEmpty || _selectedCardStatus != null;
+                    final hasActiveFilters =
+                        _cardSearchQuery.isNotEmpty ||
+                        _selectedCardStatus != null;
                     final filteredCards = list.cards.where((card) {
                       if (_cardSearchQuery.isNotEmpty) {
                         final query = _cardSearchQuery.toLowerCase();
-                        final matchTitle = card.title.toLowerCase().contains(query);
-                        final matchDesc = card.description.toLowerCase().contains(query);
+                        final matchTitle = card.title.toLowerCase().contains(
+                          query,
+                        );
+                        final matchDesc = card.description
+                            .toLowerCase()
+                            .contains(query);
                         if (!matchTitle && !matchDesc) return false;
                       }
-                      if (_selectedCardStatus != null && card.status != _selectedCardStatus) {
+                      if (_selectedCardStatus != null &&
+                          card.status != _selectedCardStatus) {
                         return false;
                       }
                       return true;
@@ -2217,16 +2213,17 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                       itemCount: list.cards.length,
                       onReorderItem: (oldIndex, newIndex) =>
                           _reorderCards(list, oldIndex, newIndex),
-                      proxyDecorator: (child, index, animation) => AnimatedBuilder(
-                        animation: animation,
-                        builder: (context, child) => Material(
-                          elevation: 4 * animation.value,
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          child: child,
-                        ),
-                        child: child,
-                      ),
+                      proxyDecorator: (child, index, animation) =>
+                          AnimatedBuilder(
+                            animation: animation,
+                            builder: (context, child) => Material(
+                              elevation: 4 * animation.value,
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              child: child,
+                            ),
+                            child: child,
+                          ),
                       itemBuilder: (context, index) {
                         final card = list.cards[index];
                         return _buildCardItem(
@@ -2368,10 +2365,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
     final isCompleted = card.status == 'completed';
     final dateLabel = _formatDateRange(card.startDate, card.dueDate);
-    final dateColor = _deadlineColor(
-      card.dueDate,
-      isCompleted: isCompleted,
-    );
+    final dateColor = _deadlineColor(card.dueDate, isCompleted: isCompleted);
     final badgeBg = _statusBgColors[card.status] ?? const Color(0xFFF1F5F9);
     final badgeText = _statusTextColors[card.status] ?? workMuted;
     final badgeLabel = _statusLabels[card.status] ?? 'รอทำ';
@@ -2560,10 +2554,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                            fontSize: 10,
-                            color: dateColor,
-                            fontWeight: FontWeight.w500,
-                          ),
+                              fontSize: 10,
+                              color: dateColor,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],
@@ -2871,11 +2865,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     });
 
     try {
-      await widget.service.updateTaskCard(
-        widget.card.id,
-        status: status,
-        description: widget.card.description,
-      );
+      await widget.service.updateTaskCard(widget.card.id, status: status);
       widget.onChanged();
     } catch (e) {
       if (mounted) {
@@ -3266,9 +3256,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                 if (_hasInvalidDateRange(startDate, dueDate)) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text(
-                        'วันสิ้นสุดต้องไม่อยู่ก่อนวันที่เริ่ม',
-                      ),
+                      content: Text('วันสิ้นสุดต้องไม่อยู่ก่อนวันที่เริ่ม'),
                     ),
                   );
                   return;
@@ -3738,9 +3726,13 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                                   : 'ไม่มีรายละเอียดคำอธิบาย',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: widget.card.description.isNotEmpty ? workText : workMuted,
+                                color: widget.card.description.isNotEmpty
+                                    ? workText
+                                    : workMuted,
                                 height: 1.4,
-                                fontStyle: widget.card.description.isNotEmpty ? FontStyle.normal : FontStyle.italic,
+                                fontStyle: widget.card.description.isNotEmpty
+                                    ? FontStyle.normal
+                                    : FontStyle.italic,
                               ),
                             ),
                             if (widget.card.startDate != null ||
@@ -3820,7 +3812,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                                                   widget.card.dueDate,
                                                   isCompleted:
                                                       widget.card.status ==
-                                                          'completed',
+                                                      'completed',
                                                 ),
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -6381,10 +6373,12 @@ class _BoardFilterBottomSheetContent extends StatefulWidget {
   });
 
   @override
-  State<_BoardFilterBottomSheetContent> createState() => _BoardFilterBottomSheetContentState();
+  State<_BoardFilterBottomSheetContent> createState() =>
+      _BoardFilterBottomSheetContentState();
 }
 
-class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetContent> {
+class _BoardFilterBottomSheetContentState
+    extends State<_BoardFilterBottomSheetContent> {
   late List<String> _tempListIds;
   String? _tempStatus;
 
@@ -6398,7 +6392,12 @@ class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetC
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        16,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -6436,7 +6435,11 @@ class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetC
 
             const Text(
               'หัวข้อรายการ',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
             ),
             const SizedBox(height: 3),
             const Text(
@@ -6454,7 +6457,7 @@ class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetC
               child: ListView(
                 shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(vertical: 4),
-              children: [
+                children: [
                   _buildListOption(
                     label: 'ทุกหัวข้อ',
                     count: widget.lists.fold<int>(
@@ -6486,7 +6489,11 @@ class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetC
 
             const Text(
               'สถานะการ์ด',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -6533,10 +6540,15 @@ class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetC
                     style: OutlinedButton.styleFrom(
                       foregroundColor: workMuted,
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('ล้างตัวกรอง', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'ล้างตัวกรอง',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -6549,11 +6561,16 @@ class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetC
                     style: ElevatedButton.styleFrom(
                       backgroundColor: workBlue,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       elevation: 0,
                     ),
-                    child: const Text('ใช้ตัวกรอง', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'ใช้ตัวกรอง',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
@@ -6592,8 +6609,7 @@ class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetC
                 style: TextStyle(
                   fontSize: 12,
                   color: isSelected ? workBlue : workText,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.w500,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
             ),

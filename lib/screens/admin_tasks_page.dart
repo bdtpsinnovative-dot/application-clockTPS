@@ -8,13 +8,41 @@ import 'package:hr_management/widgets/skeleton_loading.dart';
 import 'package:hr_management/widgets/work_due_date_picker.dart';
 import 'package:hr_management/screens/task_board_page.dart';
 
-
 // ─── Status config ───────────────────────────────────────────────
 const _statusConfig = {
-  'pending':     _StatusMeta('รอทำ',      Color(0xFF64748B), Color(0xFFF1F5F9), Color(0xFFCBD5E1)),
-  'in_progress': _StatusMeta('กำลังทำ',   Color(0xFFEA580C), Color(0xFFFFF7ED), Color(0xFFFED7AA)),
-  'completed':   _StatusMeta('เสร็จสิ้น', Color(0xFF16A34A), Color(0xFFF0FDF4), Color(0xFFBBF7D0)),
+  'pending': _StatusMeta(
+    'รอทำ',
+    Color(0xFF64748B),
+    Color(0xFFF1F5F9),
+    Color(0xFFCBD5E1),
+  ),
+  'in_progress': _StatusMeta(
+    'กำลังทำ',
+    Color(0xFFEA580C),
+    Color(0xFFFFF7ED),
+    Color(0xFFFED7AA),
+  ),
+  'in_review': _StatusMeta(
+    'รอตรวจ',
+    Color(0xFF7C3AED),
+    Color(0xFFF5F3FF),
+    Color(0xFFDDD6FE),
+  ),
+  'completed': _StatusMeta(
+    'เสร็จสิ้น',
+    Color(0xFF16A34A),
+    Color(0xFFF0FDF4),
+    Color(0xFFBBF7D0),
+  ),
 };
+
+bool isAssignmentOverdue(DateTime dueDate, String status, {DateTime? now}) {
+  if (status == 'completed') return false;
+  final current = now ?? DateTime.now();
+  final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+  final today = DateTime(current.year, current.month, current.day);
+  return dueDay.isBefore(today);
+}
 
 String assignmentFilterUserId(AppUser? currentUser, String fallbackAuthId) {
   final databaseUserId = currentUser?.id.trim() ?? '';
@@ -56,14 +84,14 @@ class AdminTasksPage extends StatefulWidget {
 }
 
 class _AdminTasksPageState extends State<AdminTasksPage> {
-  List<TaskRecord> _tasks     = [];
-  List<AppUser>   _users      = [];
-  List<BrandRecord>         _brands     = [];
-  List<TaskCategoryRecord>  _categories = [];
-  Map<String, AppUser>      _userMap    = {};
-  Map<String, BrandRecord>  _brandMap   = {};
+  List<TaskRecord> _tasks = [];
+  List<AppUser> _users = [];
+  List<BrandRecord> _brands = [];
+  List<TaskCategoryRecord> _categories = [];
+  Map<String, AppUser> _userMap = {};
+  Map<String, BrandRecord> _brandMap = {};
   Map<String, TaskCategoryRecord> _catMap = {};
-  bool   _loading = true;
+  bool _loading = true;
   String? _error;
 
   String _searchQuery = '';
@@ -85,39 +113,58 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   }
 
   Future<void> _loadData() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final isEmployee = widget.service.currentUser?.role == 'employee';
-      final results = await Future.wait([
-        isEmployee ? widget.service.getMyTasks() : widget.service.getAdminTasks(),
-        isEmployee ? Future.value(<AppUser>[]) : widget.service.getAdminUsers(),
-        widget.service.getBrands(),
-        widget.service.getTaskCategories(),
+      final tasks = await (isEmployee
+          ? widget.service.getMyTasks()
+          : widget.service.getAdminTasks());
+      final auxiliary = await Future.wait<Object>([
+        (isEmployee
+                ? Future.value(<AppUser>[])
+                : widget.service.getAdminUsers())
+            .catchError((_) => <AppUser>[]),
+        widget.service.getBrands().catchError((_) => <BrandRecord>[]),
+        widget.service.getTaskCategories().catchError(
+          (_) => <TaskCategoryRecord>[],
+        ),
       ]);
 
-      final tasks  = results[0] as List<TaskRecord>;
-      final users  = (results[1] as List<AppUser>).where((u) => u.status == 'active').toList();
-      final brands = results[2] as List<BrandRecord>;
-      final cats   = results[3] as List<TaskCategoryRecord>;
+      final users = (auxiliary[0] as List<AppUser>)
+          .where((u) => u.status == 'active')
+          .toList();
+      final brands = auxiliary[1] as List<BrandRecord>;
+      final cats = auxiliary[2] as List<TaskCategoryRecord>;
 
-      final Map<String, AppUser>          userMap  = {for (final u in users)  u.id: u};
-      final Map<String, BrandRecord>      brandMap = {for (final b in brands) b.id: b};
-      final Map<String, TaskCategoryRecord> catMap = {for (final c in cats)   c.id: c};
+      final Map<String, AppUser> userMap = {for (final u in users) u.id: u};
+      final Map<String, BrandRecord> brandMap = {
+        for (final b in brands) b.id: b,
+      };
+      final Map<String, TaskCategoryRecord> catMap = {
+        for (final c in cats) c.id: c,
+      };
 
       if (mounted) {
         setState(() {
-          _tasks      = tasks;
-          _users      = users;
-          _brands     = brands;
+          _tasks = tasks;
+          _users = users;
+          _brands = brands;
           _categories = cats;
-          _userMap    = userMap;
-          _brandMap   = brandMap;
-          _catMap     = catMap;
-          _loading    = false;
+          _userMap = userMap;
+          _brandMap = brandMap;
+          _catMap = catMap;
+          _loading = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
     }
   }
 
@@ -129,7 +176,10 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         title: const Text('ยืนยันการลบงาน'),
         content: Text('ต้องการลบงาน "${task.title}" หรือไม่?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -142,11 +192,22 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     try {
       await widget.service.deleteTask(task.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ลบงานสำเร็จ'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ลบงานสำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
+        );
         _loadData();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ลบงานล้มเหลว: $e'), backgroundColor: Colors.red));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ลบงานล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
     }
   }
 
@@ -156,20 +217,27 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       await widget.service.updateTaskStatus(task.id, newStatus);
       if (mounted) _loadData();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('เปลี่ยนสถานะล้มเหลว: $e'), backgroundColor: Colors.red));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เปลี่ยนสถานะล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
     }
   }
-
 
   void _showTaskDetailSheet(TaskRecord task) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => _TaskDetailSheet(
         task: task,
-        userMap: { for (var u in _users) u.id: u },
+        userMap: {for (var u in _users) u.id: u},
         brandMap: _brandMap,
         catMap: _catMap,
         statusConfig: _statusConfig,
@@ -180,16 +248,39 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
             _loadData();
             Navigator.pop(context);
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('เปลี่ยนสถานะล้มเหลว: $e')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('เปลี่ยนสถานะล้มเหลว: $e')));
           }
         },
         onDelete: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('ยืนยันการลบงาน'),
+              content: Text('ต้องการลบงาน “${task.title}” หรือไม่?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('ยกเลิก'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('ลบงาน'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
           try {
             await widget.service.deleteTask(task.id);
             _loadData();
             Navigator.pop(context);
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ลบงานล้มเหลว: $e')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('ลบงานล้มเหลว: $e')));
           }
         },
       ),
@@ -208,22 +299,23 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       builder: (_) => _EditTaskModal(
         task: task,
         users: _users,
-        onSave: ({
-          required title,
-          required description,
-          required assigneeIds,
-          required dueDate,
-        }) async {
-          await widget.service.updateTask(
-            id: task.id,
-            title: title,
-            description: description,
-            assigneeIds: assigneeIds,
-            dueDate: dueDate,
-            brandId: task.brandId,
-            categoryId: task.categoryId,
-          );
-        },
+        onSave:
+            ({
+              required title,
+              required description,
+              required assigneeIds,
+              required dueDate,
+            }) async {
+              await widget.service.updateTask(
+                id: task.id,
+                title: title,
+                description: description,
+                assigneeIds: assigneeIds,
+                dueDate: dueDate,
+                brandId: task.brandId,
+                categoryId: task.categoryId,
+              );
+            },
       ),
     );
     if (saved == true && mounted) {
@@ -246,29 +338,31 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => _CreateTaskModal(
         users: _users,
         brands: _brands,
         categories: _categories,
-        onSubmit: (title, desc, assignees, due, brand, category, cardNames) async {
-          // 1. สร้างงานก่อน
-          final task = await widget.service.createTask(
-            title: title,
-            description: desc,
-            assignedTo: assignees.isNotEmpty ? assignees.first : '',
-            brandId: brand,
-            categoryId: category,
-            dueDate: due,
-            assigneeIds: assignees,
-          );
-          // 2. ถ้ามีหัวข้องาน → สร้าง list สำหรับแต่ละหัวข้อ (ไม่สร้าง card อัตโนมัติ)
-          final validCards = cardNames.where((n) => n.trim().isNotEmpty).toList();
-          for (final cardName in validCards) {
-            await widget.service.createTaskList(task.id, cardName.trim());
-          }
-          _loadData();
-        },
+        onSubmit:
+            (title, desc, assignees, due, brand, category, cardNames) async {
+              final validLists = cardNames
+                  .map((name) => name.trim())
+                  .where((name) => name.isNotEmpty)
+                  .toList(growable: false);
+              await widget.service.createTask(
+                title: title,
+                description: desc,
+                assignedTo: assignees.isNotEmpty ? assignees.first : '',
+                brandId: brand,
+                categoryId: category,
+                dueDate: due,
+                assigneeIds: assignees,
+                listNames: validLists,
+              );
+              _loadData();
+            },
       ),
     );
   }
@@ -359,9 +453,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
             border: Border.all(
-              color: isSelected
-                  ? const Color(0xFFBFDBFE)
-                  : Colors.transparent,
+              color: isSelected ? const Color(0xFFBFDBFE) : Colors.transparent,
             ),
             boxShadow: isSelected
                 ? const [
@@ -411,9 +503,15 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           children: [
             const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.red),
             const SizedBox(height: 12),
-            Text('โหลดข้อมูลล้มเหลว: $_error', style: const TextStyle(color: workText)),
+            Text(
+              'โหลดข้อมูลล้มเหลว: $_error',
+              style: const TextStyle(color: workText),
+            ),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadData, child: const Text('ลองอีกครั้ง')),
+            ElevatedButton(
+              onPressed: _loadData,
+              child: const Text('ลองอีกครั้ง'),
+            ),
           ],
         ),
       );
@@ -429,7 +527,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       if (_selectedBrandId != null && task.brandId != _selectedBrandId) {
         return false;
       }
-      if (_selectedCategoryId != null && task.categoryId != _selectedCategoryId) {
+      if (_selectedCategoryId != null &&
+          task.categoryId != _selectedCategoryId) {
         return false;
       }
       if (!taskMatchesOwnershipFilter(
@@ -451,7 +550,10 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     return Scaffold(
       backgroundColor: workBackground,
       appBar: AppBar(
-        title: const Text('รายการมอบหมายงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text(
+          'รายการมอบหมายงาน',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         actions: [
           if (widget.service.currentUser?.role != 'employee')
             IconButton(
@@ -459,7 +561,11 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
               icon: const Icon(Icons.add_task_rounded, color: workBlue),
               tooltip: 'มอบหมายงานใหม่',
             ),
-          IconButton(onPressed: _loadData, icon: const Icon(Icons.refresh_rounded, color: workMuted), tooltip: 'รีโหลด'),
+          IconButton(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh_rounded, color: workMuted),
+            tooltip: 'รีโหลด',
+          ),
         ],
       ),
       body: Column(
@@ -522,11 +628,22 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         style: const TextStyle(fontSize: 13.5, color: workText),
                         decoration: InputDecoration(
                           hintText: 'ค้นหาบอร์ดงาน...',
-                          hintStyle: const TextStyle(color: workMuted, fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: workMuted, size: 20),
+                          hintStyle: const TextStyle(
+                            color: workMuted,
+                            fontSize: 13,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: workMuted,
+                            size: 20,
+                          ),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, color: workMuted, size: 18),
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    color: workMuted,
+                                    size: 18,
+                                  ),
                                   onPressed: () {
                                     setState(() {
                                       _searchQuery = '';
@@ -536,7 +653,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
                         ),
                       ),
                     ),
@@ -615,65 +734,84 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                       ),
                     )
                   : filteredTasks.isEmpty
-                      ? ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: [
-                            SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-                            Center(
-                              child: Column(
-                                children: [
-                                  Icon(Icons.filter_list_off_rounded, size: 48, color: workMuted.withOpacity(0.5)),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'ไม่พบบอร์ดงานที่ตรงตามตัวกรอง',
-                                    style: TextStyle(color: workMuted, fontSize: 13.5, fontWeight: FontWeight.w500),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  OutlinedButton(
-                                    onPressed: _clearAllFilters,
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: workBlue,
-                                      side: const BorderSide(color: workBlue),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    ),
-                                    child: const Text('ล้างตัวกรองทั้งหมด', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        )
-                      : ListView.separated(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                          itemCount: filteredTasks.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final t = filteredTasks[index];
-                            return _buildDraggableTaskCard(t);
-                          },
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.2,
                         ),
+                        Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.filter_list_off_rounded,
+                                size: 48,
+                                color: workMuted.withOpacity(0.5),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'ไม่พบบอร์ดงานที่ตรงตามตัวกรอง',
+                                style: TextStyle(
+                                  color: workMuted,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              OutlinedButton(
+                                onPressed: _clearAllFilters,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: workBlue,
+                                  side: const BorderSide(color: workBlue),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'ล้างตัวกรองทั้งหมด',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      itemCount: filteredTasks.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final t = filteredTasks[index];
+                        return _buildDraggableTaskCard(t);
+                      },
+                    ),
             ),
           ),
         ],
       ),
     );
-
   }
 
   // ─── Kanban board ───────────────────────────────────────────────
-
 
   Widget _buildDraggableTaskCard(TaskRecord task) {
     return _buildTaskCardContent(task);
   }
 
-
   Widget _buildTaskCardContent(TaskRecord task) {
-    final brand    = task.brandId != null ? _brandMap[task.brandId] : null;
+    final brand = task.brandId != null ? _brandMap[task.brandId] : null;
     final category = task.categoryId != null ? _catMap[task.categoryId] : null;
-    final isOverdue = task.status != 'completed' && task.dueDate.isBefore(DateTime.now());
+    final isOverdue = isAssignmentOverdue(task.dueDate, task.status);
 
     final isEmployee = widget.service.currentUser?.role == 'employee';
     final currentUser = widget.service.currentUser;
@@ -683,16 +821,17 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         ? task.assignedByName
         : 'เพื่อนร่วมงาน';
     // Multiple assignees mapping
-    final assignees = task.subItems.isNotEmpty && task.status == 'completed'
-        ? <AppUser>[]
-        : (isEmployee && currentUser != null
-            ? [currentUser]
-            : _users.where((u) {
-                if (task.assigneeIds.isNotEmpty) {
-                  return task.assigneeIds.contains(u.id);
-                }
-                return u.id == task.assignedTo;
-              }).toList());
+    final assignees = isEmployee && currentUser != null
+        ? [currentUser]
+        : _users.where((u) {
+            if (task.assigneeIds.isNotEmpty) {
+              return task.assigneeIds.contains(u.id);
+            }
+            return u.id == task.assignedTo;
+          }).toList();
+    final assigneeCount = task.assigneeIds.isNotEmpty
+        ? task.assigneeIds.length
+        : assignees.length;
 
     return GestureDetector(
       onTap: () {
@@ -715,7 +854,13 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFF1F5F9)),
-          boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 8, offset: Offset(0, 2))],
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x05000000),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -727,9 +872,19 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 runSpacing: 4,
                 children: [
                   if (brand != null)
-                    _buildTag(brand.name, const Color(0xFFEFF6FF), workBlue, const Color(0xFFBFDBFE)),
+                    _buildTag(
+                      brand.name,
+                      const Color(0xFFEFF6FF),
+                      workBlue,
+                      const Color(0xFFBFDBFE),
+                    ),
                   if (category != null)
-                    _buildTag(category.name, const Color(0xFFFEF3C7), const Color(0xFFB45309), const Color(0xFFFDE68A)),
+                    _buildTag(
+                      category.name,
+                      const Color(0xFFFEF3C7),
+                      const Color(0xFFB45309),
+                      const Color(0xFFFDE68A),
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -742,17 +897,36 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText)),
+                      Text(
+                        task.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: workText,
+                        ),
+                      ),
                       if (task.description.isNotEmpty) ...[
                         const SizedBox(height: 3),
-                        Text(task.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: workMuted)),
+                        Text(
+                          task.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: workMuted,
+                          ),
+                        ),
                       ],
                     ],
                   ),
                 ),
                 if (widget.service.currentUser?.role == 'admin')
                   IconButton(
-                    icon: const Icon(Icons.more_horiz, color: workMuted, size: 20),
+                    icon: const Icon(
+                      Icons.more_horiz,
+                      color: workMuted,
+                      size: 20,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     onPressed: () => _showTaskDetailSheet(task),
@@ -764,7 +938,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: isBoardCreator ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                color: isBoardCreator
+                    ? const Color(0xFFFEF2F2)
+                    : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
@@ -773,7 +949,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                   Icon(
                     isBoardCreator ? Icons.star_rounded : Icons.group_rounded,
                     size: 11,
-                    color: isBoardCreator ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                    color: isBoardCreator
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF64748B),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -783,7 +961,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: isBoardCreator ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                      color: isBoardCreator
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -806,11 +986,18 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.view_kanban_rounded, size: 12, color: workMuted),
+                              const Icon(
+                                Icons.view_kanban_rounded,
+                                size: 12,
+                                color: workMuted,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '${task.cardDone}/${task.cardTotal} การ์ด',
-                                style: const TextStyle(fontSize: 10.5, color: workMuted),
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: workMuted,
+                                ),
                               ),
                             ],
                           ),
@@ -819,7 +1006,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: isAllDone ? const Color(0xFF10B981) : workBlue,
+                              color: isAllDone
+                                  ? const Color(0xFF10B981)
+                                  : workBlue,
                             ),
                           ),
                         ],
@@ -849,17 +1038,28 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.checklist_rounded, size: 12, color: workMuted),
+                              const Icon(
+                                Icons.checklist_rounded,
+                                size: 12,
+                                color: workMuted,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '$doneCount/$totalCount รายการ',
-                                style: const TextStyle(fontSize: 10.5, color: workMuted),
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: workMuted,
+                                ),
                               ),
                             ],
                           ),
                           Text(
                             '$pct%',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: workBlue),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: workBlue,
+                            ),
                           ),
                         ],
                       ),
@@ -892,7 +1092,11 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 Row(
                   children: [
                     if (assignees.isEmpty)
-                      const Icon(Icons.person_outline_rounded, size: 16, color: workMuted)
+                      const Icon(
+                        Icons.person_outline_rounded,
+                        size: 16,
+                        color: workMuted,
+                      )
                     else
                       SizedBox(
                         height: 24,
@@ -901,27 +1105,43 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                           children: List.generate(assignees.length, (index) {
                             final u = assignees[index];
                             final avatarUrl = u.avatarUrl;
-                            final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
+                            final hasAvatar =
+                                avatarUrl != null &&
+                                avatarUrl.trim().isNotEmpty;
                             final resolvedAvatar = hasAvatar
                                 ? (avatarUrl.startsWith('r2://')
-                                    ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                                    : avatarUrl)
+                                      ? avatarUrl.replaceFirst(
+                                          'r2://',
+                                          'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+                                        )
+                                      : avatarUrl)
                                 : null;
 
                             return Positioned(
                               left: index * 12.0,
                               child: Container(
-                                width: 22, height: 22,
+                                width: 22,
+                                height: 22,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: const Color(0xFFEFF6FF),
-                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.5,
+                                  ),
                                   image: resolvedAvatar != null
-                                      ? DecorationImage(image: NetworkImage(resolvedAvatar), fit: BoxFit.cover)
+                                      ? DecorationImage(
+                                          image: NetworkImage(resolvedAvatar),
+                                          fit: BoxFit.cover,
+                                        )
                                       : null,
                                 ),
                                 child: resolvedAvatar == null
-                                    ? const Icon(Icons.person_rounded, size: 10, color: workBlue)
+                                    ? const Icon(
+                                        Icons.person_rounded,
+                                        size: 10,
+                                        color: workBlue,
+                                      )
                                     : null,
                               ),
                             );
@@ -930,21 +1150,36 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                       ),
                     const SizedBox(width: 6),
                     Text(
-                      assignees.length == 1
+                      assigneeCount == 1 && assignees.isNotEmpty
                           ? assignees.first.firstName
-                          : (assignees.length > 1 ? '${assignees.length} คน' : 'ไม่ระบุ'),
-                      style: const TextStyle(fontSize: 11, color: workText, fontWeight: FontWeight.w500),
+                          : (assigneeCount > 1
+                                ? '$assigneeCount คน'
+                                : 'ไม่ระบุ'),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: workText,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
                 Row(
                   children: [
-                    Icon(isOverdue ? Icons.warning_amber_rounded : Icons.calendar_month_rounded,
-                        size: 12, color: isOverdue ? Colors.red : workMuted),
+                    Icon(
+                      isOverdue
+                          ? Icons.warning_amber_rounded
+                          : Icons.calendar_month_rounded,
+                      size: 12,
+                      color: isOverdue ? Colors.red : workMuted,
+                    ),
                     const SizedBox(width: 3),
                     Text(
                       DateFormat('dd MMM yy').format(task.dueDate),
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: isOverdue ? Colors.red : workMuted),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: isOverdue ? Colors.red : workMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -959,8 +1194,15 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   Widget _buildTag(String label, Color bg, Color fg, Color border) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: border)),
-      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+      ),
     );
   }
 }
@@ -977,7 +1219,16 @@ class _CreateTaskModal extends StatefulWidget {
   final List<AppUser> users;
   final List<BrandRecord> brands;
   final List<TaskCategoryRecord> categories;
-  final Function(String, String, List<String>, DateTime, String?, String?, List<String>) onSubmit;
+  final Function(
+    String,
+    String,
+    List<String>,
+    DateTime,
+    String?,
+    String?,
+    List<String>,
+  )
+  onSubmit;
 
   @override
   State<_CreateTaskModal> createState() => _CreateTaskModalState();
@@ -987,13 +1238,14 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
   String? _formBrand;
   String? _formCategory;
   final List<String> _formAssignees = [];
-  String  _formTitle    = '';
-  String  _formDesc     = '';
-  DateTime _formDue     = DateTime.now().add(const Duration(days: 1));
+  String _formTitle = '';
+  String _formDesc = '';
+  DateTime _formDue = DateTime.now().add(const Duration(days: 1));
   final List<TextEditingController> _subControllers = [];
   bool _formLoading = false;
 
-  void _addSubItem() => setState(() => _subControllers.add(TextEditingController()));
+  void _addSubItem() =>
+      setState(() => _subControllers.add(TextEditingController()));
   void _removeSubItem(int i) {
     _subControllers[i].dispose();
     setState(() => _subControllers.removeAt(i));
@@ -1008,7 +1260,12 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        16,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1037,12 +1294,20 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                 const SizedBox(width: 8),
                 const Text(
                   'มอบหมายงานใหม่',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: workText),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    color: workText,
+                  ),
                 ),
                 const Spacer(),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded, color: workMuted, size: 20),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: workMuted,
+                    size: 20,
+                  ),
                   style: IconButton.styleFrom(
                     backgroundColor: const Color(0xFFF1F5F9),
                     padding: const EdgeInsets.all(8),
@@ -1056,33 +1321,62 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
             // ── Row 1: Brand + Category ──
             Row(
               children: [
-                Expanded(child: _buildDropdown(
-                  label: 'แบรนด์',
-                  icon: Icons.label_outline_rounded,
-                  value: _formBrand,
-                  items: <DropdownMenuItem<String?>>[
-                    const DropdownMenuItem<String?>(value: null, child: Text('— ไม่ระบุ —')),
-                    ...widget.brands.map((b) => DropdownMenuItem<String?>(value: b.id, child: Text(b.name, style: const TextStyle(fontSize: 13)))),
-                  ],
-                  onChanged: (v) => setState(() => _formBrand = v),
-                )),
+                Expanded(
+                  child: _buildDropdown(
+                    label: 'แบรนด์',
+                    icon: Icons.label_outline_rounded,
+                    value: _formBrand,
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('— ไม่ระบุ —'),
+                      ),
+                      ...widget.brands.map(
+                        (b) => DropdownMenuItem<String?>(
+                          value: b.id,
+                          child: Text(
+                            b.name,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _formBrand = v),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDropdown(
-                  label: 'หมวดหมู่',
-                  icon: Icons.folder_outlined,
-                  value: _formCategory,
-                  items: <DropdownMenuItem<String?>>[
-                    const DropdownMenuItem<String?>(value: null, child: Text('— ไม่ระบุ —')),
-                    ...widget.categories.map((c) => DropdownMenuItem<String?>(value: c.id, child: Text(c.name, style: const TextStyle(fontSize: 13)))),
-                  ],
-                  onChanged: (v) => setState(() => _formCategory = v),
-                )),
+                Expanded(
+                  child: _buildDropdown(
+                    label: 'หมวดหมู่',
+                    icon: Icons.folder_outlined,
+                    value: _formCategory,
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('— ไม่ระบุ —'),
+                      ),
+                      ...widget.categories.map(
+                        (c) => DropdownMenuItem<String?>(
+                          value: c.id,
+                          child: Text(
+                            c.name,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _formCategory = v),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
 
             // ── Row 2: Multi-assignee Selector Horizontal list with Avatars ──
-            _fieldLabel('ผู้รับผิดชอบ * (เลือกได้มากกว่า 1 คน)', Icons.people_outline_rounded),
+            _fieldLabel(
+              'ผู้รับผิดชอบ * (เลือกได้มากกว่า 1 คน)',
+              Icons.people_outline_rounded,
+            ),
             const SizedBox(height: 4),
             SizedBox(
               height: 72,
@@ -1092,10 +1386,14 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                 itemBuilder: (context, i) {
                   final u = widget.users[i];
                   final isSelected = _formAssignees.contains(u.id);
-                  final resolvedAvatar = u.avatarUrl != null && u.avatarUrl!.trim().isNotEmpty
+                  final resolvedAvatar =
+                      u.avatarUrl != null && u.avatarUrl!.trim().isNotEmpty
                       ? (u.avatarUrl!.startsWith('r2://')
-                          ? u.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                          : u.avatarUrl)
+                            ? u.avatarUrl!.replaceFirst(
+                                'r2://',
+                                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+                              )
+                            : u.avatarUrl)
                       : null;
 
                   return GestureDetector(
@@ -1110,17 +1408,34 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
-                      margin: const EdgeInsets.only(right: 10, top: 2, bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      margin: const EdgeInsets.only(
+                        right: 10,
+                        top: 2,
+                        bottom: 6,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                        color: isSelected
+                            ? const Color(0xFFEFF6FF)
+                            : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isSelected ? workBlue : const Color(0xFFE2E8F0),
+                          color: isSelected
+                              ? workBlue
+                              : const Color(0xFFE2E8F0),
                           width: isSelected ? 1.5 : 1,
                         ),
                         boxShadow: isSelected
-                            ? const [BoxShadow(color: Color(0x0F2563EB), blurRadius: 6, offset: Offset(0, 2))]
+                            ? const [
+                                BoxShadow(
+                                  color: Color(0x0F2563EB),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
+                                ),
+                              ]
                             : null,
                       ),
                       child: Row(
@@ -1129,9 +1444,19 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                           Stack(
                             children: [
                               CircleAvatar(
-                                backgroundImage: resolvedAvatar != null ? NetworkImage(resolvedAvatar) : null,
+                                backgroundImage: resolvedAvatar != null
+                                    ? NetworkImage(resolvedAvatar)
+                                    : null,
                                 radius: 16,
-                                child: resolvedAvatar == null ? Text(u.firstName[0], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)) : null,
+                                child: resolvedAvatar == null
+                                    ? Text(
+                                        u.firstName[0],
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
                               ),
                               if (isSelected)
                                 Positioned(
@@ -1139,10 +1464,17 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                                   bottom: 0,
                                   child: Container(
                                     padding: const EdgeInsets.all(1.5),
-                                    decoration: const BoxDecoration(color: workBlue, shape: BoxShape.circle),
-                                    child: const Icon(Icons.check, size: 7, color: Colors.white),
+                                    decoration: const BoxDecoration(
+                                      color: workBlue,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      size: 7,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                )
+                                ),
                             ],
                           ),
                           const SizedBox(width: 8),
@@ -1150,8 +1482,21 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(u.fullName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workText)),
-                              Text(u.position.isEmpty ? '-' : u.position, style: const TextStyle(fontSize: 9, color: workMuted)),
+                              Text(
+                                u.fullName,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: workText,
+                                ),
+                              ),
+                              Text(
+                                u.position.isEmpty ? '-' : u.position,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: workMuted,
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -1258,19 +1603,38 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
             // ── Cards (การ์ดงาน) ──
             Row(
               children: [
-                const Icon(Icons.view_kanban_rounded, color: workBlue, size: 16),
+                const Icon(
+                  Icons.view_kanban_rounded,
+                  color: workBlue,
+                  size: 16,
+                ),
                 const SizedBox(width: 6),
-                const Text('การ์ดงาน', style: TextStyle(fontSize: 12, color: workText, fontWeight: FontWeight.bold)),
+                const Text(
+                  'การ์ดงาน',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: workText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: _addSubItem,
                   icon: const Icon(Icons.add_rounded, size: 16),
-                  label: const Text('+ เพิ่มการ์ดงาน', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    '+ เพิ่มการ์ดงาน',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                   style: TextButton.styleFrom(
                     foregroundColor: workBlue,
                     backgroundColor: const Color(0xFFEFF6FF),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -1278,35 +1642,59 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
               ],
             ),
             const SizedBox(height: 10),
-            ...List.generate(_subControllers.length, (i) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Container(
-                    width: 24, height: 24,
-                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
-                    child: Center(child: Text('${i + 1}', style: const TextStyle(fontSize: 10, color: workBlue, fontWeight: FontWeight.bold))),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: TextField(
-                    controller: _subControllers[i],
-                    decoration: _inputDeco('ชื่อการ์ดงาน / สิ่งที่ต้องทำ...'),
-                    style: const TextStyle(fontSize: 13),
-                  )),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    onPressed: () => _removeSubItem(i),
-                    icon: const Icon(Icons.close_rounded, color: workMuted, size: 16),
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      padding: const EdgeInsets.all(6),
+            ...List.generate(
+              _subControllers.length,
+              (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${i + 1}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: workBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _subControllers[i],
+                        decoration: _inputDeco(
+                          'ชื่อการ์ดงาน / สิ่งที่ต้องทำ...',
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      onPressed: () => _removeSubItem(i),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: workMuted,
+                        size: 16,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        padding: const EdgeInsets.all(6),
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
               ),
-            )),
+            ),
             const SizedBox(height: 24),
 
             // ── Submit ──
@@ -1325,43 +1713,72 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     color: Color(0x3F2563EB),
                     blurRadius: 10,
                     offset: Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: ElevatedButton(
-                onPressed: _formLoading ? null : () async {
-                  if (_formTitle.trim().isEmpty || _formAssignees.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรุณากรอกชื่องานและเลือกผู้รับผิดชอบอย่างน้อย 1 คน')));
-                    return;
-                  }
-                  setState(() => _formLoading = true);
-                  try {
-                    final subItems = _subControllers.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList();
-                    await widget.onSubmit(
-                      _formTitle,
-                      _formDesc,
-                      _formAssignees,
-                      _formDue,
-                      _formBrand,
-                      _formCategory,
-                      subItems,
-                    );
-                    if (mounted) Navigator.pop(context);
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
-                  } finally {
-                    if (mounted) setState(() => _formLoading = false);
-                  }
-                },
+                onPressed: _formLoading
+                    ? null
+                    : () async {
+                        if (_formTitle.trim().isEmpty ||
+                            _formAssignees.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'กรุณากรอกชื่องานและเลือกผู้รับผิดชอบอย่างน้อย 1 คน',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() => _formLoading = true);
+                        try {
+                          final subItems = _subControllers
+                              .map((c) => c.text.trim())
+                              .where((s) => s.isNotEmpty)
+                              .toList();
+                          await widget.onSubmit(
+                            _formTitle,
+                            _formDesc,
+                            _formAssignees,
+                            _formDue,
+                            _formBrand,
+                            _formCategory,
+                            subItems,
+                          );
+                          if (mounted) Navigator.pop(context);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+                          );
+                        } finally {
+                          if (mounted) setState(() => _formLoading = false);
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 child: _formLoading
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('มอบหมายงาน', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'มอบหมายงาน',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -1384,7 +1801,9 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
         const SizedBox(height: 4),
         DropdownButtonFormField<T>(
           value: value,
-          decoration: _inputDeco('').copyWith(contentPadding: const EdgeInsets.symmetric(horizontal: 16)),
+          decoration: _inputDeco('').copyWith(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          ),
           isExpanded: true,
           items: items,
           onChanged: onChanged,
@@ -1399,7 +1818,14 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
       children: [
         Icon(icon, size: 14, color: workBlue),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 12, color: workMuted, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: workMuted,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }
@@ -1411,9 +1837,18 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: workBlue, width: 1.5)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: workBlue, width: 1.5),
+      ),
     );
   }
 }
@@ -1432,7 +1867,8 @@ class _EditTaskModal extends StatefulWidget {
     required String description,
     required List<String> assigneeIds,
     required DateTime dueDate,
-  }) onSave;
+  })
+  onSave;
 
   @override
   State<_EditTaskModal> createState() => _EditTaskModalState();
@@ -1503,9 +1939,7 @@ class _EditTaskModalState extends State<_EditTaskModal> {
   Widget build(BuildContext context) {
     final dueDateIsPast = isWorkDatePast(_dueDate);
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
         child: Column(
@@ -1665,9 +2099,7 @@ class _EditTaskModalState extends State<_EditTaskModal> {
                   children: [
                     Icon(
                       Icons.calendar_month_rounded,
-                      color: dueDateIsPast
-                          ? const Color(0xFFDC2626)
-                          : workBlue,
+                      color: dueDateIsPast ? const Color(0xFFDC2626) : workBlue,
                       size: 18,
                     ),
                     const SizedBox(width: 9),
@@ -1775,24 +2207,41 @@ class _TaskDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = userMap[task.assignedTo];
     final List<AppUser> detailAssignees = task.assigneeIds.isNotEmpty
-        ? task.assigneeIds.map((id) => userMap[id]).whereType<AppUser>().toList()
+        ? task.assigneeIds
+              .map((id) => userMap[id])
+              .whereType<AppUser>()
+              .toList()
         : (user != null ? [user] : []);
     final String assigneeNames = detailAssignees.isNotEmpty
         ? detailAssignees.map((u) => u.fullName).join(', ')
         : 'ไม่ระบุ';
-    final brand    = task.brandId != null ? brandMap[task.brandId] : null;
+    final brand = task.brandId != null ? brandMap[task.brandId] : null;
     final category = task.categoryId != null ? catMap[task.categoryId] : null;
-    final meta     = statusConfig[task.status]!;
-    final isOverdue = task.status != 'completed' && task.dueDate.isBefore(DateTime.now());
+    final meta = statusConfig[task.status] ?? statusConfig['pending']!;
+    final isOverdue = isAssignmentOverdue(task.dueDate, task.status);
     const otherStatuses = ['pending', 'in_progress', 'completed'];
 
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Handle bar
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)))),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Tags
@@ -1802,33 +2251,99 @@ class _TaskDetailSheet extends StatelessWidget {
             children: [
               // Status tag
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: meta.bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: meta.border)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: meta.color)),
-                  const SizedBox(width: 6),
-                  Text(meta.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: meta.color)),
-                ]),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: meta.bg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: meta.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: meta.color,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      meta.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: meta.color,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               if (brand != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.label_outline_rounded, size: 12, color: workBlue),
-                    const SizedBox(width: 4),
-                    Text(brand.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workBlue)),
-                  ]),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.label_outline_rounded,
+                        size: 12,
+                        color: workBlue,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        brand.name,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: workBlue,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               if (category != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFDE68A))),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.folder_outlined, size: 12, color: Color(0xFFB45309)),
-                    const SizedBox(width: 4),
-                    Text(category.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
-                  ]),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.folder_outlined,
+                        size: 12,
+                        color: Color(0xFFB45309),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        category.name,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
@@ -1871,58 +2386,107 @@ class _TaskDetailSheet extends StatelessWidget {
           ),
           if (task.description.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(task.description, style: const TextStyle(fontSize: 14, color: workMuted, height: 1.6)),
+            Text(
+              task.description,
+              style: const TextStyle(
+                fontSize: 14,
+                color: workMuted,
+                height: 1.6,
+              ),
+            ),
           ],
           const SizedBox(height: 16),
 
           // Assignee + Due date
           Row(
             children: [
-              Expanded(child: _infoCard(
-                icon: Icons.person_rounded,
-                label: 'ผู้รับผิดชอบ',
-                value: assigneeNames,
-              )),
+              Expanded(
+                child: _infoCard(
+                  icon: Icons.person_rounded,
+                  label: 'ผู้รับผิดชอบ',
+                  value: assigneeNames,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _infoCard(
-                icon: isOverdue ? Icons.warning_amber_rounded : Icons.calendar_month_rounded,
-                label: 'กำหนดส่ง',
-                value: DateFormat('dd MMMM yyyy', 'th').format(task.dueDate),
-                valueColor: isOverdue ? Colors.red : workText,
-                iconColor: isOverdue ? Colors.red : workBlue,
-              )),
+              Expanded(
+                child: _infoCard(
+                  icon: isOverdue
+                      ? Icons.warning_amber_rounded
+                      : Icons.calendar_month_rounded,
+                  label: 'กำหนดส่ง',
+                  value: DateFormat('dd MMMM yyyy', 'th').format(task.dueDate),
+                  valueColor: isOverdue ? Colors.red : workText,
+                  iconColor: isOverdue ? Colors.red : workBlue,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
 
           // Sub-items checklist
           if (task.subItems.isNotEmpty) ...[
-            const Text('CHECKLIST', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-            const SizedBox(height: 8),
-            ...task.subItems.map((item) => Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
-              child: Row(
-                children: [
-                  Icon(
-                    item.isDone ? Icons.check_circle_rounded : Icons.circle_outlined,
-                    color: item.isDone ? const Color(0xFF22C55E) : const Color(0xFFCBD5E1),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(
-                    item.title,
-                    style: TextStyle(fontSize: 13, color: item.isDone ? workMuted : workText, decoration: item.isDone ? TextDecoration.lineThrough : null),
-                  )),
-                ],
+            const Text(
+              'CHECKLIST',
+              style: TextStyle(
+                fontSize: 11,
+                color: workMuted,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
               ),
-            )),
+            ),
+            const SizedBox(height: 8),
+            ...task.subItems.map(
+              (item) => Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      item.isDone
+                          ? Icons.check_circle_rounded
+                          : Icons.circle_outlined,
+                      color: item.isDone
+                          ? const Color(0xFF22C55E)
+                          : const Color(0xFFCBD5E1),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: item.isDone ? workMuted : workText,
+                          decoration: item.isDone
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
           ],
 
           // Change status
-          const Text('เปลี่ยนสถานะ', style: TextStyle(fontSize: 11, color: workMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+          const Text(
+            'เปลี่ยนสถานะ',
+            style: TextStyle(
+              fontSize: 11,
+              color: workMuted,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -1935,10 +2499,21 @@ class _TaskDetailSheet extends StatelessWidget {
                   foregroundColor: m.color,
                   side: BorderSide(color: m.border, width: 1.5),
                   backgroundColor: m.bg,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                 ),
-                child: Text('→ ${m.label}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                child: Text(
+                  '→ ${m.label}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               );
             }).toList(),
           ),
@@ -1952,12 +2527,17 @@ class _TaskDetailSheet extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline_rounded, size: 18),
-              label: const Text('ลบงานนี้', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text(
+                'ลบงานนี้',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
                 side: const BorderSide(color: Color(0xFFFECACA)),
                 backgroundColor: const Color(0xFFFEF2F2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
@@ -1967,19 +2547,43 @@ class _TaskDetailSheet extends StatelessWidget {
     );
   }
 
-  Widget _infoCard({required IconData icon, required String label, required String value, Color? valueColor, Color? iconColor}) {
+  Widget _infoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+    Color? iconColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, size: 13, color: iconColor ?? workBlue),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(fontSize: 11, color: workMuted)),
-        ]),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: valueColor ?? workText)),
-      ]),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 13, color: iconColor ?? workBlue),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: workMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: valueColor ?? workText,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2001,7 +2605,8 @@ class _FilterBottomSheetContent extends StatefulWidget {
   });
 
   @override
-  State<_FilterBottomSheetContent> createState() => _FilterBottomSheetContentState();
+  State<_FilterBottomSheetContent> createState() =>
+      _FilterBottomSheetContentState();
 }
 
 class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
@@ -2018,7 +2623,12 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        16,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -2056,7 +2666,11 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
 
             const Text(
               'แบรนด์ (Brand)',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -2068,18 +2682,24 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                   isSelected: _tempBrandId == null,
                   onTap: () => setState(() => _tempBrandId = null),
                 ),
-                ...widget.brands.map((b) => _buildFilterChip(
-                  label: b.name,
-                  isSelected: _tempBrandId == b.id,
-                  onTap: () => setState(() => _tempBrandId = b.id),
-                )),
+                ...widget.brands.map(
+                  (b) => _buildFilterChip(
+                    label: b.name,
+                    isSelected: _tempBrandId == b.id,
+                    onTap: () => setState(() => _tempBrandId = b.id),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 20),
 
             const Text(
               'หมวดหมู่ (Category)',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -2091,11 +2711,13 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                   isSelected: _tempCategoryId == null,
                   onTap: () => setState(() => _tempCategoryId = null),
                 ),
-                ...widget.categories.map((c) => _buildFilterChip(
-                  label: c.name,
-                  isSelected: _tempCategoryId == c.id,
-                  onTap: () => setState(() => _tempCategoryId = c.id),
-                )),
+                ...widget.categories.map(
+                  (c) => _buildFilterChip(
+                    label: c.name,
+                    isSelected: _tempCategoryId == c.id,
+                    onTap: () => setState(() => _tempCategoryId = c.id),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 32),
@@ -2113,10 +2735,15 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: workMuted,
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('ล้างตัวกรอง', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'ล้างตัวกรอง',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -2129,11 +2756,16 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: workBlue,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       elevation: 0,
                     ),
-                    child: const Text('ใช้ตัวกรอง', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'ใช้ตัวกรอง',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],

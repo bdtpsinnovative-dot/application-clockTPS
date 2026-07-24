@@ -55,17 +55,32 @@ void main() {
       assigneeIds: const ['me'],
     );
 
-    expect(
-      taskMatchesOwnershipFilter(created, 'me', 'created_by_me'),
-      isTrue,
-    );
-    expect(
-      taskMatchesOwnershipFilter(joined, 'me', 'created_by_me'),
-      isFalse,
-    );
+    expect(taskMatchesOwnershipFilter(created, 'me', 'created_by_me'), isTrue);
+    expect(taskMatchesOwnershipFilter(joined, 'me', 'created_by_me'), isFalse);
     expect(taskMatchesOwnershipFilter(joined, 'me', 'joined'), isTrue);
     expect(taskMatchesOwnershipFilter(created, 'me', 'joined'), isFalse);
     expect(taskMatchesOwnershipFilter(created, 'me', null), isTrue);
     expect(taskMatchesOwnershipFilter(joined, 'me', null), isTrue);
+  });
+
+  test('assignment becomes overdue only after the due calendar day', () {
+    final dueDate = DateTime(2026, 7, 24);
+
+    expect(
+      isAssignmentOverdue(
+        dueDate,
+        'in_progress',
+        now: DateTime(2026, 7, 24, 23, 59),
+      ),
+      isFalse,
+    );
+    expect(
+      isAssignmentOverdue(dueDate, 'in_progress', now: DateTime(2026, 7, 25)),
+      isTrue,
+    );
+    expect(
+      isAssignmentOverdue(dueDate, 'completed', now: DateTime(2026, 7, 25)),
+      isFalse,
+    );
   });
 }
