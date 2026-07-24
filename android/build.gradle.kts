@@ -3,6 +3,19 @@ allprojects {
         google()
         mavenCentral()
     }
+    repositories.configureEach {
+        if (this is MavenArtifactRepository) {
+            val urlString = url.toString()
+            if (urlString.contains("jitpack.io")) {
+                content {
+                    excludeGroupByRegex("androidx\\..*")
+                    excludeGroupByRegex("com\\.android\\..*")
+                    excludeGroupByRegex("com\\.google\\..*")
+                    excludeGroupByRegex("org\\.jetbrains\\..*")
+                }
+            }
+        }
+    }
 }
 
 val newBuildDir: Directory =
