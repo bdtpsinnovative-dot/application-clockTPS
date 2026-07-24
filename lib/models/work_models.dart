@@ -157,6 +157,7 @@ class TaskRecord {
     required this.id,
     required this.assignedTo,
     this.assignedToName = '',
+    this.assignedByName = '',
     required this.title,
     required this.description,
     required this.dueDate,
@@ -186,6 +187,7 @@ class TaskRecord {
       id: json['id'] as String? ?? '',
       assignedTo: json['assigned_to'] as String? ?? '',
       assignedToName: json['assigned_to_name'] as String? ?? '',
+      assignedByName: json['assigned_by_name'] as String? ?? '',
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       dueDate: DateTime.parse(json['due_date'] as String),
@@ -204,6 +206,7 @@ class TaskRecord {
   final String id;
   final String assignedTo;
   final String assignedToName;
+  final String assignedByName;
   final String title;
   final String description;
   final DateTime dueDate;
@@ -386,7 +389,7 @@ class TaskListRecord {
 }
 
 class TaskCardRecord {
-  const TaskCardRecord({
+  TaskCardRecord({
     required this.id,
     required this.listId,
     required this.title,
@@ -399,6 +402,8 @@ class TaskCardRecord {
     this.subItems = const [],
     List<CardAttachment>? attachments = const [],
     this.adminComment,
+    this.assigneeIds = const [],
+    this.assignees = const [],
   }) : _attachments = attachments;
 
   factory TaskCardRecord.fromJson(Map<String, dynamic> json) {
@@ -411,6 +416,13 @@ class TaskCardRecord {
     final attachments = rawAttachments is List
         ? rawAttachments.map((e) => CardAttachment.fromJson(e as Map<String, dynamic>)).toList()
         : <CardAttachment>[];
+
+    final rawAssigneesJson = json['assignees'];
+    final rawAssignees = rawAssigneesJson is List
+        ? rawAssigneesJson.map((e) => UserSummary.fromJson(e as Map<String, dynamic>)).toList()
+        : <UserSummary>[];
+
+    final rawAssigneeIds = rawAssignees.map((e) => e.id).toList();
 
     return TaskCardRecord(
       id: json['id'] as String? ?? '',
@@ -425,6 +437,8 @@ class TaskCardRecord {
       subItems: subs,
       attachments: attachments,
       adminComment: json['admin_comment'] as String?,
+      assigneeIds: rawAssigneeIds,
+      assignees: rawAssignees,
     );
   }
 
@@ -440,7 +454,129 @@ class TaskCardRecord {
   final List<TaskSubItem> subItems;
   final List<CardAttachment>? _attachments;
   final String? adminComment;
+  List<String> assigneeIds;
+  List<UserSummary> assignees;
+  
   List<CardAttachment> get attachments => _attachments ?? const [];
+}
+
+/// A lightweight representation of a user for cards/comments
+class UserSummary {
+  const UserSummary({
+    required this.id,
+    required this.firstName,
+    required this.lastName,
+    required this.position,
+    this.avatarUrl,
+  });
+
+  factory UserSummary.fromJson(Map<String, dynamic> json) {
+    return UserSummary(
+      id: json['id'] as String? ?? '',
+      firstName: json['first_name'] as String? ?? '',
+      lastName: json['last_name'] as String? ?? '',
+      position: json['position'] as String? ?? '',
+      avatarUrl: json['avatar_url'] as String?,
+    );
+  }
+
+  final String id;
+  final String firstName;
+  final String lastName;
+  final String position;
+  final String? avatarUrl;
+
+  String get fullName => '$firstName $lastName';
+}
+
+/// A rich-text comment on a task card
+class CardComment {
+  const CardComment({
+    required this.id,
+    required this.cardId,
+    required this.authorId,
+    required this.contentDelta,
+    required this.plainText,
+    required this.isEdited,
+    required this.createdAt,
+    required this.updatedAt,
+    this.author,
+    this.mentionedUserIds = const [],
+    this.attachments = const [],
+  });
+
+  factory CardComment.fromJson(Map<String, dynamic> json) {
+    final rawMentions = json['mentioned_user_ids'];
+    final mentions = rawMentions is List
+        ? rawMentions.map((e) => e.toString()).toList()
+        : <String>[];
+
+    final rawAttachments = json['attachments'];
+    final attachments = rawAttachments is List
+        ? rawAttachments.map((e) => CommentAttachment.fromJson(e as Map<String, dynamic>)).toList()
+        : <CommentAttachment>[];
+
+    return CardComment(
+      id: json['id'] as String? ?? '',
+      cardId: json['card_id'] as String? ?? '',
+      authorId: json['author_id'] as String? ?? '',
+      contentDelta: json['content_delta'], // Passed directly for Quill
+      plainText: json['plain_text'] as String? ?? '',
+      isEdited: json['is_edited'] as bool? ?? false,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'].toString()).toLocal() : DateTime.now(),
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'].toString()).toLocal() : DateTime.now(),
+      author: json['author'] != null ? UserSummary.fromJson(json['author'] as Map<String, dynamic>) : null,
+      mentionedUserIds: mentions,
+      attachments: attachments,
+    );
+  }
+
+  final String id;
+  final String cardId;
+  final String authorId;
+  final dynamic contentDelta; // JSON representation of Quill Delta
+  final String plainText;
+  final bool isEdited;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  // Joined fields
+  final UserSummary? author;
+  final List<String> mentionedUserIds;
+  final List<CommentAttachment> attachments;
+}
+
+/// An attachment specifically inside a comment
+class CommentAttachment {
+  const CommentAttachment({
+    required this.id,
+    required this.commentId,
+    required this.url,
+    required this.name,
+    required this.type,
+    this.sizeBytes,
+    required this.createdAt,
+  });
+
+  factory CommentAttachment.fromJson(Map<String, dynamic> json) {
+    return CommentAttachment(
+      id: json['id'] as String? ?? '',
+      commentId: json['comment_id'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      type: json['type'] as String? ?? 'file',
+      sizeBytes: json['size_bytes'] != null ? int.tryParse(json['size_bytes'].toString()) : null,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'].toString()).toLocal() : DateTime.now(),
+    );
+  }
+
+  final String id;
+  final String commentId;
+  final String url;
+  final String name;
+  final String type; // "image" | "file"
+  final int? sizeBytes;
+  final DateTime createdAt;
 }
 
 /// CardAttachment represents a file/image/link attached to a task card.

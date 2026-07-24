@@ -602,6 +602,26 @@ class AuthFlowService {
     await _authorizedPatch('/api/tasks/$id/status', data: {'status': status});
   }
 
+  Future<TaskRecord> updateTask({
+    required String id,
+    required String title,
+    required String description,
+    required List<String> assigneeIds,
+    required DateTime dueDate,
+    String? brandId,
+    String? categoryId,
+  }) async {
+    final response = await _authorizedPatch('/api/tasks/$id', data: {
+      'title': title.trim(),
+      'description': description.trim(),
+      'assignee_ids': assigneeIds,
+      'due_date': _dateValue(dueDate),
+      'brand_id': brandId ?? '',
+      'category_id': categoryId ?? '',
+    });
+    return TaskRecord.fromJson(response['data'] as Map<String, dynamic>);
+  }
+
   Future<void> toggleTaskSubItem(String id, String status) async {
     await _authorizedPatch('/api/tasks/sub-items/$id/toggle', data: {'status': status});
   }
@@ -650,6 +670,7 @@ class AuthFlowService {
     String priority = 'medium',
     DateTime? startDate,
     DateTime? dueDate,
+    List<String> assigneeIds = const [],
   }) async {
     final response = await _authorizedPost('/api/tasks/lists/$listId/cards', data: {
       'title': title,
@@ -657,6 +678,7 @@ class AuthFlowService {
       'priority': priority,
       if (startDate != null) 'start_date': startDate.toUtc().toIso8601String(),
       if (dueDate != null) 'due_date': dueDate.toUtc().toIso8601String(),
+      'assignee_ids': assigneeIds,
     });
     return TaskCardRecord.fromJson(response['data'] as Map<String, dynamic>);
   }
@@ -977,6 +999,73 @@ class AuthFlowService {
       throw const AuthFlowException('รูปแบบข้อมูลผู้ใช้จาก API ไม่ถูกต้อง');
     }
     return AppUser.fromJson(data);
+  }
+
+  // --- Card Assignees ---
+  Future<List<UserSummary>> getCardAssignees(String cardId) async {
+    final response = await _authorizedGet('/api/tasks/cards/$cardId/assignees');
+    final data = response['data'] as List;
+    return data.map((e) => UserSummary.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<UserSummary>> updateCardAssignees(String cardId, List<String> userIds) async {
+    final response = await _authorizedPut('/api/tasks/cards/$cardId/assignees', data: {
+      'assignee_ids': userIds,
+    });
+    final data = response['data'] as List;
+    return data.map((e) => UserSummary.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  // --- Task Members (for assignee picker) ---
+  Future<List<UserSummary>> getTaskMembers(String taskId) async {
+    final response = await _authorizedGet('/api/tasks/$taskId/members');
+    final data = response['data'] as List;
+    return data.map((e) => UserSummary.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  // --- Card Comments ---
+  Future<List<CardComment>> getCardComments(String cardId, {DateTime? cursor, int limit = 30}) async {
+    final query = StringBuffer('?limit=$limit');
+    if (cursor != null) {
+      query.write('&cursor=${Uri.encodeComponent(cursor.toIso8601String())}');
+    }
+    final response = await _authorizedGet('/api/tasks/cards/$cardId/comments$query');
+    final data = response['data'] as List;
+    return data.map((e) => CardComment.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<CardComment> createCardComment(
+    String cardId,
+    dynamic contentDelta,
+    String plainText,
+    List<String> mentionedUserIds,
+    List<Map<String, dynamic>> attachments,
+  ) async {
+    final response = await _authorizedPost('/api/tasks/cards/$cardId/comments', data: {
+      'content_delta': contentDelta,
+      'plain_text': plainText,
+      'mentioned_user_ids': mentionedUserIds,
+      'attachments': attachments,
+    });
+    return CardComment.fromJson(response['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> updateCardComment(
+    String cardId,
+    String commentId,
+    dynamic contentDelta,
+    String plainText,
+    List<String> mentionedUserIds,
+  ) async {
+    await _authorizedPatch('/api/tasks/cards/$cardId/comments/$commentId', data: {
+      'content_delta': contentDelta,
+      'plain_text': plainText,
+      'mentioned_user_ids': mentionedUserIds,
+    });
+  }
+
+  Future<void> deleteCardComment(String cardId, String commentId) async {
+    await _authorizedDelete('/api/tasks/cards/$cardId/comments/$commentId');
   }
 
   String _apiMessage(DioException error) {

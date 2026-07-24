@@ -4,7 +4,8 @@ import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/app_user.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/work_ui.dart';
-import 'package:hr_management/widgets/app_loading_view.dart';
+import 'package:hr_management/widgets/skeleton_loading.dart';
+import 'package:hr_management/widgets/work_due_date_picker.dart';
 import 'package:hr_management/screens/task_board_page.dart';
 
 
@@ -14,6 +15,28 @@ const _statusConfig = {
   'in_progress': _StatusMeta('กำลังทำ',   Color(0xFFEA580C), Color(0xFFFFF7ED), Color(0xFFFED7AA)),
   'completed':   _StatusMeta('เสร็จสิ้น', Color(0xFF16A34A), Color(0xFFF0FDF4), Color(0xFFBBF7D0)),
 };
+
+String assignmentFilterUserId(AppUser? currentUser, String fallbackAuthId) {
+  final databaseUserId = currentUser?.id.trim() ?? '';
+  return databaseUserId.isNotEmpty ? databaseUserId : fallbackAuthId;
+}
+
+bool taskMatchesOwnershipFilter(
+  TaskRecord task,
+  String? currentUserId,
+  String? ownershipFilter,
+) {
+  if (ownershipFilter == null || currentUserId == null) return true;
+  final isCreator = task.assignedBy == currentUserId;
+  if (ownershipFilter == 'created_by_me') return isCreator;
+  if (ownershipFilter == 'joined') {
+    final isAssignee = task.assigneeIds.isNotEmpty
+        ? task.assigneeIds.contains(currentUserId)
+        : task.assignedTo == currentUserId;
+    return !isCreator && isAssignee;
+  }
+  return true;
+}
 
 class _StatusMeta {
   const _StatusMeta(this.label, this.color, this.bg, this.border);
@@ -43,10 +66,22 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   bool   _loading = true;
   String? _error;
 
+  String _searchQuery = '';
+  String? _selectedBrandId;
+  String? _selectedCategoryId;
+  String? _selectedOwnership;
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -126,6 +161,84 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   }
 
 
+  void _showTaskDetailSheet(TaskRecord task) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _TaskDetailSheet(
+        task: task,
+        userMap: { for (var u in _users) u.id: u },
+        brandMap: _brandMap,
+        catMap: _catMap,
+        statusConfig: _statusConfig,
+        onEdit: () => _showEditTaskModal(task),
+        onChangeStatus: (status) async {
+          try {
+            await widget.service.updateTaskStatus(task.id, status);
+            _loadData();
+            Navigator.pop(context);
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('เปลี่ยนสถานะล้มเหลว: $e')));
+          }
+        },
+        onDelete: () async {
+          try {
+            await widget.service.deleteTask(task.id);
+            _loadData();
+            Navigator.pop(context);
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ลบงานล้มเหลว: $e')));
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _showEditTaskModal(TaskRecord task) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _EditTaskModal(
+        task: task,
+        users: _users,
+        onSave: ({
+          required title,
+          required description,
+          required assigneeIds,
+          required dueDate,
+        }) async {
+          await widget.service.updateTask(
+            id: task.id,
+            title: title,
+            description: description,
+            assigneeIds: assigneeIds,
+            dueDate: dueDate,
+            brandId: task.brandId,
+            categoryId: task.categoryId,
+          );
+        },
+      ),
+    );
+    if (saved == true && mounted) {
+      Navigator.of(context).pop();
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('แก้ไขงานสำเร็จ'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      }
+    }
+  }
 
   // ─── Create task modal sheet (โมดูล) ──────────────────────────────
   void _showCreateTaskModal() {
@@ -160,10 +273,137 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     );
   }
 
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _FilterBottomSheetContent(
+        brands: _brands,
+        categories: _categories,
+        initialBrandId: _selectedBrandId,
+        initialCategoryId: _selectedCategoryId,
+        onApply: (brandId, categoryId) {
+          setState(() {
+            _selectedBrandId = brandId;
+            _selectedCategoryId = categoryId;
+          });
+        },
+      ),
+    );
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _searchQuery = '';
+      _selectedBrandId = null;
+      _selectedCategoryId = null;
+      _selectedOwnership = null;
+      _searchController.clear();
+    });
+  }
+
+  Widget _buildCategoryChip(String? id, String name) {
+    final isSelected = _selectedCategoryId == id;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategoryId = id;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? workBlue : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? workBlue : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(
+                color: workBlue.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+          ],
+        ),
+        child: Text(
+          name,
+          style: TextStyle(
+            color: isSelected ? Colors.white : workText,
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOwnershipOption({
+    required String label,
+    required String? value,
+  }) {
+    final isSelected = _selectedOwnership == value;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedOwnership = value),
+        borderRadius: BorderRadius.circular(9),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFFBFDBFE)
+                  : Colors.transparent,
+            ),
+            boxShadow: isSelected
+                ? const [
+                    BoxShadow(
+                      color: Color(0x0F0F172A),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isSelected ? workBlue : workMuted,
+              fontSize: 11.5,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ─── Build ──────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const AppLoadingView(message: 'กำลังโหลดข้อมูลงาน...');
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: workBackground,
+        appBar: AppBar(
+          title: const Text(
+            'รายการมอบหมายงาน',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ),
+        body: const AssignmentListSkeleton(),
+      );
+    }
     if (_error != null) {
       return Center(
         child: Column(
@@ -179,6 +419,35 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       );
     }
 
+    final filteredTasks = _tasks.where((task) {
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matchTitle = task.title.toLowerCase().contains(query);
+        final matchDesc = task.description.toLowerCase().contains(query);
+        if (!matchTitle && !matchDesc) return false;
+      }
+      if (_selectedBrandId != null && task.brandId != _selectedBrandId) {
+        return false;
+      }
+      if (_selectedCategoryId != null && task.categoryId != _selectedCategoryId) {
+        return false;
+      }
+      if (!taskMatchesOwnershipFilter(
+        task,
+        assignmentFilterUserId(
+          widget.service.currentUser,
+          widget.service.currentUserId,
+        ),
+        _selectedOwnership,
+      )) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    final hasSheetFilters =
+        _selectedBrandId != null || _selectedCategoryId != null;
+
     return Scaffold(
       backgroundColor: workBackground,
       appBar: AppBar(
@@ -193,25 +462,201 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           IconButton(onPressed: _loadData, icon: const Icon(Icons.refresh_rounded, color: workMuted), tooltip: 'รีโหลด'),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: _tasks.isEmpty
-            ? const Center(
-                child: Text(
-                  'ยังไม่มีงานมอบหมายในตอนนี้',
-                  style: TextStyle(color: workMuted, fontSize: 13),
+      body: Column(
+        children: [
+          if (_tasks.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-              )
-            : ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                itemCount: _tasks.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final t = _tasks[index];
-                  return _buildDraggableTaskCard(t);
-                },
+                child: Row(
+                  children: [
+                    _buildOwnershipOption(label: 'ทั้งหมด', value: null),
+                    _buildOwnershipOption(
+                      label: 'งานที่ฉันสร้าง',
+                      value: 'created_by_me',
+                    ),
+                    _buildOwnershipOption(
+                      label: 'งานที่ถูกเพิ่มเข้า',
+                      value: 'joined',
+                    ),
+                  ],
+                ),
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _searchQuery.isNotEmpty
+                              ? workBlue.withOpacity(0.5)
+                              : const Color(0xFFE2E8F0),
+                          width: _searchQuery.isNotEmpty ? 1.5 : 1,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x05000000),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val.trim();
+                          });
+                        },
+                        style: const TextStyle(fontSize: 13.5, color: workText),
+                        decoration: InputDecoration(
+                          hintText: 'ค้นหาบอร์ดงาน...',
+                          hintStyle: const TextStyle(color: workMuted, fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded, color: workMuted, size: 20),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, color: workMuted, size: 18),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _searchController.clear();
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: _showFilterBottomSheet,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: hasSheetFilters
+                                ? workBlue.withOpacity(0.1)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: hasSheetFilters
+                                  ? workBlue
+                                  : const Color(0xFFE2E8F0),
+                              width: 1,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x05000000),
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.tune_rounded,
+                            color: hasSheetFilters ? workBlue : workText,
+                            size: 20,
+                          ),
+                        ),
+                        if (hasSheetFilters)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: const BoxDecoration(
+                                color: workBlue,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Row(
+                children: [
+                  _buildCategoryChip(null, 'ทั้งหมด'),
+                  ..._categories.map((c) => _buildCategoryChip(c.id, c.name)),
+                ],
+              ),
+            ),
+          ],
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadData,
+              child: _tasks.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'ยังไม่มีงานมอบหมายในตอนนี้',
+                        style: TextStyle(color: workMuted, fontSize: 13),
+                      ),
+                    )
+                  : filteredTasks.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                            Center(
+                              child: Column(
+                                children: [
+                                  Icon(Icons.filter_list_off_rounded, size: 48, color: workMuted.withOpacity(0.5)),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'ไม่พบบอร์ดงานที่ตรงตามตัวกรอง',
+                                    style: TextStyle(color: workMuted, fontSize: 13.5, fontWeight: FontWeight.w500),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  OutlinedButton(
+                                    onPressed: _clearAllFilters,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: workBlue,
+                                      side: const BorderSide(color: workBlue),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    ),
+                                    child: const Text('ล้างตัวกรองทั้งหมด', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                          itemCount: filteredTasks.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final t = filteredTasks[index];
+                            return _buildDraggableTaskCard(t);
+                          },
+                        ),
+            ),
+          ),
+        ],
       ),
     );
 
@@ -232,14 +677,19 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
 
     final isEmployee = widget.service.currentUser?.role == 'employee';
     final currentUser = widget.service.currentUser;
+    final isBoardCreator =
+        currentUser != null && task.assignedBy == currentUser.id;
+    final boardCreatorName = task.assignedByName.isNotEmpty
+        ? task.assignedByName
+        : 'เพื่อนร่วมงาน';
     // Multiple assignees mapping
     final assignees = task.subItems.isNotEmpty && task.status == 'completed'
         ? <AppUser>[]
         : (isEmployee && currentUser != null
             ? [currentUser]
             : _users.where((u) {
-                if (task.subItems.isNotEmpty) {
-                  // Standard field or assignees list mapping
+                if (task.assigneeIds.isNotEmpty) {
+                  return task.assigneeIds.contains(u.id);
                 }
                 return u.id == task.assignedTo;
               }).toList());
@@ -284,40 +734,56 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
               ),
               const SizedBox(height: 6),
             ],
-
-            // Title
-            Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText)),
-
-            // Description
-            if (task.description.isNotEmpty) ...[
-              const SizedBox(height: 3),
-              Text(task.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: workMuted)),
-            ],
+            // Title & Actions
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText)),
+                      if (task.description.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(task.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: workMuted)),
+                      ],
+                    ],
+                  ),
+                ),
+                if (widget.service.currentUser?.role == 'admin')
+                  IconButton(
+                    icon: const Icon(Icons.more_horiz, color: workMuted, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => _showTaskDetailSheet(task),
+                  ),
+              ],
+            ),
 
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                color: isBoardCreator ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    task.assignedTo == widget.service.currentUserId ? Icons.star_rounded : Icons.group_rounded,
+                    isBoardCreator ? Icons.star_rounded : Icons.group_rounded,
                     size: 11,
-                    color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                    color: isBoardCreator ? const Color(0xFFDC2626) : const Color(0xFF64748B),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    task.assignedTo == widget.service.currentUserId
+                    isBoardCreator
                         ? 'คุณเป็นเจ้าของบอร์ด'
-                        : 'บอร์ดของ ${task.assignedToName.isNotEmpty ? task.assignedToName : "เพื่อนร่วมงาน"} (คุณเข้าร่วม)',
+                        : 'บอร์ดของ $boardCreatorName (คุณเข้าร่วม)',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: task.assignedTo == widget.service.currentUserId ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                      color: isBoardCreator ? const Color(0xFFDC2626) : const Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -705,11 +1171,9 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                 const SizedBox(height: 4),
                 InkWell(
                   onTap: () async {
-                    final p = await showDatePicker(
-                      context: context,
+                    final p = await showWorkDueDatePicker(
+                      context,
                       initialDate: _formDue,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
                     if (p != null) setState(() => _formDue = p);
                   },
@@ -718,18 +1182,54 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     height: 52,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      color: isWorkDatePast(_formDue)
+                          ? const Color(0xFFFEF2F2)
+                          : const Color(0xFFF8FAFC),
+                      border: Border.all(
+                        color: isWorkDatePast(_formDue)
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFFE2E8F0),
+                      ),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
                       children: [
-                        Expanded(child: Text(DateFormat('dd MMMM yyyy', 'th').format(_formDue), style: const TextStyle(fontSize: 13.5, color: workText))),
-                        const Icon(Icons.calendar_month_rounded, color: workBlue, size: 18),
+                        Expanded(
+                          child: Text(
+                            DateFormat('dd MMMM yyyy', 'th').format(_formDue),
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: isWorkDatePast(_formDue)
+                                  ? const Color(0xFFDC2626)
+                                  : workText,
+                              fontWeight: isWorkDatePast(_formDue)
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.calendar_month_rounded,
+                          color: isWorkDatePast(_formDue)
+                              ? const Color(0xFFDC2626)
+                              : workBlue,
+                          size: 18,
+                        ),
                       ],
                     ),
                   ),
                 ),
+                if (isWorkDatePast(_formDue)) ...[
+                  const SizedBox(height: 6),
+                  const Text(
+                    'วันที่กำหนดส่งผ่านมาแล้ว แต่ยังสามารถสร้างงานได้',
+                    style: TextStyle(
+                      color: Color(0xFFB91C1C),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -918,6 +1418,337 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
   }
 }
 
+class _EditTaskModal extends StatefulWidget {
+  const _EditTaskModal({
+    required this.task,
+    required this.users,
+    required this.onSave,
+  });
+
+  final TaskRecord task;
+  final List<AppUser> users;
+  final Future<void> Function({
+    required String title,
+    required String description,
+    required List<String> assigneeIds,
+    required DateTime dueDate,
+  }) onSave;
+
+  @override
+  State<_EditTaskModal> createState() => _EditTaskModalState();
+}
+
+class _EditTaskModalState extends State<_EditTaskModal> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+  late final Set<String> _assigneeIds;
+  late DateTime _dueDate;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.task.title);
+    _descriptionController = TextEditingController(
+      text: widget.task.description,
+    );
+    _assigneeIds = {
+      ...(widget.task.assigneeIds.isNotEmpty
+          ? widget.task.assigneeIds
+          : [widget.task.assignedTo]),
+    }..removeWhere((id) => id.isEmpty);
+    _dueDate = widget.task.dueDate;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_titleController.text.trim().isEmpty || _assigneeIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณากรอกชื่องานและเลือกผู้รับผิดชอบอย่างน้อย 1 คน'),
+        ),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        assigneeIds: _assigneeIds.toList(growable: false),
+        dueDate: _dueDate,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('แก้ไขงานไม่สำเร็จ: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dueDateIsPast = isWorkDatePast(_dueDate);
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Icon(Icons.edit_note_rounded, color: workBlue, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'แก้ไขงานมอบหมาย',
+                  style: TextStyle(
+                    color: workText,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'ชื่องาน',
+              style: TextStyle(
+                color: workText,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _titleController,
+              textInputAction: TextInputAction.next,
+              decoration: _editInputDecoration('กรอกชื่องาน'),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'รายละเอียด',
+              style: TextStyle(
+                color: workText,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _descriptionController,
+              maxLines: 3,
+              decoration: _editInputDecoration('รายละเอียดงาน'),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'ผู้รับผิดชอบ',
+              style: TextStyle(
+                color: workText,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 190),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: widget.users.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                itemBuilder: (context, index) {
+                  final user = widget.users[index];
+                  final selected = _assigneeIds.contains(user.id);
+                  return CheckboxListTile(
+                    value: selected,
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    activeColor: workBlue,
+                    title: Text(
+                      user.fullName,
+                      style: const TextStyle(
+                        color: workText,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: user.position.isEmpty
+                        ? null
+                        : Text(
+                            user.position,
+                            style: const TextStyle(
+                              color: workMuted,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                    onChanged: (_) => setState(() {
+                      if (selected) {
+                        _assigneeIds.remove(user.id);
+                      } else {
+                        _assigneeIds.add(user.id);
+                      }
+                    }),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'วันที่สิ้นสุด',
+              style: TextStyle(
+                color: workText,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () async {
+                final picked = await showWorkDueDatePicker(
+                  context,
+                  initialDate: _dueDate,
+                );
+                if (picked != null) setState(() => _dueDate = picked);
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 13,
+                ),
+                decoration: BoxDecoration(
+                  color: dueDateIsPast
+                      ? const Color(0xFFFEF2F2)
+                      : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: dueDateIsPast
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_month_rounded,
+                      color: dueDateIsPast
+                          ? const Color(0xFFDC2626)
+                          : workBlue,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 9),
+                    Text(
+                      DateFormat('dd MMMM yyyy', 'th').format(_dueDate),
+                      style: TextStyle(
+                        color: dueDateIsPast
+                            ? const Color(0xFFDC2626)
+                            : workText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (dueDateIsPast) ...[
+              const SizedBox(height: 6),
+              const Text(
+                'วันที่สิ้นสุดผ่านมาแล้ว แต่ยังบันทึกได้',
+                style: TextStyle(
+                  color: Color(0xFFB91C1C),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: const Text('บันทึกการแก้ไข'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: workBlue,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _editInputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: workBlue, width: 1.4),
+      ),
+    );
+  }
+}
+
 // ─── Task Detail Bottom Sheet ────────────────────────────────────
 class _TaskDetailSheet extends StatelessWidget {
   const _TaskDetailSheet({
@@ -926,6 +1757,7 @@ class _TaskDetailSheet extends StatelessWidget {
     required this.brandMap,
     required this.catMap,
     required this.statusConfig,
+    required this.onEdit,
     required this.onChangeStatus,
     required this.onDelete,
   });
@@ -935,12 +1767,19 @@ class _TaskDetailSheet extends StatelessWidget {
   final Map<String, BrandRecord> brandMap;
   final Map<String, TaskCategoryRecord> catMap;
   final Map<String, _StatusMeta> statusConfig;
+  final VoidCallback onEdit;
   final ValueChanged<String> onChangeStatus;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final user     = userMap[task.assignedTo];
+    final user = userMap[task.assignedTo];
+    final List<AppUser> detailAssignees = task.assigneeIds.isNotEmpty
+        ? task.assigneeIds.map((id) => userMap[id]).whereType<AppUser>().toList()
+        : (user != null ? [user] : []);
+    final String assigneeNames = detailAssignees.isNotEmpty
+        ? detailAssignees.map((u) => u.fullName).join(', ')
+        : 'ไม่ระบุ';
     final brand    = task.brandId != null ? brandMap[task.brandId] : null;
     final category = task.categoryId != null ? catMap[task.categoryId] : null;
     final meta     = statusConfig[task.status]!;
@@ -996,7 +1835,40 @@ class _TaskDetailSheet extends StatelessWidget {
           const SizedBox(height: 14),
 
           // Title
-          Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: workText)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  task.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: workText,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 15),
+                label: const Text('แก้ไข'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: workBlue,
+                  side: const BorderSide(color: Color(0xFFBFDBFE)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
+              ),
+            ],
+          ),
           if (task.description.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(task.description, style: const TextStyle(fontSize: 14, color: workMuted, height: 1.6)),
@@ -1009,7 +1881,7 @@ class _TaskDetailSheet extends StatelessWidget {
               Expanded(child: _infoCard(
                 icon: Icons.person_rounded,
                 label: 'ผู้รับผิดชอบ',
-                value: user?.fullName ?? 'ไม่ระบุ',
+                value: assigneeNames,
               )),
               const SizedBox(width: 12),
               Expanded(child: _infoCard(
@@ -1108,6 +1980,199 @@ class _TaskDetailSheet extends StatelessWidget {
         const SizedBox(height: 4),
         Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: valueColor ?? workText)),
       ]),
+    );
+  }
+}
+
+class _FilterBottomSheetContent extends StatefulWidget {
+  final List<BrandRecord> brands;
+  final List<TaskCategoryRecord> categories;
+  final String? initialBrandId;
+  final String? initialCategoryId;
+  final Function(String? brandId, String? categoryId) onApply;
+
+  const _FilterBottomSheetContent({
+    super.key,
+    required this.brands,
+    required this.categories,
+    this.initialBrandId,
+    this.initialCategoryId,
+    required this.onApply,
+  });
+
+  @override
+  State<_FilterBottomSheetContent> createState() => _FilterBottomSheetContentState();
+}
+
+class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
+  String? _tempBrandId;
+  String? _tempCategoryId;
+
+  @override
+  void initState() {
+    super.initState();
+    _tempBrandId = widget.initialBrandId;
+    _tempCategoryId = widget.initialCategoryId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.tune_rounded, color: workBlue, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'ตัวกรองบอร์ดงาน',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: workText,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded, color: workMuted),
+                ),
+              ],
+            ),
+            const Divider(color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 12),
+
+            const Text(
+              'แบรนด์ (Brand)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildFilterChip(
+                  label: 'ทั้งหมด',
+                  isSelected: _tempBrandId == null,
+                  onTap: () => setState(() => _tempBrandId = null),
+                ),
+                ...widget.brands.map((b) => _buildFilterChip(
+                  label: b.name,
+                  isSelected: _tempBrandId == b.id,
+                  onTap: () => setState(() => _tempBrandId = b.id),
+                )),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'หมวดหมู่ (Category)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildFilterChip(
+                  label: 'ทั้งหมด',
+                  isSelected: _tempCategoryId == null,
+                  onTap: () => setState(() => _tempCategoryId = null),
+                ),
+                ...widget.categories.map((c) => _buildFilterChip(
+                  label: c.name,
+                  isSelected: _tempCategoryId == c.id,
+                  onTap: () => setState(() => _tempCategoryId = c.id),
+                )),
+              ],
+            ),
+            const SizedBox(height: 32),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _tempBrandId = null;
+                        _tempCategoryId = null;
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: workMuted,
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('ล้างตัวกรอง', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      widget.onApply(_tempBrandId, _tempCategoryId);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: workBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                    ),
+                    child: const Text('ใช้ตัวกรอง', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    Color? activeColor,
+  }) {
+    final finalActiveColor = activeColor ?? workBlue;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? finalActiveColor.withOpacity(0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? finalActiveColor : const Color(0xFFE2E8F0),
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? finalActiveColor : workText,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
+      ),
     );
   }
 }

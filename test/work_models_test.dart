@@ -2,6 +2,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hr_management/models/work_models.dart';
 
 void main() {
+  test('TaskRecord keeps the board creator name returned by the API', () {
+    final task = TaskRecord.fromJson({
+      'id': 'task-1',
+      'assigned_to': 'assignee-id',
+      'assigned_to_name': 'Khanin',
+      'assigned_by': 'creator-id',
+      'assigned_by_name': 'Current User',
+      'title': 'Board',
+      'description': '',
+      'due_date': '2026-07-31T00:00:00Z',
+      'status': 'pending',
+      'created_at': '2026-07-24T00:00:00Z',
+    });
+
+    expect(task.assignedBy, 'creator-id');
+    expect(task.assignedByName, 'Current User');
+  });
+
   group('AttendanceRecord Tests', () {
     test('should parse AttendanceRecord from JSON with complete fields', () {
       final json = {

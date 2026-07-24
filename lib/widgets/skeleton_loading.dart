@@ -305,6 +305,264 @@ class TaskListSkeleton extends StatelessWidget {
   }
 }
 
+class AssignmentListSkeleton extends StatelessWidget {
+  const AssignmentListSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonShimmer(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Expanded(
+                    child: SkeletonBox(
+                      width: double.infinity,
+                      height: 36,
+                      borderRadius: 9,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: SkeletonBox(
+                      width: double.infinity,
+                      height: 36,
+                      borderRadius: 9,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: SkeletonBox(
+                      width: double.infinity,
+                      height: 36,
+                      borderRadius: 9,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SkeletonBox(
+                    width: double.infinity,
+                    height: 46,
+                    borderRadius: 12,
+                  ),
+                ),
+                SizedBox(width: 12),
+                SkeletonBox(width: 46, height: 46, borderRadius: 12),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Row(
+              children: [
+                SkeletonBox(width: 70, height: 30, borderRadius: 15),
+                SizedBox(width: 8),
+                SkeletonBox(width: 96, height: 30, borderRadius: 15),
+                SizedBox(width: 8),
+                SkeletonBox(width: 82, height: 30, borderRadius: 15),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              itemCount: 5,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (_, index) => _AssignmentCardSkeleton(
+                compactDetails: index.isOdd,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssignmentCardSkeleton extends StatelessWidget {
+  const _AssignmentCardSkeleton({required this.compactDetails});
+
+  final bool compactDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: compactDetails ? 116 : 132,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: SkeletonLine(width: 184, height: 15)),
+              const SizedBox(width: 12),
+              SkeletonBox(
+                width: compactDetails ? 58 : 72,
+                height: 24,
+                borderRadius: 12,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SkeletonLine(
+            width: compactDetails ? 180 : double.infinity,
+            height: 10,
+          ),
+          if (!compactDetails) ...[
+            const SizedBox(height: 7),
+            const SkeletonLine(width: 230, height: 10),
+          ],
+          const Spacer(),
+          const Row(
+            children: [
+              SkeletonCircle(size: 24),
+              SizedBox(width: 7),
+              SkeletonLine(width: 76, height: 10),
+              Spacer(),
+              SkeletonLine(width: 92, height: 10),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TaskBoardSkeleton extends StatelessWidget {
+  const TaskBoardSkeleton({
+    super.key,
+    this.viewportFraction = 0.90,
+  });
+
+  final double viewportFraction;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columnWidth = constraints.maxWidth * viewportFraction;
+        return SkeletonShimmer(
+          child: ClipRect(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: List.generate(
+                  2,
+                  (columnIndex) => SizedBox(
+                    width: columnWidth,
+                    child: _BoardColumnSkeleton(
+                      alternate: columnIndex.isOdd,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BoardColumnSkeleton extends StatelessWidget {
+  const _BoardColumnSkeleton({required this.alternate});
+
+  final bool alternate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(5, 8, 5, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            child: Row(
+              children: [
+                SkeletonLine(
+                  width: alternate ? 92 : 128,
+                  height: 15,
+                ),
+                const Spacer(),
+                const SkeletonCircle(size: 26),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Expanded(
+            child: ListView.separated(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(9),
+              itemCount: 4,
+              separatorBuilder: (_, _) => const SizedBox(height: 9),
+              itemBuilder: (_, index) => Container(
+                height: index == 1 ? 106 : 88,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonLine(
+                      width: index.isEven ? 152 : 118,
+                      height: 13,
+                    ),
+                    const SizedBox(height: 9),
+                    const SkeletonLine(width: double.infinity, height: 9),
+                    if (index == 1) ...[
+                      const SizedBox(height: 6),
+                      const SkeletonLine(width: 142, height: 9),
+                    ],
+                    const Spacer(),
+                    const Row(
+                      children: [
+                        SkeletonCircle(size: 20),
+                        SizedBox(width: 6),
+                        SkeletonLine(width: 54, height: 9),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class NotificationListSkeleton extends StatelessWidget {
   const NotificationListSkeleton({super.key});
 

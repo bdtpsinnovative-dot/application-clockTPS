@@ -3,8 +3,12 @@ import 'package:flutter/scheduler.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/priority_selector.dart';
+import 'package:hr_management/widgets/skeleton_loading.dart';
 import 'package:hr_management/widgets/work_ui.dart';
 import 'package:file_picker/file_picker.dart' as fp;
+import '../widgets/card_assignee_picker.dart';
+import '../widgets/card_comment_section.dart';
+import '../widgets/work_due_date_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -12,10 +16,203 @@ import 'dart:io';
 String _formatDate(DateTime? dt) {
   if (dt == null) return '';
   final thaiMonths = [
-    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+    'ม.ค.',
+    'ก.พ.',
+    'มี.ค.',
+    'เม.ย.',
+    'พ.ค.',
+    'มิ.ย.',
+    'ก.ค.',
+    'ส.ค.',
+    'ก.ย.',
+    'ต.ค.',
+    'พ.ย.',
+    'ธ.ค.',
   ];
   return '${dt.day} ${thaiMonths[dt.month - 1]} ${dt.year + 543}';
+}
+
+class _BoardDockButton extends StatelessWidget {
+  const _BoardDockButton({
+    required this.tooltip,
+    required this.icon,
+    required this.active,
+    required this.onTap,
+    this.badge,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(11),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: active
+                ? const Color(0xFFEFF6FF)
+                : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(
+              color: active
+                  ? const Color(0xFFBFDBFE)
+                  : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: active ? workBlue : workMuted,
+              ),
+              if (badge != null)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: workBlue,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatDateRange(DateTime? startDate, DateTime? dueDate) {
+  if (startDate != null && dueDate != null) {
+    return '${_formatDate(startDate)} → ${_formatDate(dueDate)}';
+  }
+  if (startDate != null) return 'เริ่ม ${_formatDate(startDate)}';
+  if (dueDate != null) return 'ครบกำหนด ${_formatDate(dueDate)}';
+  return '';
+}
+
+bool _hasInvalidDateRange(DateTime? startDate, DateTime? dueDate) {
+  if (startDate == null || dueDate == null) return false;
+  return dueDate.isBefore(startDate);
+}
+
+Color _deadlineColor(DateTime? dueDate, {required bool isCompleted}) {
+  if (isCompleted) return const Color(0xFF15803D);
+  if (dueDate == null) return workMuted;
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final deadline = DateTime(dueDate.year, dueDate.month, dueDate.day);
+  final daysLeft = deadline.difference(today).inDays;
+  if (daysLeft < 0) return const Color(0xFFB91C1C);
+  if (daysLeft <= 2) return const Color(0xFFB45309);
+  return workMuted;
+}
+
+double boardViewportFraction(bool compactMode) =>
+    compactMode ? 0.72 : 0.90;
+
+class BoardKeyboardDismissRegion extends StatelessWidget {
+  const BoardKeyboardDismissRegion({
+    super.key,
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: child,
+    );
+  }
+}
+
+class BoardPageIndicator extends StatelessWidget {
+  const BoardPageIndicator({
+    super.key,
+    required this.currentPage,
+    required this.pageCount,
+  });
+
+  final int currentPage;
+  final int pageCount;
+
+  @override
+  Widget build(BuildContext context) {
+    if (pageCount <= 1) return const SizedBox.shrink();
+
+    return Semantics(
+      label: 'หน้าที่ ${currentPage + 1} จาก $pageCount',
+      child: Container(
+        key: const ValueKey('board-page-indicator'),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.90),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x120F172A),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(pageCount, (index) {
+            final active = currentPage == index;
+            return AnimatedContainer(
+              key: ValueKey('board-page-dot-$index'),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+              margin: const EdgeInsets.symmetric(horizontal: 2.5),
+              width: active ? 14 : 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: active
+                    ? workBlue
+                    : workMuted.withValues(alpha: 0.32),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
 }
 
 class TaskBoardPage extends StatefulWidget {
@@ -42,9 +239,14 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   bool _isDraggingList = false;
   TaskListRecord? _draggedList;
   bool _scrolling = false;
+  bool _isCompactMode = false;
+  final bool _useBottomBoardTools = true;
   final ValueNotifier<double> _cardDragXNotifier = ValueNotifier<double>(0.0);
-  // ตรวจจับว่านิ้วอยู่ใน Zone การ์ด → ปิด PageView physics ทันที
-  final ValueNotifier<bool> _cardAreaActive = ValueNotifier(false);
+
+  String _cardSearchQuery = '';
+  List<String> _selectedListIds = [];
+  String? _selectedCardStatus;
+  final TextEditingController _cardSearchController = TextEditingController();
 
   // Status mapping colors & labels for Card badges
   final Map<String, String> _statusLabels = {
@@ -69,7 +271,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   void initState() {
     super.initState();
     _currentPage = 0;
-    _pageController = PageController(initialPage: _currentPage, viewportFraction: 0.90);
+    _pageController = PageController(
+      initialPage: _currentPage,
+      viewportFraction: boardViewportFraction(_isCompactMode),
+    );
     _loadBoard();
   }
 
@@ -77,7 +282,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   void dispose() {
     _pageController.dispose();
     _cardDragXNotifier.dispose();
-    _cardAreaActive.dispose();
+    _cardSearchController.dispose();
     super.dispose();
   }
 
@@ -96,13 +301,19 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
             // ให้ความสำคัญกับ Priority
             int getPriorityVal(String p) {
               switch (p) {
-                case 'urgent': return 4;
-                case 'high': return 3;
-                case 'medium': return 2;
-                case 'low': return 1;
-                default: return 0;
+                case 'urgent':
+                  return 4;
+                case 'high':
+                  return 3;
+                case 'medium':
+                  return 2;
+                case 'low':
+                  return 1;
+                default:
+                  return 0;
               }
             }
+
             final pA = getPriorityVal(a.priority);
             final pB = getPriorityVal(b.priority);
             if (pA != pB) return pB.compareTo(pA);
@@ -111,7 +322,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
             return a.sortOrder.compareTo(b.sortOrder);
           });
         }
-        
+
         setState(() {
           _lists = boardLists;
           _loading = false;
@@ -121,7 +332,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       if (mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('โหลดข้อมูลบอร์ดล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('โหลดข้อมูลบอร์ดล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -129,7 +343,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
   // เรียงลำดับการ์ดใหม่ภายในคอลัมน์เดียวกัน
   // onReorderItem ปรับ newIndex ให้อัตโนมัติแล้ว (ไม่ต้องลบ 1 เอง)
-  Future<void> _reorderCards(TaskListRecord list, int oldIndex, int newIndex) async {
+  Future<void> _reorderCards(
+    TaskListRecord list,
+    int oldIndex,
+    int newIndex,
+  ) async {
     final listIdx = _lists.indexWhere((l) => l.id == list.id);
     if (listIdx == -1) return;
 
@@ -152,12 +370,14 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       if (mounted) {
         _loadBoard();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เรียงลำดับการ์ดล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('เรียงลำดับการ์ดล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
-
 
   void _startEdgeScroll(bool isLeft) {
     if (_scrolling) return;
@@ -173,7 +393,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     while (_scrolling && mounted) {
       final targetPage = _currentPage + (isLeft ? -1 : 1);
       final pageCount = _lists.length + 1;
-      
+
       if (targetPage >= 0 && targetPage < pageCount) {
         await _pageController.animateToPage(
           targetPage,
@@ -207,11 +427,15 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       _loadBoard();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('สลับตำแหน่งรายการล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('สลับตำแหน่งรายการล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
+
   // Create new List (คอลัมน์)
   Future<void> _createNewList() async {
     final controller = TextEditingController();
@@ -219,7 +443,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('เพิ่มรายการใหม่', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text(
+          'เพิ่มรายการใหม่',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -227,18 +454,27 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
             hintText: 'ชื่อรายการ (เช่น ทำหน้าจ่ายเงิน)',
             filled: true,
             fillColor: Color(0xFFF8FAFC),
-            border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+            border: OutlineInputBorder(
+              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก', style: TextStyle(color: workMuted))),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
+          ),
           TextButton(
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
                 Navigator.pop(context, controller.text.trim());
               }
             },
-            child: const Text('เพิ่ม', style: TextStyle(color: workBlue, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'เพิ่ม',
+              style: TextStyle(color: workBlue, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -254,7 +490,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         setState(() => _loading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('เพิ่มรายการล้มเหลว: $e'), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text('เพิ่มรายการล้มเหลว: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
@@ -268,6 +507,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     DateTime? startDate;
     DateTime? dueDate;
     String priority = 'medium';
+    List<UserSummary> selectedAssignees = [];
+    List<UserSummary> allMembers = [];
+    bool loadingMembers = true;
 
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -279,6 +521,16 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setDlgState) {
+          final dueDateIsPast =
+              dueDate != null && isWorkDatePast(dueDate!);
+          if (loadingMembers) {
+            loadingMembers = false;
+            widget.service.getTaskMembers(widget.task.id).then((members) {
+              setDlgState(() {
+                allMembers = members;
+              });
+            }).catchError((_) {});
+          }
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -302,12 +554,20 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                   ),
                   const Text(
                     'เพิ่มการ์ดใหม่',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: workText),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: workText,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   const Text(
                     'ชื่องานของการ์ด',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workText),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: workText,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   TextField(
@@ -315,10 +575,16 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                     autofocus: true,
                     decoration: InputDecoration(
                       hintText: 'เช่น ทำหน้าชำระเงิน',
-                      hintStyle: const TextStyle(color: workMuted, fontSize: 13),
+                      hintStyle: const TextStyle(
+                        color: workMuted,
+                        fontSize: 13,
+                      ),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       border: OutlineInputBorder(
                         borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                         borderRadius: BorderRadius.circular(10),
@@ -328,7 +594,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: workBlue, width: 1.5),
+                        borderSide: const BorderSide(
+                          color: workBlue,
+                          width: 1.5,
+                        ),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -336,7 +605,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                   const SizedBox(height: 16),
                   const Text(
                     'รายละเอียด (ไม่จำเป็นต้องใส่ก็ได้)',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workText),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: workText,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   TextField(
@@ -344,10 +617,16 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                     maxLines: 3,
                     decoration: InputDecoration(
                       hintText: 'คำอธิบายงานเพิ่มเติม...',
-                      hintStyle: const TextStyle(color: workMuted, fontSize: 13),
+                      hintStyle: const TextStyle(
+                        color: workMuted,
+                        fontSize: 13,
+                      ),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       border: OutlineInputBorder(
                         borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                         borderRadius: BorderRadius.circular(10),
@@ -357,7 +636,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: workBlue, width: 1.5),
+                        borderSide: const BorderSide(
+                          color: workBlue,
+                          width: 1.5,
+                        ),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -365,7 +647,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                   const SizedBox(height: 16),
                   const Text(
                     'ความสำคัญ',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workText),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: workText,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   PrioritySelector(
@@ -374,6 +660,92 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                       setDlgState(() => priority = val);
                     },
                   ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'ผู้รับผิดชอบ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: workText,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (allMembers.isEmpty)
+                    const Text(
+                      'กำลังโหลดสมาชิก...',
+                      style: TextStyle(fontSize: 12, color: workMuted),
+                    )
+                  else
+                    SizedBox(
+                      height: 56,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: allMembers.length,
+                        itemBuilder: (context, index) {
+                          final member = allMembers[index];
+                          final isSelected = selectedAssignees.any((m) => m.id == member.id);
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: Tooltip(
+                              message: member.fullName,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setDlgState(() {
+                                    if (isSelected) {
+                                      selectedAssignees.removeWhere((m) => m.id == member.id);
+                                    } else {
+                                      selectedAssignees.add(member);
+                                    }
+                                  });
+                                },
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isSelected ? workBlue : Colors.transparent,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: 20,
+                                        backgroundImage: member.avatarUrl != null && member.avatarUrl!.isNotEmpty
+                                            ? NetworkImage(member.avatarUrl!)
+                                            : null,
+                                        child: member.avatarUrl == null || member.avatarUrl!.isEmpty
+                                            ? Text(
+                                                member.firstName.isNotEmpty ? member.firstName[0] : '?',
+                                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(
+                                            color: workBlue,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.check_rounded,
+                                            size: 10,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -404,25 +776,50 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           },
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.date_range_rounded, size: 16, color: workBlue),
+                                const Icon(
+                                  Icons.date_range_rounded,
+                                  size: 16,
+                                  color: workBlue,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Text('วันที่เริ่ม', style: TextStyle(fontSize: 10, color: workMuted, fontWeight: FontWeight.w500)),
+                                      const Text(
+                                        'วันที่เริ่ม',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: workMuted,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        startDate != null ? _formatDate(startDate) : 'เลือกวันเริ่ม',
-                                        style: TextStyle(fontSize: 12, color: startDate != null ? workText : workMuted, fontWeight: FontWeight.w600),
+                                        startDate != null
+                                            ? _formatDate(startDate)
+                                            : 'เลือกวันเริ่ม',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: startDate != null
+                                              ? workText
+                                              : workMuted,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -436,23 +833,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                       Expanded(
                         child: InkWell(
                           onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: dueDate ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2035),
-                              builder: (context, child) {
-                                return Theme(
-                                  data: Theme.of(context).copyWith(
-                                    colorScheme: const ColorScheme.light(
-                                      primary: workBlue,
-                                      onPrimary: Colors.white,
-                                      onSurface: workText,
-                                    ),
-                                  ),
-                                  child: child!,
-                                );
-                              },
+                            final picked = await showWorkDueDatePicker(
+                              context,
+                              initialDate: dueDate,
                             );
                             if (picked != null) {
                               setDlgState(() => dueDate = picked);
@@ -460,25 +843,58 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           },
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(
+                                color: dueDateIsPast
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.alarm_rounded, size: 16, color: Colors.orange),
+                                Icon(
+                                  Icons.alarm_rounded,
+                                  size: 16,
+                                  color: dueDateIsPast
+                                      ? const Color(0xFFDC2626)
+                                      : Colors.orange,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Text('วันสิ้นสุด', style: TextStyle(fontSize: 10, color: workMuted, fontWeight: FontWeight.w500)),
+                                      Text(
+                                        'วันสิ้นสุด',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: dueDateIsPast
+                                              ? const Color(0xFFDC2626)
+                                              : workMuted,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        dueDate != null ? _formatDate(dueDate) : 'เลือกกำหนดส่ง',
-                                        style: TextStyle(fontSize: 12, color: dueDate != null ? workText : workMuted, fontWeight: FontWeight.w600),
+                                        dueDate != null
+                                            ? _formatDate(dueDate)
+                                            : 'เลือกกำหนดส่ง',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: dueDateIsPast
+                                              ? const Color(0xFFDC2626)
+                                              : dueDate != null
+                                                  ? workText
+                                                  : workMuted,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -490,6 +906,27 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                       ),
                     ],
                   ),
+                  if (dueDateIsPast) ...[
+                    const SizedBox(height: 7),
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 14,
+                          color: Color(0xFFDC2626),
+                        ),
+                        SizedBox(width: 5),
+                        Text(
+                          'วันที่สิ้นสุดผ่านมาแล้ว แต่ยังสร้างการ์ดได้',
+                          style: TextStyle(
+                            color: Color(0xFFB91C1C),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Row(
                     children: [
@@ -499,9 +936,17 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             side: const BorderSide(color: Color(0xFFE2E8F0)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          child: const Text('ยกเลิก', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                          child: const Text(
+                            'ยกเลิก',
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -515,10 +960,18 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: workBlue,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             elevation: 0,
                           ),
-                          child: const Text('สร้างการ์ด', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          child: const Text(
+                            'สร้างการ์ด',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -542,6 +995,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
           priority: priority,
           startDate: startDate,
           dueDate: dueDate,
+          assigneeIds: selectedAssignees.map((m) => m.id).toList(),
         );
         widget.onRefreshNeeded();
         _loadBoard();
@@ -549,7 +1003,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         setState(() => _loading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('สร้างการ์ดล้มเหลว: $e'), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text('สร้างการ์ดล้มเหลว: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
@@ -559,9 +1016,17 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   // Show Card Details & Checklists Bottom Sheet
   void _showCardDetailSheet(TaskCardRecord card) {
     final user = widget.service.currentUser;
-    final bool canEdit = (user?.role == 'admin') || 
-                         (user?.id == widget.task.assignedTo) || 
-                         (widget.task.assigneeIds.contains(user?.id));
+    var listName = 'รายการงาน';
+    for (final list in _lists) {
+      if (list.id == card.listId) {
+        listName = list.name;
+        break;
+      }
+    }
+    final bool canEdit =
+        (user?.role == 'admin') ||
+        (user?.id == widget.task.assignedTo) ||
+        (widget.task.assigneeIds.contains(user?.id));
 
     showModalBottomSheet(
       context: context,
@@ -573,6 +1038,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       ),
       builder: (context) => _CardDetailSheet(
         taskId: widget.task.id,
+        listName: listName,
         card: card,
         service: widget.service,
         canEdit: canEdit,
@@ -584,14 +1050,257 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     );
   }
 
+  void _clearAllBoardFilters() {
+    setState(() {
+      _cardSearchQuery = '';
+      _selectedListIds = [];
+      _selectedCardStatus = null;
+      _cardSearchController.clear();
+    });
+  }
+
+  void _setCompactMode(bool value) {
+    if (_isCompactMode == value) return;
+    final previousController = _pageController;
+    final targetPage = _currentPage;
+    setState(() {
+      _isCompactMode = value;
+      _pageController = PageController(
+        initialPage: targetPage,
+        viewportFraction: boardViewportFraction(value),
+      );
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      previousController.dispose();
+    });
+  }
+
+  void _showBoardFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _BoardFilterBottomSheetContent(
+        lists: _lists,
+        initialSelectedListIds: _selectedListIds,
+        initialSelectedStatus: _selectedCardStatus,
+        onApply: (listIds, status) {
+          setState(() {
+            _selectedListIds = listIds;
+            _selectedCardStatus = status;
+            _currentPage = 0;
+          });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_pageController.hasClients) {
+              _pageController.jumpToPage(0);
+            }
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildActiveBoardFilter({
+    required IconData icon,
+    required String label,
+    required VoidCallback onRemove,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(right: 5),
+      padding: const EdgeInsets.only(left: 7, right: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: workMuted),
+          const SizedBox(width: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 145),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 10.5,
+                color: workText,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: onRemove,
+            borderRadius: BorderRadius.circular(12),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close_rounded, size: 12, color: workMuted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBoardBottomDock({
+    required int filterCount,
+  }) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: EdgeInsets.fromLTRB(
+              18,
+              0,
+              18,
+              MediaQuery.paddingOf(context).bottom + 10,
+            ),
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1A0F172A),
+                  blurRadius: 18,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _cardSearchController,
+                      onChanged: (value) =>
+                          setState(() => _cardSearchQuery = value.trim()),
+                      textInputAction: TextInputAction.search,
+                      style: const TextStyle(fontSize: 13, color: workText),
+                      decoration: InputDecoration(
+                        hintText: 'ค้นหาการ์ด...',
+                        hintStyle: const TextStyle(
+                          color: workMuted,
+                          fontSize: 12,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          color: workMuted,
+                          size: 18,
+                        ),
+                        prefixIconConstraints:
+                            const BoxConstraints(minWidth: 35),
+                        suffixIcon: _cardSearchQuery.isEmpty
+                            ? null
+                            : IconButton(
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setState(() {
+                                    _cardSearchQuery = '';
+                                    _cardSearchController.clear();
+                                  });
+                                },
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: 16,
+                                  color: workMuted,
+                                ),
+                              ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 7,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(11),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(11),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFBFDBFE),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  _BoardDockButton(
+                    tooltip: filterCount > 0
+                        ? 'ตัวกรองที่ใช้ $filterCount รายการ'
+                        : 'ตัวกรอง',
+                    icon: Icons.tune_rounded,
+                    active: filterCount > 0,
+                    badge: filterCount > 0 ? '$filterCount' : null,
+                    onTap: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      _showBoardFilterBottomSheet();
+                    },
+                  ),
+                  const SizedBox(width: 5),
+                  _BoardDockButton(
+                    tooltip: _isCompactMode
+                        ? 'ปิด Compact mode'
+                        : 'เปิด Compact mode',
+                    icon: _isCompactMode
+                        ? Icons.view_week_rounded
+                        : Icons.view_column_outlined,
+                    active: _isCompactMode,
+                    onTap: () => _setCompactMode(!_isCompactMode),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final pageCount = _lists.length + 1; // last page is "+ เพิ่มรายการ"
+    final isBoardCreator =
+        widget.service.currentUser?.id == widget.task.assignedBy;
+    final boardCreatorName = widget.task.assignedByName.isNotEmpty
+        ? widget.task.assignedByName
+        : 'เพื่อนร่วมงาน';
+    final filteredLists = _lists.where((list) {
+      if (_selectedListIds.isNotEmpty && !_selectedListIds.contains(list.id)) {
+        return false;
+      }
+      return true;
+    }).toList();
 
+    final isListFilterActive = _selectedListIds.isNotEmpty;
+    final pageCount = filteredLists.length + (isListFilterActive ? 0 : 1);
+
+    final hasActiveFilters = _cardSearchQuery.isNotEmpty ||
+        _selectedListIds.isNotEmpty ||
+        _selectedCardStatus != null;
+    final boardFilterCount = (_selectedListIds.isNotEmpty ? 1 : 0) +
+        (_selectedCardStatus != null ? 1 : 0);
+    final selectedListLabel = _selectedListIds.isEmpty
+        ? null
+        : _lists
+            .where((list) => _selectedListIds.contains(list.id))
+            .map((list) => list.name)
+            .join(', ');
+    final selectedStatusLabel = _selectedCardStatus == null
+        ? null
+        : _statusLabels[_selectedCardStatus!];
     return Scaffold(
       backgroundColor: workBackground,
-      body: Stack(
-        children: [
+      body: BoardKeyboardDismissRegion(
+        child: Stack(
+          children: [
           Column(
             children: [
               // Gradient Header
@@ -607,14 +1316,20 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     child: Column(
                       children: [
                         Row(
                           children: [
                             IconButton(
                               onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white),
+                              icon: const Icon(
+                                Icons.arrow_back_ios_rounded,
+                                color: Colors.white,
+                              ),
                             ),
                             Expanded(
                               child: Column(
@@ -624,7 +1339,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                     widget.task.title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 17,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                   if (widget.task.description.isNotEmpty)
                                     Padding(
@@ -633,12 +1352,18 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                         widget.task.description,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white70,
+                                        ),
                                       ),
                                     ),
                                   const SizedBox(height: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(12),
@@ -647,7 +1372,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          widget.task.assignedTo == widget.service.currentUserId
+                                          isBoardCreator
                                               ? Icons.star_rounded
                                               : Icons.group_rounded,
                                           size: 12,
@@ -655,10 +1380,14 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          widget.task.assignedTo == widget.service.currentUserId
+                                          isBoardCreator
                                               ? 'คุณเป็นเจ้าของบอร์ดนี้'
-                                              : 'บอร์ดนี้เป็นของ ${widget.task.assignedToName.isNotEmpty ? widget.task.assignedToName : "เพื่อนร่วมงาน"} (คุณถูกเพิ่มเข้ามา)',
-                                          style: const TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.w500),
+                                              : 'บอร์ดนี้เป็นของ $boardCreatorName (คุณถูกเพิ่มเข้ามา)',
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -668,7 +1397,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                             ),
                             IconButton(
                               onPressed: _loadBoard,
-                              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                              icon: const Icon(
+                                Icons.refresh_rounded,
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),
@@ -678,61 +1410,285 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                 ),
               ),
 
+              // Compact search and filters
+              if (!_useBottomBoardTools && _lists.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 5),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 42,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _cardSearchController,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _cardSearchQuery = value.trim();
+                                  });
+                                },
+                                textInputAction: TextInputAction.search,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: workText,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'ค้นหาชื่อการ์ด...',
+                                  hintStyle: const TextStyle(
+                                    color: workMuted,
+                                    fontSize: 12.5,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.search_rounded,
+                                    color: workMuted,
+                                    size: 18,
+                                  ),
+                                  prefixIconConstraints: const BoxConstraints(
+                                    minWidth: 38,
+                                  ),
+                                  suffixIcon: _cardSearchQuery.isNotEmpty
+                                      ? IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          icon: const Icon(
+                                            Icons.close_rounded,
+                                            color: workMuted,
+                                            size: 17,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _cardSearchQuery = '';
+                                              _cardSearchController.clear();
+                                            });
+                                          },
+                                        )
+                                      : null,
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 9,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(
+                                      color: workBlue,
+                                      width: 1.25,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: _showBoardFilterBottomSheet,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 42,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 11,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: boardFilterCount > 0
+                                      ? const Color(0xFFEFF6FF)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: boardFilterCount > 0
+                                        ? const Color(0xFFBFDBFE)
+                                        : const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.tune_rounded,
+                                      size: 17,
+                                      color: boardFilterCount > 0
+                                          ? workBlue
+                                          : workMuted,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      boardFilterCount > 0
+                                          ? 'กรอง $boardFilterCount'
+                                          : 'กรอง',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: boardFilterCount > 0
+                                            ? workBlue
+                                            : workText,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (hasActiveFilters) ...[
+                        const SizedBox(height: 5),
+                        SizedBox(
+                          height: 26,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              if (selectedListLabel != null)
+                                _buildActiveBoardFilter(
+                                  icon: Icons.view_column_outlined,
+                                  label: selectedListLabel,
+                                  onRemove: () {
+                                    setState(() => _selectedListIds = []);
+                                  },
+                                ),
+                              if (selectedStatusLabel != null)
+                                _buildActiveBoardFilter(
+                                  icon: Icons.flag_outlined,
+                                  label: selectedStatusLabel,
+                                  onRemove: () {
+                                    setState(() {
+                                      _selectedCardStatus = null;
+                                    });
+                                  },
+                                ),
+                              if (_cardSearchQuery.isNotEmpty)
+                                _buildActiveBoardFilter(
+                                  icon: Icons.search_rounded,
+                                  label: '“$_cardSearchQuery”',
+                                  onRemove: () {
+                                    setState(() {
+                                      _cardSearchQuery = '';
+                                      _cardSearchController.clear();
+                                    });
+                                  },
+                                ),
+                              TextButton(
+                                onPressed: _clearAllBoardFilters,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: workMuted,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text(
+                                  'ล้างทั้งหมด',
+                                  style: TextStyle(fontSize: 10.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
               // Lists PageView — physics จะถูก toggle โดย _cardAreaActive
               // เมื่อนิ้วอยู่ใน Zone การ์ด: NeverScrollableScrollPhysics (PageView หยุด)
               // เมื่อนิ้วอยู่ใน Header: PageScrollPhysics (PageView เลื่อนปกติ)
               Expanded(
                 child: _loading && _lists.isEmpty
-                    ? const Center(child: CircularProgressIndicator(color: workBlue))
-                    : ValueListenableBuilder<bool>(
-                        valueListenable: _cardAreaActive,
-                        builder: (context, cardActive, _) {
-                          return PageView.builder(
-                            controller: _pageController,
-                            physics: cardActive
-                                ? const NeverScrollableScrollPhysics()
-                                : const PageScrollPhysics(),
-                            onPageChanged: (idx) {
-                              setState(() {
-                                _currentPage = idx;
-                              });
+                    ? TaskBoardSkeleton(
+                        viewportFraction:
+                            boardViewportFraction(_isCompactMode),
+                      )
+                    : filteredLists.isEmpty && isListFilterActive
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.filter_list_off_rounded, size: 48, color: workMuted.withOpacity(0.5)),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'ไม่พบรายการที่ตรงตามตัวกรอง',
+                                  style: TextStyle(color: workMuted, fontSize: 13.5, fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 16),
+                                OutlinedButton(
+                                  onPressed: _clearAllBoardFilters,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: workBlue,
+                                    side: const BorderSide(color: workBlue),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  ),
+                                  child: const Text('ล้างตัวกรองทั้งหมด', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Builder(
+                            builder: (context) {
+                              return PageView.builder(
+                                controller: _pageController,
+                                physics: const PageScrollPhysics(),
+                                onPageChanged: (idx) {
+                                  setState(() {
+                                    _currentPage = idx;
+                                  });
+                                },
+                                itemCount: pageCount,
+                                itemBuilder: (context, idx) {
+                                  if (idx == filteredLists.length) {
+                                    return _buildAddListPage();
+                                  }
+                                  final list = filteredLists[idx];
+                                  return _buildListPage(list, idx);
+                                },
+                              );
                             },
-                            itemCount: pageCount,
-                            itemBuilder: (context, idx) {
-                              if (idx == _lists.length) {
-                                return _buildAddListPage();
-                              }
-                              final list = _lists[idx];
-                              return _buildListPage(list, idx);
-                            },
-                          );
-                        },
-                      ),
+                          ),
               ),
 
               // Page indicators (Dots)
-              if (pageCount > 1)
+              if (!_useBottomBoardTools && pageCount > 1)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(pageCount, (idx) {
-                      final active = _currentPage == idx;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: active ? 18 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: active ? workBlue : workMuted.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      );
-                    }),
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: BoardPageIndicator(
+                    currentPage: _currentPage,
+                    pageCount: pageCount,
                   ),
                 ),
             ],
           ),
+
+          if (_useBottomBoardTools &&
+              _lists.isNotEmpty &&
+              pageCount > 1)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.paddingOf(context).bottom + 68,
+              child: IgnorePointer(
+                child: Center(
+                  child: BoardPageIndicator(
+                    currentPage: _currentPage,
+                    pageCount: pageCount,
+                  ),
+                ),
+              ),
+            ),
+
+          if (_useBottomBoardTools && _lists.isNotEmpty)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildBoardBottomDock(
+                filterCount: boardFilterCount,
+              ),
+            ),
 
           // Edge strips สำหรับ Column drag (เลื่อนหน้าจอตอนลาก Column)
           if (_isDraggingList)
@@ -770,7 +1726,8 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                 },
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -785,8 +1742,13 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('แก้ไขข้อมูลรายการ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'แก้ไขข้อมูลรายการ',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -799,7 +1761,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                     labelText: 'ชื่อรายการ',
                     filled: true,
                     fillColor: Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -810,7 +1775,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                     labelText: 'รายละเอียดรายการ',
                     filled: true,
                     fillColor: Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -831,7 +1799,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                         },
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF8FAFC),
                             borderRadius: BorderRadius.circular(8),
@@ -840,11 +1811,25 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('วันที่เริ่ม', style: TextStyle(fontSize: 10, color: workMuted)),
+                              const Text(
+                                'วันที่เริ่ม',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: workMuted,
+                                ),
+                              ),
                               const SizedBox(height: 2),
                               Text(
-                                startDate != null ? _formatDate(startDate) : 'เลือกวันเริ่ม',
-                                style: TextStyle(fontSize: 11, color: startDate != null ? workText : workMuted, fontWeight: FontWeight.w500),
+                                startDate != null
+                                    ? _formatDate(startDate)
+                                    : 'เลือกวันเริ่ม',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: startDate != null
+                                      ? workText
+                                      : workMuted,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ],
                           ),
@@ -867,7 +1852,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                         },
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF8FAFC),
                             borderRadius: BorderRadius.circular(8),
@@ -876,11 +1864,23 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('วันที่สิ้นสุด', style: TextStyle(fontSize: 10, color: workMuted)),
+                              const Text(
+                                'วันที่สิ้นสุด',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: workMuted,
+                                ),
+                              ),
                               const SizedBox(height: 2),
                               Text(
-                                dueDate != null ? _formatDate(dueDate) : 'เลือกวันสิ้นสุด',
-                                style: TextStyle(fontSize: 11, color: dueDate != null ? workText : workMuted, fontWeight: FontWeight.w500),
+                                dueDate != null
+                                    ? _formatDate(dueDate)
+                                    : 'เลือกวันสิ้นสุด',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: dueDate != null ? workText : workMuted,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ],
                           ),
@@ -898,11 +1898,25 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
               child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () {
+                if (_hasInvalidDateRange(startDate, dueDate)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'วันที่สิ้นสุดต้องไม่อยู่ก่อนวันที่เริ่ม',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(context, true);
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: workBlue,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text('บันทึก'),
             ),
@@ -927,7 +1941,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         setState(() => _loading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('แก้ไขข้อมูลรายการล้มเหลว: $e'), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text('แก้ไขข้อมูลรายการล้มเหลว: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }
@@ -938,8 +1955,15 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     final totalCards = list.cards.length;
     final doneCards = list.cards.where((c) => c.status == 'completed').length;
     final pct = totalCards == 0 ? 0 : (doneCards / totalCards * 100).toInt();
+    final dateLabel = _formatDateRange(list.startDate, list.dueDate);
+    final isCompleted = totalCards > 0 && doneCards == totalCards;
+    final dateColor = _deadlineColor(
+      list.dueDate,
+      isCompleted: isCompleted,
+    );
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
@@ -948,17 +1972,88 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.drag_indicator_rounded, color: workMuted, size: 16),
+                  const Icon(
+                    Icons.drag_indicator_rounded,
+                    color: workMuted,
+                    size: 16,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       list.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: workText),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: workText,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
+              if (list.description.trim().isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Text(
+                    list.description.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      height: 1.25,
+                      color: workMuted,
+                    ),
+                  ),
+                ),
+              ],
+              if (dateLabel.isNotEmpty || totalCards > 0) ...[
+                const SizedBox(height: 5),
+                Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Row(
+                    children: [
+                      if (dateLabel.isNotEmpty) ...[
+                        Icon(
+                          list.dueDate != null &&
+                                  _deadlineColor(
+                                        list.dueDate,
+                                        isCompleted: isCompleted,
+                                      ) !=
+                                      workMuted
+                              ? Icons.schedule_rounded
+                              : Icons.calendar_today_outlined,
+                          size: 11,
+                          color: dateColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            dateLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: dateColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ] else
+                        const Spacer(),
+                      if (totalCards > 0)
+                        Text(
+                          '$doneCards/$totalCards งาน',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: workMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
               if (totalCards > 0) ...[
                 const SizedBox(height: 4),
                 Row(
@@ -970,7 +2065,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                         child: LinearProgressIndicator(
                           value: totalCards == 0 ? 0 : doneCards / totalCards,
                           backgroundColor: const Color(0xFFE2E8F0),
-                          color: pct == 100 ? const Color(0xFF10B981) : workBlue,
+                          color: pct == 100
+                              ? const Color(0xFF10B981)
+                              : workBlue,
                           minHeight: 3,
                         ),
                       ),
@@ -995,7 +2092,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           onPressed: () => _editListName(list),
-          icon: const Icon(Icons.mode_edit_outline_rounded, color: workMuted, size: 16),
+          icon: const Icon(
+            Icons.mode_edit_outline_rounded,
+            color: workMuted,
+            size: 16,
+          ),
         ),
       ],
     );
@@ -1011,7 +2112,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
         final columnCardWidget = AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.fromLTRB(5, 8, 5, 6),
+          margin: _isCompactMode
+              ? const EdgeInsets.fromLTRB(3, 6, 3, 4)
+              : const EdgeInsets.fromLTRB(5, 8, 5, 6),
           decoration: BoxDecoration(
             color: isOver ? workBlue.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -1020,7 +2123,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
               width: isOver ? 1.5 : 1.0,
             ),
             boxShadow: const [
-              BoxShadow(color: Color(0x0D0F172A), blurRadius: 8, offset: Offset(0, 2)),
+              BoxShadow(
+                color: Color(0x0D0F172A),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
             ],
           ),
           child: Column(
@@ -1028,44 +2135,112 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
             children: [
               // Header of list
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: EdgeInsets.symmetric(
+                  horizontal: _isCompactMode ? 9 : 12,
+                  vertical: _isCompactMode ? 6 : 8,
+                ),
                 child: _buildListHeaderContent(list),
               ),
               const Divider(height: 1, color: Color(0xFFF1F5F9)),
 
-              // Cards inside list — ReorderableListView สลับลำดับในคอลัมน์ได้
-              // Listener ปิด PageView physics ตอนนิ้วอยู่ใน Zone นี้
+              // Cards inside list
               Expanded(
-                child: Listener(
-                  behavior: HitTestBehavior.translucent,
-                  onPointerDown: (_) => _cardAreaActive.value = true,
-                  onPointerUp: (_) => _cardAreaActive.value = false,
-                  onPointerCancel: (_) => _cardAreaActive.value = false,
-                  child: ReorderableListView.builder(
-                    physics: const ClampingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
-                    itemCount: list.cards.length,
-                    onReorderItem: (oldIndex, newIndex) =>
-                        _reorderCards(list, oldIndex, newIndex),
-                    proxyDecorator: (child, index, animation) => AnimatedBuilder(
-                      animation: animation,
-                      builder: (context, child) => Material(
-                        elevation: 4 * animation.value,
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
+                child: Builder(
+                  builder: (context) {
+                    final hasActiveFilters = _cardSearchQuery.isNotEmpty || _selectedCardStatus != null;
+                    final filteredCards = list.cards.where((card) {
+                      if (_cardSearchQuery.isNotEmpty) {
+                        final query = _cardSearchQuery.toLowerCase();
+                        final matchTitle = card.title.toLowerCase().contains(query);
+                        final matchDesc = card.description.toLowerCase().contains(query);
+                        if (!matchTitle && !matchDesc) return false;
+                      }
+                      if (_selectedCardStatus != null && card.status != _selectedCardStatus) {
+                        return false;
+                      }
+                      return true;
+                    }).toList();
+
+                    if (hasActiveFilters) {
+                      if (filteredCards.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.search_off_rounded,
+                                  size: 28,
+                                  color: Color(0xFFCBD5E1),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'ไม่พบการ์ดในหัวข้อนี้',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: workMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                TextButton(
+                                  onPressed: _clearAllBoardFilters,
+                                  child: const Text(
+                                    'ล้างตัวกรอง',
+                                    style: TextStyle(fontSize: 11.5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        physics: const ClampingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(5, 6, 5, 92),
+                        itemCount: filteredCards.length,
+                        itemBuilder: (context, index) {
+                          final card = filteredCards[index];
+                          return _buildCardItem(
+                            card,
+                            listIdx,
+                            key: ValueKey(card.id),
+                          );
+                        },
+                      );
+                    }
+
+                    return ReorderableListView.builder(
+                      physics: const ClampingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(5, 6, 5, 92),
+                      itemCount: list.cards.length,
+                      onReorderItem: (oldIndex, newIndex) =>
+                          _reorderCards(list, oldIndex, newIndex),
+                      proxyDecorator: (child, index, animation) => AnimatedBuilder(
+                        animation: animation,
+                        builder: (context, child) => Material(
+                          elevation: 4 * animation.value,
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          child: child,
+                        ),
                         child: child,
                       ),
-                      child: child,
-                    ),
-                    itemBuilder: (context, index) {
-                      final card = list.cards[index];
-                      return _buildCardItem(card, listIdx, key: ValueKey(card.id));
-                    },
-                    footer: Padding(
-                      padding: const EdgeInsets.only(top: 2, bottom: 4),
-                      child: _buildCompactAddCardButton(list.id),
-                    ),
-                  ),
+                      itemBuilder: (context, index) {
+                        final card = list.cards[index];
+                        return _buildCardItem(
+                          card,
+                          listIdx,
+                          key: ValueKey(card.id),
+                        );
+                      },
+                      footer: Padding(
+                        padding: const EdgeInsets.only(top: 2, bottom: 4),
+                        child: _buildCompactAddCardButton(list.id),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -1117,7 +2292,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
             setState(() {
               _isDraggingList = true;
               _draggedList = list;
-              _pageController = PageController(initialPage: curPage, viewportFraction: 0.75);
+              _pageController = PageController(
+                initialPage: curPage,
+                viewportFraction: _isCompactMode ? 0.64 : 0.75,
+              );
             });
           },
           onDragUpdate: (details) {
@@ -1129,7 +2307,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
             setState(() {
               _isDraggingList = false;
               _draggedList = null;
-              _pageController = PageController(initialPage: curPage, viewportFraction: 0.90);
+              _pageController = PageController(
+                initialPage: curPage,
+                viewportFraction: boardViewportFraction(_isCompactMode),
+              );
             });
           },
           child: scaledColumn,
@@ -1167,7 +2348,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
               SizedBox(width: 4),
               Text(
                 'เพิ่มการ์ด',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: workBlue),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11.5,
+                  color: workBlue,
+                ),
               ),
             ],
           ),
@@ -1182,6 +2367,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     final pct = totalCount == 0 ? 0 : (doneCount / totalCount * 100).toInt();
 
     final isCompleted = card.status == 'completed';
+    final dateLabel = _formatDateRange(card.startDate, card.dueDate);
+    final dateColor = _deadlineColor(
+      card.dueDate,
+      isCompleted: isCompleted,
+    );
     final badgeBg = _statusBgColors[card.status] ?? const Color(0xFFF1F5F9);
     final badgeText = _statusTextColors[card.status] ?? workMuted;
     final badgeLabel = _statusLabels[card.status] ?? 'รอทำ';
@@ -1189,7 +2379,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     Color priorityBg = const Color(0xFFE2E8F0);
     Color priorityText = const Color(0xFF64748B);
     String priorityLabel = 'Medium';
-    
+
     switch (card.priority) {
       case 'low':
         priorityBg = const Color(0xFFE0F2FE);
@@ -1217,15 +2407,23 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       onTap: () => _showCardDetailSheet(card),
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+        padding: _isCompactMode
+            ? const EdgeInsets.fromLTRB(8, 6, 5, 6)
+            : const EdgeInsets.fromLTRB(10, 8, 6, 8),
         decoration: BoxDecoration(
           color: isCompleted ? const Color(0xFFF0FDF4) : Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isCompleted ? const Color(0xFFBBF7D0) : const Color(0xFFF1F5F9),
+            color: isCompleted
+                ? const Color(0xFFBBF7D0)
+                : const Color(0xFFF1F5F9),
           ),
           boxShadow: const [
-            BoxShadow(color: Color(0x05000000), blurRadius: 3, offset: Offset(0, 1)),
+            BoxShadow(
+              color: Color(0x05000000),
+              blurRadius: 3,
+              offset: Offset(0, 1),
+            ),
           ],
         ),
         child: Row(
@@ -1236,7 +2434,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
               onTap: () async {
                 final newStatus = isCompleted ? 'pending' : 'completed';
                 try {
-                  await widget.service.updateTaskCard(card.id, status: newStatus);
+                  await widget.service.updateTaskCard(
+                    card.id,
+                    status: newStatus,
+                  );
                   _loadBoard();
                 } catch (_) {}
               },
@@ -1245,15 +2446,23 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                 height: 20,
                 margin: const EdgeInsets.only(top: 1, right: 8),
                 decoration: BoxDecoration(
-                  color: isCompleted ? const Color(0xFF10B981) : Colors.transparent,
+                  color: isCompleted
+                      ? const Color(0xFF10B981)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(5),
                   border: Border.all(
-                    color: isCompleted ? const Color(0xFF10B981) : const Color(0xFFCBD5E1),
+                    color: isCompleted
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFCBD5E1),
                     width: 1.5,
                   ),
                 ),
                 child: isCompleted
-                    ? const Icon(Icons.check_rounded, size: 13, color: Colors.white)
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 13,
+                        color: Colors.white,
+                      )
                     : null,
               ),
             ),
@@ -1272,40 +2481,59 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 12.5,
-                            color: isCompleted ? const Color(0xFF6B7280) : workText,
-                            decoration: isCompleted ? TextDecoration.lineThrough : null,
+                            fontSize: _isCompactMode ? 11.5 : 12.5,
+                            color: isCompleted
+                                ? const Color(0xFF6B7280)
+                                : workText,
+                            decoration: isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
                         ),
                       ),
                       const SizedBox(width: 6),
-                      if (card.priority != 'medium') // Show priority only if it's not medium to save space, or show always? Let's show always for now.
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                        margin: const EdgeInsets.only(right: 4),
-                        decoration: BoxDecoration(
-                          color: priorityBg,
-                          borderRadius: BorderRadius.circular(4),
+                      if (card.priority !=
+                          'medium') // Show priority only if it's not medium to save space, or show always? Let's show always for now.
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1.5,
+                          ),
+                          margin: const EdgeInsets.only(right: 4),
+                          decoration: BoxDecoration(
+                            color: priorityBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            priorityLabel,
+                            style: TextStyle(
+                              color: priorityText,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                        child: Text(
-                          priorityLabel,
-                          style: TextStyle(color: priorityText, fontSize: 8, fontWeight: FontWeight.bold),
-                        ),
-                      ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1.5,
+                        ),
                         decoration: BoxDecoration(
                           color: badgeBg,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           badgeLabel,
-                          style: TextStyle(color: badgeText, fontSize: 8.5, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: badgeText,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  if (card.description.isNotEmpty) ...[
+                  if (!_isCompactMode && card.description.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
                       card.description,
@@ -1315,16 +2543,94 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                     ),
                   ],
                   if (card.startDate != null || card.dueDate != null) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.calendar_today_rounded, size: 10, color: workBlue),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${card.startDate != null ? _formatDate(card.startDate) : ''}${card.startDate != null && card.dueDate != null ? ' - ' : ''}${card.dueDate != null ? _formatDate(card.dueDate) : ''}',
-                          style: const TextStyle(fontSize: 10, color: workMuted, fontWeight: FontWeight.w500),
+                        Icon(
+                          dateColor == workMuted
+                              ? Icons.calendar_today_outlined
+                              : Icons.schedule_rounded,
+                          size: 10.5,
+                          color: dateColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            dateLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                            fontSize: 10,
+                            color: dateColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          ),
                         ),
                       ],
+                    ),
+                  ],
+                  if (card.subItems.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.only(left: 7),
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          left: BorderSide(
+                            color: Color(0xFFCBD5E1),
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          for (final subItem in card.subItems.take(2))
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 3),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    subItem.isDone
+                                        ? Icons.check_circle_rounded
+                                        : Icons.radio_button_unchecked_rounded,
+                                    size: 10,
+                                    color: subItem.isDone
+                                        ? const Color(0xFF16A34A)
+                                        : const Color(0xFF94A3B8),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      subItem.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: subItem.isDone
+                                            ? workMuted
+                                            : workText,
+                                        decoration: subItem.isDone
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (card.subItems.length > 2)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '+${card.subItems.length - 2} รายการย่อย',
+                                style: const TextStyle(
+                                  fontSize: 9.5,
+                                  color: workMuted,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                   if (totalCount > 0) ...[
@@ -1334,17 +2640,29 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.playlist_add_check_rounded, size: 12, color: workBlue),
+                            Icon(
+                              Icons.playlist_add_check_rounded,
+                              size: 12,
+                              color: workBlue,
+                            ),
                             SizedBox(width: 3),
                             Text(
                               'ความคืบหน้า',
-                              style: TextStyle(fontSize: 10, color: workMuted, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: workMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
                         Text(
                           '$pct%',
-                          style: const TextStyle(fontSize: 10.5, color: workBlue, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: workBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -1376,7 +2694,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFF1F5F9)),
         boxShadow: const [
-          BoxShadow(color: Color(0x0D0F172A), blurRadius: 8, offset: Offset(0, 2)),
+          BoxShadow(
+            color: Color(0x0D0F172A),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Center(
@@ -1391,12 +2713,20 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                   color: Color(0xFFEFF6FF),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.playlist_add_rounded, size: 36, color: workBlue),
+                child: const Icon(
+                  Icons.playlist_add_rounded,
+                  size: 36,
+                  color: workBlue,
+                ),
               ),
               const SizedBox(height: 16),
               const Text(
                 'เพิ่มรายการงาน',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: workText),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  color: workText,
+                ),
               ),
               const SizedBox(height: 6),
               const Text(
@@ -1413,9 +2743,14 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: workBlue,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text('เพิ่มรายการ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'เพิ่มรายการ',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -1447,6 +2782,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 class _CardDetailSheet extends StatefulWidget {
   const _CardDetailSheet({
     required this.taskId,
+    required this.listName,
     required this.card,
     required this.service,
     required this.canEdit,
@@ -1454,6 +2790,7 @@ class _CardDetailSheet extends StatefulWidget {
   });
 
   final String taskId;
+  final String listName;
   final TaskCardRecord card;
   final AuthFlowService service;
   final bool canEdit;
@@ -1464,19 +2801,20 @@ class _CardDetailSheet extends StatefulWidget {
 }
 
 class _CardDetailSheetState extends State<_CardDetailSheet> {
+  late String _cardTitle;
+  final ScrollController _detailScrollController = ScrollController();
   late List<TaskSubItem> _subItems;
   late List<CardAttachment> _attachments;
   late String _currentStatus;
   bool _saving = false;
   final _subItemController = TextEditingController();
-  late TextEditingController _adminCommentController;
 
   final List<String> _statusKeys = ['pending', 'in_progress', 'completed'];
   final List<String> _statusLabels = ['รอทำ', 'กำลังทำ', 'เสร็จสิ้น'];
   final List<Color> _statusColors = [
     const Color(0xFF64748B),
     const Color(0xFFEA580C),
-    const Color(0xFF10B981)
+    const Color(0xFF10B981),
   ];
 
   bool _loadingCard = false;
@@ -1484,11 +2822,11 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
   @override
   void initState() {
     super.initState();
+    _cardTitle = widget.card.title;
     _subItems = List.from(widget.card.subItems);
     _attachments = List.from(widget.card.attachments);
     _currentStatus = widget.card.status;
-    _adminCommentController = TextEditingController(text: widget.card.adminComment);
-    
+
     // Auto-refresh card details from the server to prevent stale state across different devices
     Future.microtask(() => _refreshCardData());
   }
@@ -1508,10 +2846,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
       }
       if (updatedCard != null && mounted) {
         setState(() {
-          _subItems = List.from(updatedCard!.subItems);
+          _cardTitle = updatedCard!.title;
+          _subItems = List.from(updatedCard.subItems);
           _attachments = List.from(updatedCard.attachments);
           _currentStatus = updatedCard.status;
-          _adminCommentController.text = updatedCard.adminComment ?? '';
         });
       }
     } catch (e) {
@@ -1521,7 +2859,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
 
   @override
   void dispose() {
-    _adminCommentController.dispose();
+    _detailScrollController.dispose();
     _subItemController.dispose();
     super.dispose();
   }
@@ -1533,38 +2871,19 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     });
 
     try {
-      await widget.service.updateTaskCard(widget.card.id, status: status, description: widget.card.description);
-      widget.onChanged();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เปลี่ยนสถานะการ์ดล้มเหลว: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _saveAdminComment() async {
-    setState(() => _saving = true);
-    try {
       await widget.service.updateTaskCard(
         widget.card.id,
-        status: widget.card.status,
+        status: status,
         description: widget.card.description,
-        adminComment: _adminCommentController.text.trim(),
       );
       widget.onChanged();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('บันทึกความคิดเห็นผู้ดูแลแล้ว!'), backgroundColor: Colors.green),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('บันทึกความคิดเห็นล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('เปลี่ยนสถานะการ์ดล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -1597,7 +2916,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('อัปเดตความคืบหน้าล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('อัปเดตความคืบหน้าล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -1611,7 +2933,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     setState(() => _saving = true);
 
     try {
-      final newItem = await widget.service.createCardSubItem(widget.card.id, title);
+      final newItem = await widget.service.createCardSubItem(
+        widget.card.id,
+        title,
+      );
       setState(() {
         _subItems.add(newItem);
       });
@@ -1619,7 +2944,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เพิ่มรายการย่อยล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('เพิ่มรายการย่อยล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -1628,7 +2956,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
   }
 
   Future<void> _editCard() async {
-    final titleController = TextEditingController(text: widget.card.title);
+    final titleController = TextEditingController(text: _cardTitle);
     final descController = TextEditingController(text: widget.card.description);
     DateTime? startDate = widget.card.startDate;
     DateTime? dueDate = widget.card.dueDate;
@@ -1638,16 +2966,28 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           backgroundColor: Colors.white,
           titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 10,
+          ),
           actionsPadding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
           title: const Row(
             children: [
               Icon(Icons.edit_note_rounded, color: workBlue, size: 22),
               SizedBox(width: 8),
-              Text('แก้ไขข้อมูลการ์ด', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: workText)),
+              Text(
+                'แก้ไขข้อมูลการ์ด',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: workText,
+                ),
+              ),
             ],
           ),
           content: SingleChildScrollView(
@@ -1655,7 +2995,14 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('ชื่องาน', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: workText)),
+                const Text(
+                  'ชื่องาน',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: workText,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: titleController,
@@ -1664,7 +3011,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                     hintText: 'กรอกชื่องาน...',
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: workBlue, width: 1.5),
@@ -1676,7 +3026,14 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('รายละเอียด', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: workText)),
+                const Text(
+                  'รายละเอียด',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: workText,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: descController,
@@ -1686,7 +3043,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                     hintText: 'กรอกรายละเอียดเพิ่มเติม...',
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: workBlue, width: 1.5),
@@ -1698,7 +3058,14 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('ความสำคัญ', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: workText)),
+                const Text(
+                  'ความสำคัญ',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: workText,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 PrioritySelector(
                   selectedPriority: priority,
@@ -1713,7 +3080,14 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('วันที่เริ่ม', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: workText)),
+                          const Text(
+                            'วันที่เริ่ม',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: workText,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           InkWell(
                             onTap: () async {
@@ -1739,24 +3113,37 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                             },
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_today_rounded, size: 14, color: workMuted),
+                                  const Icon(
+                                    Icons.calendar_today_rounded,
+                                    size: 14,
+                                    color: workMuted,
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      startDate != null ? _formatDate(startDate) : 'เลือกวันเริ่ม',
+                                      startDate != null
+                                          ? _formatDate(startDate)
+                                          : 'เลือกวันเริ่ม',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: startDate != null ? workText : workMuted,
+                                        color: startDate != null
+                                            ? workText
+                                            : workMuted,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -1773,7 +3160,14 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('วันสิ้นสุด', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: workText)),
+                          const Text(
+                            'วันสิ้นสุด',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: workText,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           InkWell(
                             onTap: () async {
@@ -1799,24 +3193,37 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                             },
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_month_rounded, size: 14, color: workMuted),
+                                  const Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 14,
+                                    color: workMuted,
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      dueDate != null ? _formatDate(dueDate) : 'เลือกวันส่ง',
+                                      dueDate != null
+                                          ? _formatDate(dueDate)
+                                          : 'เลือกวันส่ง',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: dueDate != null ? workText : workMuted,
+                                        color: dueDate != null
+                                            ? workText
+                                            : workMuted,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -1839,26 +3246,51 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: workMuted,
                 side: const BorderSide(color: Color(0xFFE2E8F0)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
               ),
-              child: const Text('ยกเลิก', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'ยกเลิก',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(width: 4),
             ElevatedButton(
               onPressed: () {
-                if (titleController.text.trim().isNotEmpty) {
-                  Navigator.pop(context, true);
+                if (titleController.text.trim().isEmpty) return;
+                if (_hasInvalidDateRange(startDate, dueDate)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'วันสิ้นสุดต้องไม่อยู่ก่อนวันที่เริ่ม',
+                      ),
+                    ),
+                  );
+                  return;
                 }
+                Navigator.pop(context, true);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: workBlue,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 elevation: 0,
               ),
-              child: const Text('บันทึก', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'บันทึก',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -1881,7 +3313,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('แก้ไขการ์ดล้มเหลว: $e'), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text('แก้ไขการ์ดล้มเหลว: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       } finally {
@@ -1896,223 +3331,589 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     final totalCount = _subItems.length;
     final pct = totalCount == 0 ? 0 : (doneCount / totalCount * 100).toInt();
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-          // Navigation / Action Bar (ชิดซ้ายเป็นระเบียบเรียบร้อย)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-            ),
-            child: Row(
-              children: [
-                // Left side: Back Button
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_rounded, color: workText),
-                  tooltip: 'ย้อนกลับ',
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Navigation / Action Bar (ชิดซ้ายเป็นระเบียบเรียบร้อย)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
                 ),
-                const SizedBox(width: 6),
-                // Left-aligned Title
-                const Text(
-                  'การ์ดงาน',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: workText),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
                 ),
-                const Spacer(), // ดันปุ่มทั้งหมดไปด้านขวา
-                // Right side: Action Menu Buttons (+ and ...)
-                IconButton(
-                  icon: const Icon(Icons.add_rounded, color: workBlue),
-                  tooltip: 'เพิ่มรายการย่อย',
-                  onPressed: () async {
-                    final textController = TextEditingController();
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        title: const Text('เพิ่มรายการย่อยใหม่', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        content: TextField(
-                          controller: textController,
-                          autofocus: true,
-                          decoration: const InputDecoration(
-                            hintText: 'พิมพ์หัวข้อรายการย่อย...',
-                            filled: true,
-                            fillColor: Color(0xFFF8FAFC),
-                            border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+                child: Row(
+                  children: [
+                    // Left side: Back Button
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: workText,
+                      ),
+                      tooltip: 'ย้อนกลับ',
+                    ),
+                    // List > Card hierarchy
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  widget.listName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    color: workMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 4),
+                                child: Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 13,
+                                  color: Color(0xFFCBD5E1),
+                                ),
+                              ),
+                              const Text(
+                                'การ์ด',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: workBlue,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
-                          ),
-                          ElevatedButton(
-                            onPressed: () {
-                              if (textController.text.trim().isNotEmpty) {
-                                Navigator.pop(context, true);
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: workBlue,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          const SizedBox(height: 1),
+                          Text(
+                            _cardTitle,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: workText,
                             ),
-                            child: const Text('เพิ่ม'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
-                    );
-
-                    if (confirm == true && textController.text.trim().isNotEmpty) {
-                      setState(() => _saving = true);
-                      try {
-                        final newItem = await widget.service.createCardSubItem(widget.card.id, textController.text.trim());
-                        setState(() {
-                          _subItems.add(newItem);
-                        });
-                        widget.onChanged();
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('เพิ่มรายการย่อยล้มเหลว: $e'), backgroundColor: Colors.red),
-                          );
-                        }
-                      } finally {
-                        setState(() => _saving = false);
-                      }
-                    }
-                  },
-                ),
-                const SizedBox(width: 4),
-                // Action Menu Button (... icon)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_horiz_rounded, color: workMuted),
-                  onSelected: (action) async {
-                    if (action == 'edit_card') {
-                      _editCard();
-                    } else if (action == 'delete_card') {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          title: const Text('ลบการ์ด', style: TextStyle(fontWeight: FontWeight.bold)),
-                          content: Text('คุณต้องการลบการ์ด "${widget.card.title}" หรือไม่?'),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก', style: TextStyle(color: workMuted))),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text('ลบ', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 8),
+                    // Right side: Action Menu Buttons (+ and ...)
+                    IconButton(
+                      icon: const Icon(Icons.add_rounded, color: workBlue),
+                      tooltip: 'เพิ่มรายการย่อย',
+                      onPressed: () async {
+                        final textController = TextEditingController();
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) {
-                        try {
-                          await widget.service.deleteTaskCard(widget.card.id);
-                          widget.onChanged();
-                          if (mounted) Navigator.pop(context);
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('ลบการ์ดล้มเหลว: $e'), backgroundColor: Colors.red),
-                            );
+                            title: const Text(
+                              'เพิ่มรายการย่อยใหม่',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            content: TextField(
+                              controller: textController,
+                              autofocus: true,
+                              decoration: const InputDecoration(
+                                hintText: 'พิมพ์หัวข้อรายการย่อย...',
+                                filled: true,
+                                fillColor: Color(0xFFF8FAFC),
+                                border: OutlineInputBorder(
+                                  borderSide: BorderSide.none,
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text(
+                                  'ยกเลิก',
+                                  style: TextStyle(color: workMuted),
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  if (textController.text.trim().isNotEmpty) {
+                                    Navigator.pop(context, true);
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: workBlue,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text('เพิ่ม'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true &&
+                            textController.text.trim().isNotEmpty) {
+                          setState(() => _saving = true);
+                          try {
+                            final newItem = await widget.service
+                                .createCardSubItem(
+                                  widget.card.id,
+                                  textController.text.trim(),
+                                );
+                            setState(() {
+                              _subItems.add(newItem);
+                            });
+                            widget.onChanged();
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('เพิ่มรายการย่อยล้มเหลว: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } finally {
+                            setState(() => _saving = false);
                           }
                         }
-                      }
-                    } else if (action.startsWith('status_')) {
-                      final newStatus = action.substring(7); // Extract "todo", "doing", "done"
-                      _updateCardStatus(newStatus);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit_card',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_outlined, color: workBlue, size: 18),
-                          SizedBox(width: 8),
-                          Text('แก้ไขการ์ด', style: TextStyle(fontSize: 12.5)),
-                        ],
-                      ),
+                      },
                     ),
-                    const PopupMenuItem(
-                      value: 'delete_card',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
-                          SizedBox(width: 8),
-                          Text('ลบการ์ด', style: TextStyle(fontSize: 12.5)),
-                        ],
+                    const SizedBox(width: 4),
+                    // Action Menu Button (... icon)
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_horiz_rounded,
+                        color: workMuted,
                       ),
-                    ),
-                    const PopupMenuDivider(),
-                    PopupMenuItem(
-                      value: 'status_todo',
-                      child: Row(
-                        children: [
-                          Icon(Icons.circle_rounded, color: _statusColors[0], size: 12),
-                          const SizedBox(width: 8),
-                          const Text('ย้ายไป "รอทำ"', style: TextStyle(fontSize: 12.5)),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'status_doing',
-                      child: Row(
-                        children: [
-                          Icon(Icons.circle_rounded, color: _statusColors[1], size: 12),
-                          const SizedBox(width: 8),
-                          const Text('ย้ายไป "กำลังทำ"', style: TextStyle(fontSize: 12.5)),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'status_done',
-                      child: Row(
-                        children: [
-                          Icon(Icons.circle_rounded, color: _statusColors[2], size: 12),
-                          const SizedBox(width: 8),
-                          const Text('ย้ายไป "เสร็จสิ้น"', style: TextStyle(fontSize: 12.5)),
-                        ],
-                      ),
+                      onSelected: (action) async {
+                        if (action == 'edit_card') {
+                          _editCard();
+                        } else if (action == 'delete_card') {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              title: const Text(
+                                'ลบการ์ด',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              content: Text(
+                                'คุณต้องการลบการ์ด "$_cardTitle" หรือไม่?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text(
+                                    'ยกเลิก',
+                                    style: TextStyle(color: workMuted),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text(
+                                    'ลบ',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            try {
+                              await widget.service.deleteTaskCard(
+                                widget.card.id,
+                              );
+                              widget.onChanged();
+                              if (mounted) Navigator.pop(context);
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('ลบการ์ดล้มเหลว: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        } else if (action.startsWith('status_')) {
+                          final newStatus = action.substring(
+                            7,
+                          ); // Extract "todo", "doing", "done"
+                          _updateCardStatus(newStatus);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit_card',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.edit_outlined,
+                                color: workBlue,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'แก้ไขการ์ด',
+                                style: TextStyle(fontSize: 12.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete_card',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete_outline_rounded,
+                                color: Colors.redAccent,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text('ลบการ์ด', style: TextStyle(fontSize: 12.5)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: 'status_todo',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.circle_rounded,
+                                color: _statusColors[0],
+                                size: 12,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'ย้ายไป "รอทำ"',
+                                style: TextStyle(fontSize: 12.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'status_doing',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.circle_rounded,
+                                color: _statusColors[1],
+                                size: 12,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'ย้ายไป "กำลังทำ"',
+                                style: TextStyle(fontSize: 12.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'status_done',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.circle_rounded,
+                                color: _statusColors[2],
+                                size: 12,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'ย้ายไป "เสร็จสิ้น"',
+                                style: TextStyle(fontSize: 12.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
+              ),
+              const SizedBox(height: 10),
 
               // Scrollable content area
               Expanded(
                 child: SingleChildScrollView(
+                  controller: _detailScrollController,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. รายการย่อย (Checklist)
+                      // 1. รายละเอียดการ์ดงาน (Card Details - Top Section)
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.playlist_add_check_rounded, color: workBlue, size: 20),
-                              const SizedBox(width: 6),
-                              const Text('รายการย่อย (Checklist)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText)),
-                            ],
+                          const Icon(
+                            Icons.subject_rounded,
+                            color: workBlue,
+                            size: 18,
                           ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _cardTitle,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14.5,
+                                color: workText,
+                              ),
+                            ),
+                          ),
+                          if (widget.card.priority != 'medium')
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              margin: const EdgeInsets.only(left: 8),
+                              decoration: BoxDecoration(
+                                color: widget.card.priority == 'urgent'
+                                    ? const Color(0xFFFEE2E2)
+                                    : widget.card.priority == 'high'
+                                    ? const Color(0xFFFFEDD5)
+                                    : const Color(0xFFE0F2FE),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                widget.card.priority == 'urgent'
+                                    ? 'Urgent'
+                                    : widget.card.priority == 'high'
+                                    ? 'High'
+                                    : 'Low',
+                                style: TextStyle(
+                                  color: widget.card.priority == 'urgent'
+                                      ? const Color(0xFFDC2626)
+                                      : widget.card.priority == 'high'
+                                      ? const Color(0xFFEA580C)
+                                      : const Color(0xFF0284C7),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.card.description.isNotEmpty
+                                  ? widget.card.description
+                                  : 'ไม่มีรายละเอียดคำอธิบาย',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: widget.card.description.isNotEmpty ? workText : workMuted,
+                                height: 1.4,
+                                fontStyle: widget.card.description.isNotEmpty ? FontStyle.normal : FontStyle.italic,
+                              ),
+                            ),
+                            if (widget.card.startDate != null ||
+                                widget.card.dueDate != null) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: const Color(0xFFF1F5F9),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    if (widget.card.startDate != null)
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'วันที่เริ่ม',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                color: workMuted,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _formatDate(
+                                                widget.card.startDate,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 11.5,
+                                                color: workText,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    if (widget.card.startDate != null &&
+                                        widget.card.dueDate != null)
+                                      Container(
+                                        width: 1,
+                                        height: 30,
+                                        margin: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        color: const Color(0xFFE2E8F0),
+                                      ),
+                                    if (widget.card.dueDate != null)
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'วันที่สิ้นสุด',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                color: workMuted,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _formatDate(widget.card.dueDate),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                color: _deadlineColor(
+                                                  widget.card.dueDate,
+                                                  isCompleted:
+                                                      widget.card.status ==
+                                                          'completed',
+                                                ),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // 2. ผู้รับผิดชอบ (Assignees)
+                      const Text(
+                        'ผู้รับผิดชอบการ์ดงาน',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: workText,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      CardAssigneePicker(
+                        service: widget.service,
+                        taskId: widget.taskId,
+                        cardId: widget.card.id,
+                        initialAssigneeIds: widget.card.assigneeIds,
+                        initialAssignees: widget.card.assignees,
+                        isReadOnly: !widget.canEdit,
+                        onAssigneesChanged: (ids, assignees) {
+                          widget.card.assigneeIds = ids;
+                          widget.card.assignees = assignees;
+                          widget.onChanged();
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      // 3. รายการย่อย (Checklist)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.account_tree_outlined,
+                            color: workBlue,
+                            size: 19,
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'รายการย่อยของ “$_cardTitle”',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                    color: workText,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${widget.listName} › $_cardTitle',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    color: workMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
                       if (totalCount == 0)
                         const Center(
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 20),
-                            child: Text('ไม่มีรายการย่อยในการ์ดนี้', style: TextStyle(color: workMuted, fontSize: 12.5, fontStyle: FontStyle.italic)),
+                            child: Text(
+                              'ไม่มีรายการย่อยในการ์ดนี้',
+                              style: TextStyle(
+                                color: workMuted,
+                                fontSize: 12.5,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
                           ),
                         )
                       else
@@ -2123,41 +3924,62 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                           itemCount: totalCount,
                           itemBuilder: (context, i) {
                             final item = _subItems[i];
-                            final hasDetails = item.startDate != null ||
+                            final hasDetails =
+                                item.startDate != null ||
                                 item.dueDate != null ||
-                                (item.linkUrl != null && item.linkUrl!.isNotEmpty) ||
-                                (item.attachmentUrl != null && item.attachmentUrl!.isNotEmpty) ||
-                                (item.verificationNotes != null && item.verificationNotes!.isNotEmpty);
+                                (item.linkUrl != null &&
+                                    item.linkUrl!.isNotEmpty) ||
+                                (item.attachmentUrl != null &&
+                                    item.attachmentUrl!.isNotEmpty) ||
+                                (item.verificationNotes != null &&
+                                    item.verificationNotes!.isNotEmpty);
 
                             return Container(
                               decoration: const BoxDecoration(
-                                border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: Color(0xFFF1F5F9),
+                                    width: 1,
+                                  ),
+                                ),
                               ),
                               child: Row(
                                 children: [
                                   Checkbox(
                                     value: item.isDone,
                                     activeColor: workBlue,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
                                     onChanged: (_) => _toggleSubItem(item, i),
                                   ),
                                   Expanded(
                                     child: InkWell(
-                                      onTap: () => _showSubItemDetailSheet(item, i),
+                                      onTap: () =>
+                                          _showSubItemDetailSheet(item, i),
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 6,
+                                          horizontal: 4,
+                                        ),
                                         child: Row(
                                           children: [
                                             Expanded(
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     item.title,
                                                     style: TextStyle(
                                                       fontSize: 13,
-                                                      color: item.isDone ? workMuted : workText,
-                                                      decoration: item.isDone ? TextDecoration.lineThrough : null,
+                                                      color: item.isDone
+                                                          ? workMuted
+                                                          : workText,
+                                                      decoration: item.isDone
+                                                          ? TextDecoration
+                                                                .lineThrough
+                                                          : null,
                                                     ),
                                                   ),
                                                   if (hasDetails) ...[
@@ -2166,24 +3988,70 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                                                       spacing: 6,
                                                       runSpacing: 2,
                                                       children: [
-                                                        if (item.startDate != null || item.dueDate != null)
+                                                        if (item.startDate !=
+                                                                null ||
+                                                            item.dueDate !=
+                                                                null)
                                                           Text(
                                                             '${item.startDate != null ? _formatThaiDate(item.startDate) : 'เริ่ม'} - ${item.dueDate != null ? _formatThaiDate(item.dueDate) : 'กำหนด'}',
-                                                            style: const TextStyle(fontSize: 9.5, color: workMuted),
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 9.5,
+                                                                  color:
+                                                                      workMuted,
+                                                                ),
                                                           ),
-                                                        if (item.linkUrl != null && item.linkUrl!.isNotEmpty)
-                                                          const Text('• ลิงก์', style: TextStyle(fontSize: 9.5, color: workBlue, fontWeight: FontWeight.bold)),
-                                                        if (item.attachmentUrl != null && item.attachmentUrl!.isNotEmpty)
-                                                          const Text('• ไฟล์แนบ', style: TextStyle(fontSize: 9.5, color: workMuted)),
-                                                        if (item.verificationNotes != null && item.verificationNotes!.isNotEmpty)
-                                                          const Text('• ตรวจสอบแล้ว', style: TextStyle(fontSize: 9.5, color: Colors.green)),
+                                                        if (item.linkUrl !=
+                                                                null &&
+                                                            item
+                                                                .linkUrl!
+                                                                .isNotEmpty)
+                                                          const Text(
+                                                            '• ลิงก์',
+                                                            style: TextStyle(
+                                                              fontSize: 9.5,
+                                                              color: workBlue,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        if (item.attachmentUrl !=
+                                                                null &&
+                                                            item
+                                                                .attachmentUrl!
+                                                                .isNotEmpty)
+                                                          const Text(
+                                                            '• ไฟล์แนบ',
+                                                            style: TextStyle(
+                                                              fontSize: 9.5,
+                                                              color: workMuted,
+                                                            ),
+                                                          ),
+                                                        if (item.verificationNotes !=
+                                                                null &&
+                                                            item
+                                                                .verificationNotes!
+                                                                .isNotEmpty)
+                                                          const Text(
+                                                            '• ตรวจสอบแล้ว',
+                                                            style: TextStyle(
+                                                              fontSize: 9.5,
+                                                              color:
+                                                                  Colors.green,
+                                                            ),
+                                                          ),
                                                       ],
                                                     ),
                                                   ],
                                                 ],
                                               ),
                                             ),
-                                            const Icon(Icons.chevron_right_rounded, color: workMuted, size: 20),
+                                            const Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: workMuted,
+                                              size: 20,
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -2194,18 +4062,52 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                             );
                           },
                         ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 24),
 
-                      // 2. เพิ่มไฟล์แนบ (ปุ่มแนบไฟล์/แนบลิงก์)
-                      if (widget.canEdit) ...[
-                        Row(
+                      // 4. หลักฐานและไฟล์แนบ (Attachments Section)
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.inventory_2_outlined,
+                            color: workBlue,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'หลักฐานและไฟล์แนบ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                              color: workText,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (_attachments.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 24, bottom: 10),
+                          child: Text(
+                            'ไม่มีไฟล์แนบในขณะนี้',
+                            style: TextStyle(
+                              color: workMuted,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        )
+                      else ...[
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
                           children: [
-                            const Icon(Icons.add_circle_outline_rounded, color: workBlue, size: 18),
-                            const SizedBox(width: 6),
-                            const Text('เพิ่มไฟล์แนบหลักฐาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText)),
+                            for (int idx = 0; idx < _attachments.length; idx++)
+                              _buildAttachmentBox(_attachments[idx], idx),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 12),
+                      ],
+                      if (widget.canEdit) ...[
                         Row(
                           children: [
                             Expanded(
@@ -2227,113 +4129,17 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
                       ],
+                      const SizedBox(height: 24),
 
-                      // 3. แสดงสิ่งที่แนบ
-                      if (_attachments.isNotEmpty) ...[
-                        Row(
-                          children: [
-                            const Icon(Icons.inventory_2_outlined, color: workBlue, size: 18),
-                            const SizedBox(width: 6),
-                            const Text('หลักฐานที่แนบมา', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: [
-                            for (int idx = 0; idx < _attachments.length; idx++)
-                              _buildAttachmentBox(_attachments[idx], idx),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // 4. รายละเอียดการ์ดงาน
-                      Row(
-                        children: [
-                          const Icon(Icons.subject_rounded, color: workBlue, size: 18),
-                          const SizedBox(width: 6),
-                          const Text('รายละเอียดการ์ดงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText)),
-                        ],
+                      // 5. ความคิดเห็น (Rich Text & Activities)
+                      CardCommentSection(
+                        service: widget.service,
+                        cardId: widget.card.id,
+                        taskId: widget.taskId,
+                        isReadOnly: !widget.canEdit,
+                        parentScrollController: _detailScrollController,
                       ),
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.card.title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: workText),
-                                  ),
-                                ),
-                                if (widget.card.priority != 'medium')
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    margin: const EdgeInsets.only(left: 8),
-                                    decoration: BoxDecoration(
-                                      color: widget.card.priority == 'urgent' ? const Color(0xFFFEE2E2) :
-                                             widget.card.priority == 'high' ? const Color(0xFFFFEDD5) :
-                                             const Color(0xFFE0F2FE),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      widget.card.priority == 'urgent' ? 'Urgent' :
-                                      widget.card.priority == 'high' ? 'High' : 'Low',
-                                      style: TextStyle(
-                                        color: widget.card.priority == 'urgent' ? const Color(0xFFDC2626) :
-                                               widget.card.priority == 'high' ? const Color(0xFFEA580C) :
-                                               const Color(0xFF0284C7),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            if (widget.card.description.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                widget.card.description,
-                                style: const TextStyle(fontSize: 13, color: workMuted, height: 1.4),
-                              ),
-                            ],
-                            if (widget.card.startDate != null || widget.card.dueDate != null) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFFF1F5F9)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.calendar_today_rounded, size: 14, color: workBlue),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'ระยะเวลา: ${widget.card.startDate != null ? _formatDate(widget.card.startDate) : ''}${widget.card.startDate != null && widget.card.dueDate != null ? ' ถึง ' : ''}${widget.card.dueDate != null ? _formatDate(widget.card.dueDate) : ''}',
-                                      style: const TextStyle(fontSize: 12, color: workText, fontWeight: FontWeight.w500),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // 5. ความคิดเห็น
-                      _buildCardAdminCommentSection(),
                       const SizedBox(height: 20),
                     ],
                   ),
@@ -2342,7 +4148,8 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
             ],
           ),
         ),
-      );
+      ),
+    );
   }
 
   Widget _buildAttachmentBox(CardAttachment attachment, int index) {
@@ -2362,7 +4169,11 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 2)),
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Stack(
@@ -2375,7 +4186,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                 if (isLink || !isImage) {
                   // Show URL in snackbar (open externally when url_launcher available)
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('URL: $fullUrl'), backgroundColor: workBlue),
+                    SnackBar(
+                      content: Text('URL: $fullUrl'),
+                      backgroundColor: workBlue,
+                    ),
                   );
                 } else {
                   // Show image fullscreen
@@ -2395,39 +4209,47 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                 borderRadius: BorderRadius.circular(12),
                 child: isImage
                     ? (isTemp
-                        ? Image.file(
-                            File(attachment.url),
-                            fit: BoxFit.cover,
-                          )
-                        : Image.network(
-                            fullUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFFF1F5F9),
-                              child: const Icon(Icons.broken_image_rounded, color: workMuted),
-                            ),
-                          ))
+                          ? Image.file(File(attachment.url), fit: BoxFit.cover)
+                          : Image.network(
+                              fullUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFF1F5F9),
+                                child: const Icon(
+                                  Icons.broken_image_rounded,
+                                  color: workMuted,
+                                ),
+                              ),
+                            ))
                     : Container(
                         padding: const EdgeInsets.all(8),
-                        color: isLink ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                        color: isLink
+                            ? const Color(0xFFF0FDF4)
+                            : const Color(0xFFFEF2F2),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              isLink ? Icons.link_rounded : Icons.insert_drive_file_rounded,
+                              isLink
+                                  ? Icons.link_rounded
+                                  : Icons.insert_drive_file_rounded,
                               size: 28,
                               color: isLink ? Colors.green : Colors.redAccent,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              attachment.name.isEmpty ? attachment.url : attachment.name,
+                              attachment.name.isEmpty
+                                  ? attachment.url
+                                  : attachment.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color: isLink ? Colors.green[800] : Colors.red[800],
+                                color: isLink
+                                    ? Colors.green[800]
+                                    : Colors.red[800],
                               ),
                             ),
                           ],
@@ -2448,11 +4270,19 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                   attachment.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
-          if (widget.canEdit && !isTemp && (user?.role == 'admin' || attachment.createdBy == user?.id || attachment.createdBy == null))
+          if (widget.canEdit &&
+              !isTemp &&
+              (user?.role == 'admin' ||
+                  attachment.createdBy == user?.id ||
+                  attachment.createdBy == null))
             Positioned(
               top: 4,
               right: 4,
@@ -2467,7 +4297,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                   } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('ลบหลักฐานล้มเหลว: $e'), backgroundColor: Colors.red),
+                        SnackBar(
+                          content: Text('ลบหลักฐานล้มเหลว: $e'),
+                          backgroundColor: Colors.red,
+                        ),
                       );
                     }
                   }
@@ -2478,7 +4311,11 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                     color: Colors.black54,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 12,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -2498,83 +4335,6 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardAdminCommentSection() {
-    final bool isAdminOrHr = widget.service.currentUser?.role == 'admin' || widget.service.currentUser?.role == 'hr';
-    final hasComment = widget.card.adminComment != null && widget.card.adminComment!.trim().isNotEmpty;
-
-    if (!isAdminOrHr && !hasComment) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB), // warm light amber background for comments
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.comment_rounded, size: 16, color: Colors.amber[800]),
-              const SizedBox(width: 6),
-              Text(
-                'ความคิดเห็นจากผู้ดูแล (Admin Comment)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Colors.amber[900]),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (isAdminOrHr) ...[
-            TextField(
-              controller: _adminCommentController,
-              maxLines: 2,
-              style: const TextStyle(fontSize: 13, color: workText),
-              decoration: const InputDecoration(
-                hintText: 'พิมพ์ความคิดเห็น/คำแนะนำผู้ดูแล...',
-                hintStyle: TextStyle(fontSize: 12.5, color: workMuted),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFFE2E8F0)),
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFFE2E8F0)),
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _saveAdminComment,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber[700],
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  minimumSize: Size.zero,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                ),
-                child: const Text('บันทึกความเห็น', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ] else ...[
-            Text(
-              widget.card.adminComment ?? '',
-              style: const TextStyle(fontSize: 13, color: workText, height: 1.4),
-            ),
-          ],
         ],
       ),
     );
@@ -2613,7 +4373,11 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -2621,7 +4385,12 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     );
   }
 
-  Future<void> _uploadSingleFileInBackground(File uploadFile, String filename, bool isImage, String tempId) async {
+  Future<void> _uploadSingleFileInBackground(
+    File uploadFile,
+    String filename,
+    bool isImage,
+    String tempId,
+  ) async {
     try {
       final url = await widget.service.uploadImage(uploadFile);
       final attachType = isImage ? 'image' : 'file';
@@ -2635,7 +4404,9 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
 
       if (mounted) {
         setState(() {
-          final idx = _attachments.indexWhere((element) => element.id == tempId);
+          final idx = _attachments.indexWhere(
+            (element) => element.id == tempId,
+          );
           if (idx != -1) {
             _attachments[idx] = attachment;
           } else {
@@ -2650,7 +4421,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
           _attachments.removeWhere((element) => element.id == tempId);
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('อัปโหลดไฟล์ $filename ล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('อัปโหลดไฟล์ $filename ล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -2660,7 +4434,18 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     try {
       final result = await fp.FilePicker.pickFiles(
         type: fp.FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'pdf',
+          'doc',
+          'docx',
+          'xls',
+          'xlsx',
+          'txt',
+        ],
         allowMultiple: true,
       );
       if (result != null && result.files.isNotEmpty) {
@@ -2670,9 +4455,13 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
           File file = File(fileItem.path!);
           final filename = fileItem.name;
           final lowerName = filename.toLowerCase();
-          
-          final bool isImage = lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg') || lowerName.endsWith('.png');
-          final String tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}_${tempCount++}';
+
+          final bool isImage =
+              lowerName.endsWith('.jpg') ||
+              lowerName.endsWith('.jpeg') ||
+              lowerName.endsWith('.png');
+          final String tempId =
+              'temp_${DateTime.now().millisecondsSinceEpoch}_${tempCount++}';
 
           // Immediately add temporary item for instant local display
           final tempAttachment = CardAttachment(
@@ -2695,7 +4484,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('แนบไฟล์ล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('แนบไฟล์ล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -2708,7 +4500,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('แนบหลักฐานลิงก์ใหม่', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        title: const Text(
+          'แนบหลักฐานลิงก์ใหม่',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2719,7 +4514,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                 hintText: 'ชื่อหลักฐาน/ลิงก์ (เช่น งานออกแบบเว็บ)...',
                 filled: true,
                 fillColor: Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -2729,7 +4527,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                 hintText: 'https://example.com...',
                 filled: true,
                 fillColor: Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
               ),
             ),
           ],
@@ -2744,7 +4545,9 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
             style: ElevatedButton.styleFrom(
               backgroundColor: workBlue,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('บันทึก'),
           ),
@@ -2754,7 +4557,9 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
 
     if (confirm == true && linkController.text.trim().isNotEmpty) {
       final link = linkController.text.trim();
-      final name = titleController.text.trim().isNotEmpty ? titleController.text.trim() : 'ลิงก์แนบ';
+      final name = titleController.text.trim().isNotEmpty
+          ? titleController.text.trim()
+          : 'ลิงก์แนบ';
       setState(() => _saving = true);
       try {
         final attachment = await widget.service.createCardAttachment(
@@ -2770,7 +4575,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('แนบลิงก์ล้มเหลว: $e'), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text('แนบลิงก์ล้มเหลว: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       } finally {
@@ -2790,6 +4598,8 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
       ),
       builder: (context) => _SubItemDetailSheet(
         item: item,
+        parentCardTitle: _cardTitle,
+        listName: widget.listName,
         service: widget.service,
         canEdit: widget.canEdit,
         onChanged: widget.onChanged,
@@ -2804,12 +4614,16 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
 class _SubItemDetailSheet extends StatefulWidget {
   const _SubItemDetailSheet({
     required this.item,
+    required this.parentCardTitle,
+    required this.listName,
     required this.service,
     required this.canEdit,
     required this.onChanged,
   });
 
   final TaskSubItem item;
+  final String parentCardTitle;
+  final String listName;
   final AuthFlowService service;
   final bool canEdit;
   final VoidCallback onChanged;
@@ -2840,9 +4654,15 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     super.initState();
     _titleController = TextEditingController(text: widget.item.title);
     _linkUrlController = TextEditingController(text: widget.item.linkUrl ?? '');
-    _attachmentUrlController = TextEditingController(text: widget.item.attachmentUrl ?? '');
-    _verificationController = TextEditingController(text: widget.item.verificationNotes ?? '');
-    _adminCommentController = TextEditingController(text: widget.item.adminComment ?? '');
+    _attachmentUrlController = TextEditingController(
+      text: widget.item.attachmentUrl ?? '',
+    );
+    _verificationController = TextEditingController(
+      text: widget.item.verificationNotes ?? '',
+    );
+    _adminCommentController = TextEditingController(
+      text: widget.item.adminComment ?? '',
+    );
     _inspectionNotesController = TextEditingController();
     _startDate = widget.item.startDate;
     _dueDate = widget.item.dueDate;
@@ -2914,7 +4734,9 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     try {
       final result = await fp.FilePicker.pickFiles(
         type: isImageOnly ? fp.FileType.image : fp.FileType.custom,
-        allowedExtensions: isImageOnly ? null : ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
+        allowedExtensions: isImageOnly
+            ? null
+            : ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
       );
 
       if (result == null || result.files.single.path == null) {
@@ -2926,10 +4748,13 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
       final filename = result.files.single.name.toLowerCase();
 
       // Compress if it is an image (jpg, jpeg, png) to WebP for Cloudflare savings
-      if (filename.endsWith('.jpg') || filename.endsWith('.jpeg') || filename.endsWith('.png')) {
+      if (filename.endsWith('.jpg') ||
+          filename.endsWith('.jpeg') ||
+          filename.endsWith('.png')) {
         final tempDir = await getTemporaryDirectory();
-        final targetPath = '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.webp';
-        
+        final targetPath =
+            '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.webp';
+
         final compressedFile = await FlutterImageCompress.compressAndGetFile(
           selectedFile.path,
           targetPath,
@@ -2949,7 +4774,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('อัปโหลดไฟล์สำเร็จ!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('อัปโหลดไฟล์สำเร็จ!'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
@@ -2961,13 +4789,21 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   List<String> _getAttachmentUrls() {
     final text = _attachmentUrlController.text.trim();
     if (text.isEmpty) return [];
-    return text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    return text
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
   }
 
   List<String> _getLinkUrls() {
     final text = _linkUrlController.text.trim();
     if (text.isEmpty) return [];
-    return text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    return text
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
   }
 
   String _resolveFullUrl(String url) {
@@ -2980,11 +4816,12 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     required VoidCallback onDelete,
   }) {
     final fullUrl = _resolveFullUrl(url);
-    final bool isImage = !isLink &&
+    final bool isImage =
+        !isLink &&
         (fullUrl.toLowerCase().contains('.webp') ||
-         fullUrl.toLowerCase().contains('.jpg') ||
-         fullUrl.toLowerCase().contains('.jpeg') ||
-         fullUrl.toLowerCase().contains('.png'));
+            fullUrl.toLowerCase().contains('.jpg') ||
+            fullUrl.toLowerCase().contains('.jpeg') ||
+            fullUrl.toLowerCase().contains('.png'));
 
     return Container(
       width: 100,
@@ -2994,7 +4831,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 2)),
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Stack(
@@ -3008,17 +4849,24 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: const Color(0xFFF1F5F9),
-                        child: const Icon(Icons.broken_image_rounded, color: workMuted),
+                        child: const Icon(
+                          Icons.broken_image_rounded,
+                          color: workMuted,
+                        ),
                       ),
                     )
                   : Container(
                       padding: const EdgeInsets.all(6),
-                      color: isLink ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                      color: isLink
+                          ? const Color(0xFFF0FDF4)
+                          : const Color(0xFFFEF2F2),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            isLink ? Icons.link_rounded : Icons.picture_as_pdf_rounded,
+                            isLink
+                                ? Icons.link_rounded
+                                : Icons.picture_as_pdf_rounded,
                             size: 24,
                             color: isLink ? Colors.green : Colors.redAccent,
                           ),
@@ -3030,7 +4878,9 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                             style: TextStyle(
                               fontSize: 9.5,
                               fontWeight: FontWeight.bold,
-                              color: isLink ? Colors.green[800] : Colors.red[800],
+                              color: isLink
+                                  ? Colors.green[800]
+                                  : Colors.red[800],
                             ),
                           ),
                         ],
@@ -3050,7 +4900,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                     color: Colors.black54,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 12,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -3071,7 +4925,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 2)),
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Stack(
@@ -3080,10 +4938,7 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: isImage && localPath.isNotEmpty
-                  ? Image.file(
-                      File(localPath),
-                      fit: BoxFit.cover,
-                    )
+                  ? Image.file(File(localPath), fit: BoxFit.cover)
                   : Container(
                       padding: const EdgeInsets.all(6),
                       color: const Color(0xFFFEF2F2),
@@ -3131,7 +4986,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     );
   }
 
-  Future<void> _uploadSubItemFileInBackground(File uploadFile, String filename, String localPathKey) async {
+  Future<void> _uploadSubItemFileInBackground(
+    File uploadFile,
+    String filename,
+    String localPathKey,
+  ) async {
     try {
       final uploadedUrl = await widget.service.uploadImage(uploadFile);
       if (mounted) {
@@ -3148,7 +5007,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
           _uploadingFiles.removeWhere((item) => item['path'] == localPathKey);
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('อัปโหลดไฟล์ $filename ล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('อัปโหลดไฟล์ $filename ล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -3158,7 +5020,18 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     try {
       final result = await fp.FilePicker.pickFiles(
         type: fp.FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'pdf',
+          'doc',
+          'docx',
+          'xls',
+          'xlsx',
+          'txt',
+        ],
         allowMultiple: true,
       );
 
@@ -3171,14 +5044,21 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
         if (fileItem.path == null) continue;
         File file = File(fileItem.path!);
         final filename = fileItem.name;
-        final localPathKey = 'local_${DateTime.now().millisecondsSinceEpoch}_${tempCount++}';
+        final localPathKey =
+            'local_${DateTime.now().millisecondsSinceEpoch}_${tempCount++}';
 
         setState(() {
           _uploadingFiles.add({
             'path': localPathKey,
             'localPath': file.path,
             'name': filename,
-            'type': (filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg') || filename.toLowerCase().endsWith('.png') || filename.toLowerCase().endsWith('.webp')) ? 'image' : 'file',
+            'type':
+                (filename.toLowerCase().endsWith('.jpg') ||
+                    filename.toLowerCase().endsWith('.jpeg') ||
+                    filename.toLowerCase().endsWith('.png') ||
+                    filename.toLowerCase().endsWith('.webp'))
+                ? 'image'
+                : 'file',
           });
         });
 
@@ -3188,7 +5068,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เลือกไฟล์ล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('เลือกไฟล์ล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -3198,7 +5081,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกหัวข้อรายการย่อย'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('กรุณากรอกหัวข้อรายการย่อย'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -3249,7 +5135,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
       if (mounted) {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('บันทึกรายละเอียดล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('บันทึกรายละเอียดล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -3257,7 +5146,9 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAdminOrHr = widget.service.currentUser?.role == 'admin' || widget.service.currentUser?.role == 'hr';
+    final bool isAdminOrHr =
+        widget.service.currentUser?.role == 'admin' ||
+        widget.service.currentUser?.role == 'hr';
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       child: Scaffold(
@@ -3265,100 +5156,172 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: workText),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text('การดำเนินการรายการย่อย', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: workText)),
-        centerTitle: true,
-        actions: [
-          // Plus Action menu (+ ...)
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.add_circle_outline_rounded, color: workBlue),
-            onSelected: (action) {
-              if (action == 'pick_image') {
-                _pickFileOrImage(true);
-              } else if (action == 'pick_pdf') {
-                _pickFileOrImage(false);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'pick_image',
-                child: Row(
-                  children: [
-                    Icon(Icons.image_rounded, color: workBlue, size: 18),
-                    SizedBox(width: 8),
-                    Text('เลือกรูปภาพ (บีบอัด WebP)', style: TextStyle(fontSize: 12.5)),
-                  ],
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: workText),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${widget.listName} › ${widget.parentCardTitle}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: workMuted,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const PopupMenuItem(
-                value: 'pick_pdf',
-                child: Row(
-                  children: [
-                    Icon(Icons.picture_as_pdf_rounded, color: workBlue, size: 18),
-                    SizedBox(width: 8),
-                    Text('เลือกไฟล์ PDF', style: TextStyle(fontSize: 12.5)),
-                  ],
+              const SizedBox(height: 1),
+              const Text(
+                'รายละเอียดรายการย่อย',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: workText,
                 ),
               ),
             ],
           ),
-          // Delete SubItem Button
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  title: const Text('ลบรายการย่อย', style: TextStyle(fontWeight: FontWeight.bold)),
-                  content: Text('คุณต้องการลบรายการย่อย "${widget.item.title}" หรือไม่?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก', style: TextStyle(color: workMuted))),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('ลบ', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
+          centerTitle: false,
+          actions: [
+            // Plus Action menu (+ ...)
+            PopupMenuButton<String>(
+              icon: const Icon(
+                Icons.add_circle_outline_rounded,
+                color: workBlue,
+              ),
+              onSelected: (action) {
+                if (action == 'pick_image') {
+                  _pickFileOrImage(true);
+                } else if (action == 'pick_pdf') {
+                  _pickFileOrImage(false);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'pick_image',
+                  child: Row(
+                    children: [
+                      Icon(Icons.image_rounded, color: workBlue, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'เลือกรูปภาพ (บีบอัด WebP)',
+                        style: TextStyle(fontSize: 12.5),
+                      ),
+                    ],
+                  ),
                 ),
-              );
+                const PopupMenuItem(
+                  value: 'pick_pdf',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.picture_as_pdf_rounded,
+                        color: workBlue,
+                        size: 18,
+                      ),
+                      SizedBox(width: 8),
+                      Text('เลือกไฟล์ PDF', style: TextStyle(fontSize: 12.5)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            // Delete SubItem Button
+            IconButton(
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.redAccent,
+              ),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    title: const Text(
+                      'ลบรายการย่อย',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    content: Text(
+                      'คุณต้องการลบรายการย่อย "${widget.item.title}" หรือไม่?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text(
+                          'ยกเลิก',
+                          style: TextStyle(color: workMuted),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text(
+                          'ลบ',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
 
-              if (confirm == true) {
-                setState(() => _saving = true);
-                try {
-                  await widget.service.deleteTaskSubItem(widget.item.id);
-                  widget.onChanged();
-                  if (mounted) {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Close detail sheet with empty update
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    setState(() => _saving = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('ลบรายการย่อยล้มเหลว: $e'), backgroundColor: Colors.red),
-                    );
+                if (confirm == true) {
+                  setState(() => _saving = true);
+                  try {
+                    await widget.service.deleteTaskSubItem(widget.item.id);
+                    widget.onChanged();
+                    if (mounted) {
+                      Navigator.pop(context); // Close dialog
+                      Navigator.pop(
+                        context,
+                      ); // Close detail sheet with empty update
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      setState(() => _saving = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('ลบรายการย่อยล้มเหลว: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 }
-              }
-            },
-            tooltip: 'ลบรายการย่อย',
+              },
+              tooltip: 'ลบรายการย่อย',
+            ),
+          ],
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(height: 1, color: Color(0xFFF1F5F9)),
           ),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: Color(0xFFF1F5F9)),
         ),
-      ),
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 16),
-        child: SingleChildScrollView(
-          child: Column(
+        body: Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('หัวข้อรายการย่อย', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText)),
+                const Text(
+                  'หัวข้อรายการย่อย',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: workText,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _titleController,
@@ -3366,8 +5329,14 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                     hintText: 'พิมพ์หัวข้อรายการย่อย...',
                     filled: true,
                     fillColor: Color(0xFFF8FAFC),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -3378,27 +5347,45 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('วันที่เริ่มต้น', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText)),
+                          const Text(
+                            'วันที่เริ่มต้น',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: workText,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           InkWell(
                             onTap: _pickStartDate,
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_today_rounded, size: 16, color: workMuted),
+                                  const Icon(
+                                    Icons.calendar_today_rounded,
+                                    size: 16,
+                                    color: workMuted,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      _startDate != null ? _formatThaiDate(_startDate!) : 'เลือกวันที่เริ่ม',
+                                      _startDate != null
+                                          ? _formatThaiDate(_startDate!)
+                                          : 'เลือกวันที่เริ่ม',
                                       style: TextStyle(
                                         fontSize: 12.5,
-                                        color: _startDate != null ? workText : workMuted,
+                                        color: _startDate != null
+                                            ? workText
+                                            : workMuted,
                                       ),
                                     ),
                                   ),
@@ -3409,7 +5396,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                                           _startDate = null;
                                         });
                                       },
-                                      child: const Icon(Icons.clear_rounded, size: 16, color: workMuted),
+                                      child: const Icon(
+                                        Icons.clear_rounded,
+                                        size: 16,
+                                        color: workMuted,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -3423,27 +5414,45 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('วันครบกำหนด', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText)),
+                          const Text(
+                            'วันครบกำหนด',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: workText,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           InkWell(
                             onTap: _pickDueDate,
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_month_rounded, size: 16, color: workMuted),
+                                  const Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 16,
+                                    color: workMuted,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      _dueDate != null ? _formatThaiDate(_dueDate!) : 'เลือกวันกำหนดส่ง',
+                                      _dueDate != null
+                                          ? _formatThaiDate(_dueDate!)
+                                          : 'เลือกวันกำหนดส่ง',
                                       style: TextStyle(
                                         fontSize: 12.5,
-                                        color: _dueDate != null ? workText : workMuted,
+                                        color: _dueDate != null
+                                            ? workText
+                                            : workMuted,
                                       ),
                                     ),
                                   ),
@@ -3454,7 +5463,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                                           _dueDate = null;
                                         });
                                       },
-                                      child: const Icon(Icons.clear_rounded, size: 16, color: workMuted),
+                                      child: const Icon(
+                                        Icons.clear_rounded,
+                                        size: 16,
+                                        color: workMuted,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -3470,15 +5483,28 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                 // ─── แนบหลักฐาน Section ───
                 Row(
                   children: [
-                    const Icon(Icons.inventory_2_outlined, color: workBlue, size: 18),
+                    const Icon(
+                      Icons.inventory_2_outlined,
+                      color: workBlue,
+                      size: 18,
+                    ),
                     const SizedBox(width: 6),
-                    const Text('แนบหลักฐาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText)),
+                    const Text(
+                      'แนบหลักฐาน',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: workText,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
 
                 // Attached Evidence Preview Card Box (If attached or uploading)
-                if (_getAttachmentUrls().isNotEmpty || _getLinkUrls().isNotEmpty || _uploadingFiles.isNotEmpty) ...[
+                if (_getAttachmentUrls().isNotEmpty ||
+                    _getLinkUrls().isNotEmpty ||
+                    _uploadingFiles.isNotEmpty) ...[
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -3523,11 +5549,17 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                           onTap: () => _pickFileOrImageCombined(),
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: workBlue.withValues(alpha: 0.3), width: 1.5),
+                              border: Border.all(
+                                color: workBlue.withValues(alpha: 0.3),
+                                width: 1.5,
+                              ),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -3538,14 +5570,22 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                                     color: workBlue.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.attach_file_rounded, size: 18, color: workBlue),
+                                  child: const Icon(
+                                    Icons.attach_file_rounded,
+                                    size: 18,
+                                    color: workBlue,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(
                                   'แนบไฟล์',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: workBlue),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: workBlue,
+                                  ),
                                 ),
                               ],
                             ),
@@ -3556,12 +5596,22 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                       Expanded(
                         child: InkWell(
                           onTap: () async {
-                            final textController = TextEditingController(text: _linkUrlController.text);
+                            final textController = TextEditingController(
+                              text: _linkUrlController.text,
+                            );
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (context) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                title: const Text('แนบลิงก์อ้างอิง', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                title: const Text(
+                                  'แนบลิงก์อ้างอิง',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
                                 content: TextField(
                                   controller: textController,
                                   autofocus: true,
@@ -3569,17 +5619,32 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                                     hintText: 'https://example.com...',
                                     filled: true,
                                     fillColor: Color(0xFFF8FAFC),
-                                    border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+                                    border: OutlineInputBorder(
+                                      borderSide: BorderSide.none,
+                                      borderRadius: BorderRadius.all(
+                                        Radius.circular(10),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 actions: [
-                                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก', style: TextStyle(color: workMuted))),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text(
+                                      'ยกเลิก',
+                                      style: TextStyle(color: workMuted),
+                                    ),
+                                  ),
                                   ElevatedButton(
-                                    onPressed: () => Navigator.pop(context, true),
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: workBlue,
                                       foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
                                     ),
                                     child: const Text('ตกลง'),
                                   ),
@@ -3588,17 +5653,24 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                             );
                             if (confirm == true) {
                               setState(() {
-                                _linkUrlController.text = textController.text.trim();
+                                _linkUrlController.text = textController.text
+                                    .trim();
                               });
                             }
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.green.withValues(alpha: 0.3), width: 1.5),
+                              border: Border.all(
+                                color: Colors.green.withValues(alpha: 0.3),
+                                width: 1.5,
+                              ),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -3609,14 +5681,22 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                                     color: Colors.green.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.link_rounded, size: 18, color: Colors.green),
+                                  child: const Icon(
+                                    Icons.link_rounded,
+                                    size: 18,
+                                    color: Colors.green,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(
                                   'แนบลิงก์',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
                                 ),
                               ],
                             ),
@@ -3632,16 +5712,25 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                               _linkUrlController.clear();
                             });
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('ล้างไฟล์แนบแล้ว'), backgroundColor: Colors.orange),
+                              const SnackBar(
+                                content: Text('ล้างไฟล์แนบแล้ว'),
+                                backgroundColor: Colors.orange,
+                              ),
                             );
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3), width: 1.5),
+                              border: Border.all(
+                                color: Colors.redAccent.withValues(alpha: 0.3),
+                                width: 1.5,
+                              ),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -3649,17 +5738,27 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: Colors.redAccent.withValues(alpha: 0.1),
+                                    color: Colors.redAccent.withValues(
+                                      alpha: 0.1,
+                                    ),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                                  child: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 18,
+                                    color: Colors.redAccent,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(
                                   'ล้างหลักฐาน',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.redAccent,
+                                  ),
                                 ),
                               ],
                             ),
@@ -3671,7 +5770,14 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                   const SizedBox(height: 16),
                 ],
 
-                const Text('ข้อกำหนดในการตรวจสอบงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText)),
+                const Text(
+                  'ข้อกำหนดในการตรวจสอบงาน',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: workText,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _verificationController,
@@ -3681,8 +5787,14 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                     hintText: 'กรอกรายละเอียดข้อกำหนดในการตรวจสอบงาน...',
                     filled: true,
                     fillColor: Color(0xFFF8FAFC),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                    ),
                   ),
                 ),
                 _buildVerificationRoundsSection(),
@@ -3697,9 +5809,14 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: workBlue,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    child: Text(_saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text(
+                      _saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
@@ -3711,8 +5828,12 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   }
 
   Widget _buildSubItemAdminCommentSection() {
-    final bool isAdminOrHr = widget.service.currentUser?.role == 'admin' || widget.service.currentUser?.role == 'hr';
-    final hasComment = widget.item.adminComment != null && widget.item.adminComment!.trim().isNotEmpty;
+    final bool isAdminOrHr =
+        widget.service.currentUser?.role == 'admin' ||
+        widget.service.currentUser?.role == 'hr';
+    final hasComment =
+        widget.item.adminComment != null &&
+        widget.item.adminComment!.trim().isNotEmpty;
 
     if (!isAdminOrHr && !hasComment) {
       return const SizedBox.shrink();
@@ -3728,7 +5849,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
             const SizedBox(width: 6),
             Text(
               'ความคิดเห็นจากผู้ดูแล',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber[900]),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: Colors.amber[900],
+              ),
             ),
           ],
         ),
@@ -3741,8 +5866,14 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
               hintText: 'พิมพ์ความคิดเห็นหรือข้อสังเกตของผู้ดูแล...',
               filled: true,
               fillColor: Color(0xFFFFFBEB), // warm amber tint
-              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.all(Radius.circular(10))),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
             ),
           )
         else
@@ -3756,7 +5887,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
             ),
             child: Text(
               widget.item.adminComment ?? '',
-              style: const TextStyle(fontSize: 13, color: workText, height: 1.4),
+              style: const TextStyle(
+                fontSize: 13,
+                color: workText,
+                height: 1.4,
+              ),
             ),
           ),
       ],
@@ -3775,7 +5910,8 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
 
       widget.onChanged();
 
-      final verifierName = widget.service.currentUser?.firstName ?? 'ผู้ตรวจสอบ';
+      final verifierName =
+          widget.service.currentUser?.firstName ?? 'ผู้ตรวจสอบ';
       final newV = SubItemVerification(
         id: '',
         subItemId: widget.item.id,
@@ -3788,28 +5924,38 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
 
       setState(() {
         _verifications.insert(0, newV);
-        _currentStatus = _selectedInspectionStatus == 'approved' ? 'completed' : 'pending';
+        _currentStatus = _selectedInspectionStatus == 'approved'
+            ? 'completed'
+            : 'pending';
         _inspectionNotesController.clear();
         _verifying = false;
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('บันทึกผลการตรวจสอบสำเร็จ'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('บันทึกผลการตรวจสอบสำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _verifying = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('บันทึกผลการตรวจสอบล้มเหลว: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('บันทึกผลการตรวจสอบล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
   Widget _buildVerificationRoundsSection() {
-    final bool isAdminOrHr = widget.service.currentUser?.role == 'admin' || widget.service.currentUser?.role == 'hr';
+    final bool isAdminOrHr =
+        widget.service.currentUser?.role == 'admin' ||
+        widget.service.currentUser?.role == 'hr';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3823,7 +5969,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
             SizedBox(width: 8),
             Text(
               'ประวัติการตรวจสอบงาน',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
             ),
           ],
         ),
@@ -3859,10 +6009,14 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
               return Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isApproved ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                  color: isApproved
+                      ? const Color(0xFFF0FDF4)
+                      : const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isApproved ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                    color: isApproved
+                        ? const Color(0xFFDCFCE7)
+                        : const Color(0xFFFEE2E2),
                   ),
                 ),
                 child: Column(
@@ -3874,9 +6028,14 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
-                                color: isApproved ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA),
+                                color: isApproved
+                                    ? const Color(0xFFBBF7D0)
+                                    : const Color(0xFFFECACA),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -3884,31 +6043,48 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
-                                  color: isApproved ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+                                  color: isApproved
+                                      ? const Color(0xFF15803D)
+                                      : const Color(0xFFB91C1C),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               'รอบที่ ${v.round}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: workText),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: workText,
+                              ),
                             ),
                           ],
                         ),
                         Text(
                           dateStr,
-                          style: const TextStyle(fontSize: 10.5, color: workMuted),
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: workMuted,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.person_outline_rounded, size: 12, color: workMuted),
+                        const Icon(
+                          Icons.person_outline_rounded,
+                          size: 12,
+                          color: workMuted,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'ผู้ตรวจ: ${v.verifierName}',
-                          style: const TextStyle(fontSize: 11, color: workText, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: workText,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -3923,7 +6099,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                         ),
                         child: Text(
                           v.notes!,
-                          style: const TextStyle(fontSize: 11.5, color: workText),
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: workText,
+                          ),
                         ),
                       ),
                     ],
@@ -3943,7 +6122,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
               SizedBox(width: 8),
               Text(
                 'บันทึกผลการตรวจสอบใหม่',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: workText,
+                ),
               ),
             ],
           ),
@@ -3956,7 +6139,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                   label: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle_outline_rounded, size: 16, color: Colors.green),
+                      Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 16,
+                        color: Colors.green,
+                      ),
                       SizedBox(width: 6),
                       Text('ผ่าน'),
                     ],
@@ -3971,12 +6158,16 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                   backgroundColor: const Color(0xFFF8FAFC),
                   labelStyle: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: _selectedInspectionStatus == 'approved' ? Colors.green[800] : workMuted,
+                    color: _selectedInspectionStatus == 'approved'
+                        ? Colors.green[800]
+                        : workMuted,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                     side: BorderSide(
-                      color: _selectedInspectionStatus == 'approved' ? Colors.green : const Color(0xFFE2E8F0),
+                      color: _selectedInspectionStatus == 'approved'
+                          ? Colors.green
+                          : const Color(0xFFE2E8F0),
                     ),
                   ),
                 ),
@@ -4002,12 +6193,16 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                   backgroundColor: const Color(0xFFF8FAFC),
                   labelStyle: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: _selectedInspectionStatus == 'rejected' ? Colors.red[800] : workMuted,
+                    color: _selectedInspectionStatus == 'rejected'
+                        ? Colors.red[800]
+                        : workMuted,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                     side: BorderSide(
-                      color: _selectedInspectionStatus == 'rejected' ? Colors.red : const Color(0xFFE2E8F0),
+                      color: _selectedInspectionStatus == 'rejected'
+                          ? Colors.red
+                          : const Color(0xFFE2E8F0),
                     ),
                   ),
                 ),
@@ -4023,7 +6218,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
               hintText: 'ระบุคำอธิบายหรือเหตุผลการตรวจสอบรอบนี้...',
               filled: true,
               fillColor: Color(0xFFF8FAFC),
-              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
               border: OutlineInputBorder(
                 borderSide: BorderSide.none,
                 borderRadius: BorderRadius.all(Radius.circular(10)),
@@ -4040,11 +6238,16 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: workBlue,
                 side: const BorderSide(color: workBlue),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               child: Text(
                 _verifying ? 'กำลังบันทึกผล...' : 'บันทึกผลการตรวจสอบรอบนี้',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
             ),
           ),
@@ -4055,8 +6258,18 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
 
   String _formatInspectionDate(DateTime dt) {
     final thaiMonths = [
-      'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-      'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+      'ม.ค.',
+      'ก.พ.',
+      'มี.ค.',
+      'เม.ย.',
+      'พ.ค.',
+      'มิ.ย.',
+      'ก.ค.',
+      'ส.ค.',
+      'ก.ย.',
+      'ต.ค.',
+      'พ.ย.',
+      'ธ.ค.',
     ];
     return '${dt.day} ${thaiMonths[dt.month - 1]} ${dt.year + 543} - ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
   }
@@ -4066,17 +6279,24 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
 String _formatThaiDate(DateTime? date) {
   if (date == null) return '';
   final months = [
-    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+    'ม.ค.',
+    'ก.พ.',
+    'มี.ค.',
+    'เม.ย.',
+    'พ.ค.',
+    'มิ.ย.',
+    'ก.ค.',
+    'ส.ค.',
+    'ก.ย.',
+    'ต.ค.',
+    'พ.ย.',
+    'ธ.ค.',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year + 543}';
 }
 
 class _TiltingDragCard extends StatelessWidget {
-  const _TiltingDragCard({
-    required this.dragXNotifier,
-    required this.child,
-  });
+  const _TiltingDragCard({required this.dragXNotifier, required this.child});
 
   final ValueNotifier<double> dragXNotifier;
   final Widget child;
@@ -4088,7 +6308,10 @@ class _TiltingDragCard extends StatelessWidget {
     return ValueListenableBuilder<double>(
       valueListenable: dragXNotifier,
       builder: (context, dragX, _) {
-        final normX = ((dragX - (screenWidth / 2)) / (screenWidth / 2)).clamp(-1.0, 1.0);
+        final normX = ((dragX - (screenWidth / 2)) / (screenWidth / 2)).clamp(
+          -1.0,
+          1.0,
+        );
         // Left side (normX < 0) tilts right (+0.20 rad = ~11.5 deg)
         // Right side (normX > 0) tilts left (-0.20 rad = ~-11.5 deg)
         final angle = -normX * 0.20;
@@ -4102,7 +6325,11 @@ class _TiltingDragCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: const [
-                  BoxShadow(color: Color(0x35000000), blurRadius: 20, offset: Offset(0, 10)),
+                  BoxShadow(
+                    color: Color(0x35000000),
+                    blurRadius: 20,
+                    offset: Offset(0, 10),
+                  ),
                 ],
               ),
               child: child,
@@ -4119,10 +6346,16 @@ String resolveFullR2Url(String? url, String baseUrl) {
   var trimmed = url.trim();
   if (trimmed.isEmpty) return '';
   if (trimmed.startsWith('r2://')) {
-    return trimmed.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/');
+    return trimmed.replaceFirst(
+      'r2://',
+      'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+    );
   }
   if (trimmed.startsWith('okpr2://')) {
-    return trimmed.replaceFirst('okpr2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/');
+    return trimmed.replaceFirst(
+      'okpr2://',
+      'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+    );
   }
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
@@ -4131,4 +6364,280 @@ String resolveFullR2Url(String? url, String baseUrl) {
     return '$baseUrl$trimmed';
   }
   return '$baseUrl/$trimmed';
+}
+
+class _BoardFilterBottomSheetContent extends StatefulWidget {
+  final List<TaskListRecord> lists;
+  final List<String> initialSelectedListIds;
+  final String? initialSelectedStatus;
+  final Function(List<String> listIds, String? status) onApply;
+
+  const _BoardFilterBottomSheetContent({
+    super.key,
+    required this.lists,
+    required this.initialSelectedListIds,
+    this.initialSelectedStatus,
+    required this.onApply,
+  });
+
+  @override
+  State<_BoardFilterBottomSheetContent> createState() => _BoardFilterBottomSheetContentState();
+}
+
+class _BoardFilterBottomSheetContentState extends State<_BoardFilterBottomSheetContent> {
+  late List<String> _tempListIds;
+  String? _tempStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _tempListIds = List.from(widget.initialSelectedListIds);
+    _tempStatus = widget.initialSelectedStatus;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.tune_rounded, color: workBlue, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'กรองการ์ด',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: workText,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded, color: workMuted),
+                ),
+              ],
+            ),
+            const Divider(color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 12),
+
+            const Text(
+              'หัวข้อรายการ',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            ),
+            const SizedBox(height: 3),
+            const Text(
+              'เลือกหัวข้อที่ต้องการดู',
+              style: TextStyle(fontSize: 11, color: workMuted),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 220),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+              children: [
+                  _buildListOption(
+                    label: 'ทุกหัวข้อ',
+                    count: widget.lists.fold<int>(
+                      0,
+                      (total, list) => total + list.cards.length,
+                    ),
+                    isSelected: _tempListIds.isEmpty,
+                    onTap: () {
+                      setState(() => _tempListIds.clear());
+                    },
+                  ),
+                  ...widget.lists.map((list) {
+                    final isSelected = _tempListIds.contains(list.id);
+                    return _buildListOption(
+                      label: list.name,
+                      count: list.cards.length,
+                      isSelected: isSelected,
+                      onTap: () {
+                        setState(() {
+                          _tempListIds = isSelected ? [] : [list.id];
+                        });
+                      },
+                    );
+                  }),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            const Text(
+              'สถานะการ์ด',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                _buildFilterChip(
+                  label: 'ทุกสถานะ',
+                  isSelected: _tempStatus == null,
+                  onTap: () => setState(() => _tempStatus = null),
+                ),
+                _buildFilterChip(
+                  label: 'รอทำ',
+                  isSelected: _tempStatus == 'pending',
+                  onTap: () => setState(() => _tempStatus = 'pending'),
+                  activeColor: const Color(0xFF2563EB),
+                ),
+                _buildFilterChip(
+                  label: 'กำลังทำ',
+                  isSelected: _tempStatus == 'in_progress',
+                  onTap: () => setState(() => _tempStatus = 'in_progress'),
+                  activeColor: const Color(0xFFEA580C),
+                ),
+                _buildFilterChip(
+                  label: 'เสร็จสิ้น',
+                  isSelected: _tempStatus == 'completed',
+                  onTap: () => setState(() => _tempStatus = 'completed'),
+                  activeColor: const Color(0xFF16A34A),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _tempListIds.clear();
+                        _tempStatus = null;
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: workMuted,
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('ล้างตัวกรอง', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      widget.onApply(_tempListIds, _tempStatus);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: workBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                    ),
+                    child: const Text('ใช้ตัวกรอง', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListOption({
+    required String label,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 17,
+              color: isSelected ? workBlue : const Color(0xFFCBD5E1),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isSelected ? workBlue : workText,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ),
+            Text(
+              '$count',
+              style: const TextStyle(fontSize: 10.5, color: workMuted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    Color? activeColor,
+  }) {
+    final finalActiveColor = activeColor ?? workBlue;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? finalActiveColor.withValues(alpha: 0.1)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? finalActiveColor : const Color(0xFFE2E8F0),
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? finalActiveColor : workText,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
 }
