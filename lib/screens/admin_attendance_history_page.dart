@@ -5,6 +5,7 @@ import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/skeleton_loading.dart';
 import '../widgets/app_loading_view.dart';
 
 class AdminAttendanceHistoryPage extends StatefulWidget {
@@ -931,8 +932,8 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
 
           // Main content area
           Expanded(
-            child: _loading
-                ? const AppLoadingView(message: 'กำลังคำนวณและโหลดบันทึกประวัติ...')
+            child: _loading && _allRows.isEmpty
+                ? const AttendanceHistorySkeleton()
                 : _error != null
                     ? Center(
                         child: Column(

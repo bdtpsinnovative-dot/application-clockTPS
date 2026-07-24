@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
+import '../services/fcm_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/skeleton_loading.dart';
 
 class AdminRequestsPage extends StatefulWidget {
   const AdminRequestsPage({
@@ -526,16 +528,8 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                         color: Color(0xFFEF4444),
                       ),
                       const SizedBox(height: 12),
-                      if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3,
-                              color: workBlue,
-                            ),
-                          ),
-                        )
+                      if (_loading && _requests.isEmpty)
+                        const RequestListSkeleton()
                       else if (_error != null)
                         Center(
                           child: Padding(

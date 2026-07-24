@@ -1,15 +1,20 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
 
 import 'face_scanner_page.dart';
+import 'selfie_camera_page.dart';
 
 import '../models/app_user.dart';
 import '../models/work_models.dart';
+import '../widgets/skeleton_loading.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/app_loading_view.dart';
@@ -422,17 +427,20 @@ class _DashboardPageState extends State<DashboardPage> {
       List<double> faceVector = const [];
 
       if (mode == 'selfie') {
-        // โหมดเซลฟี่: เปิดกล้องถ่ายภาพเซลฟี่
-        final picker = ImagePicker();
-        final photo = await picker.pickImage(
-          source: ImageSource.camera,
-          preferredCameraDevice: CameraDevice.front,
+        // โหมดเซลฟี่: เปิดหน้ากล้องที่สร้างเองเพื่อถ่ายรูป (ไม่ใช้ ImagePicker)
+        setState(() => _submitting = false); // ซ่อน loading ชั่วคราวระหว่างถ่ายรูป
+        if (!mounted) return;
+        final photoFile = await Navigator.of(context).push<File>(
+          MaterialPageRoute(builder: (_) => const SelfieCameraPage()),
         );
-        if (photo == null) {
+        if (!mounted) return;
+        setState(() => _submitting = true); // เปิด loading อีกครั้งเมื่อกลับมา
+        if (photoFile == null) {
           setState(() => _submitting = false);
           return;
         }
-        imageFile = File(photo.path);
+
+        imageFile = photoFile;
       } else {
         // โหมดสแกนใบหน้า: สแกนด้วย FaceScannerPage
         if (!mounted) return;
@@ -523,11 +531,18 @@ class _DashboardPageState extends State<DashboardPage> {
       foregroundColor = workBlue;
     }
 
+    final hasData = _attendance != null;
+
     return ColoredBox(
       color: workBackground,
-      child: Stack(
-        children: [
-          RefreshIndicator(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: _loading && !hasData
+            ? const DashboardSkeleton(key: ValueKey('dashboard_skeleton'))
+            : Stack(
+                key: const ValueKey('dashboard_content'),
+                children: [
+                  RefreshIndicator(
             onRefresh: _loadToday,
             child: ListView(
               padding: EdgeInsets.zero,
@@ -941,6 +956,7 @@ class _DashboardPageState extends State<DashboardPage> {
           if (_submitting)
             const AppLoadingOverlay(message: 'กำลังบันทึกเวลา...'),
         ],
+      ),
       ),
     );
   }
