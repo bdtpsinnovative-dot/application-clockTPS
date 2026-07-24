@@ -149,13 +149,10 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
             dueDate: due,
             assigneeIds: assignees,
           );
-          // 2. ถ้ามีการ์ดงาน → สร้าง list ตั้งต้นแล้วใส่การ์ดเข้าไป
+          // 2. ถ้ามีหัวข้องาน → สร้าง list สำหรับแต่ละหัวข้อ (ไม่สร้าง card อัตโนมัติ)
           final validCards = cardNames.where((n) => n.trim().isNotEmpty).toList();
-          if (validCards.isNotEmpty) {
-            final list = await widget.service.createTaskList(task.id, 'งานทั้งหมด');
-            for (final cardName in validCards) {
-              await widget.service.createTaskCard(list.id, cardName.trim());
-            }
+          for (final cardName in validCards) {
+            await widget.service.createTaskList(task.id, cardName.trim());
           }
           _loadData();
         },
