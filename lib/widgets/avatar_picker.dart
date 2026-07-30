@@ -32,9 +32,104 @@ class _AvatarPickerState extends State<AvatarPicker> {
         value?.startsWith('http://') == true;
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _showPickerBottomSheet() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'เลือกรูปภาพโปรไฟล์',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildSourceOption(
+                  context,
+                  icon: Icons.camera_alt_rounded,
+                  label: 'ถ่ายรูป',
+                  source: ImageSource.camera,
+                ),
+                _buildSourceOption(
+                  context,
+                  icon: Icons.photo_library_rounded,
+                  label: 'แกลลอรี่',
+                  source: ImageSource.gallery,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+
+    if (source != null) {
+      await _pickImage(source);
+    }
+  }
+
+  Widget _buildSourceOption(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required ImageSource source,
+  }) {
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(source),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        width: 100,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F7FA),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE4E9F0)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 32, color: const Color(0xFF2563EB)),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
+    final picked = await picker.pickImage(source: source);
     if (picked == null) return;
 
     setState(() => _processing = true);
@@ -134,7 +229,7 @@ class _AvatarPickerState extends State<AvatarPicker> {
               shape: const CircleBorder(),
               elevation: 2,
               child: InkWell(
-                onTap: _processing ? null : _pickImage,
+                onTap: _processing ? null : _showPickerBottomSheet,
                 customBorder: const CircleBorder(),
                 child: Padding(
                   padding: const EdgeInsets.all(10),

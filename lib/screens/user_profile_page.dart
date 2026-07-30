@@ -59,6 +59,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   void _showEditProfileBottomSheet(BuildContext context) {
     final firstCtrl = TextEditingController(text: widget.user.firstName);
     final lastCtrl = TextEditingController(text: widget.user.lastName);
+    final nickCtrl = TextEditingController(text: widget.user.nickname);
     File? selectedFile;
     bool saving = false;
 
@@ -167,6 +168,29 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       ),
                       style: const TextStyle(fontSize: 13),
                     ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'ชื่อเล่น',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: workMuted,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: nickCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'ชื่อเล่น',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: saving
@@ -174,10 +198,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           : () async {
                               final fName = firstCtrl.text.trim();
                               final lName = lastCtrl.text.trim();
-                              if (fName.isEmpty || lName.isEmpty) {
+                              final nName = nickCtrl.text.trim();
+                              if (fName.isEmpty || lName.isEmpty || nName.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('กรุณากรอกชื่อและนามสกุล'),
+                                    content: Text('กรุณากรอกชื่อ นามสกุล และชื่อเล่น'),
                                     backgroundColor: Colors.red,
                                   ),
                                 );
@@ -198,6 +223,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 await widget.service.updateProfileInfo(
                                   firstName: fName,
                                   lastName: lName,
+                                  nickname: nName,
                                   avatarUrl: finalAvatarUrl,
                                 );
 
@@ -447,6 +473,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             value: widget.user.email,
                           ),
                           _ProfileRow(
+                            icon: Icons.sentiment_satisfied_alt_outlined,
+                            label: 'ชื่อเล่น',
+                            value: widget.user.nickname.isEmpty
+                                ? 'ยังไม่ระบุ'
+                                : widget.user.nickname,
+                            onEdit: () => _showEditProfileBottomSheet(context),
+                          ),
+                          _ProfileRow(
                             icon: Icons.business_outlined,
                             label: 'แผนก',
                             value: widget.user.department.isEmpty
@@ -577,12 +611,14 @@ class _ProfileRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.valueColor,
+    this.onEdit,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final Color? valueColor;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -601,16 +637,35 @@ class _ProfileRow extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: TextStyle(
-                color: valueColor ?? workText,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.end,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: valueColor ?? workText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (onEdit != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: onEdit,
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4.0),
+                        child: Icon(Icons.edit_outlined, size: 14, color: workBlue),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

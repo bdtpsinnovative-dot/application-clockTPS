@@ -8,7 +8,6 @@ import '../services/fcm_service.dart';
 import 'admin_websites_page.dart';
 import 'admin_tasks_page.dart';
 
-
 class MainDashboardPage extends StatefulWidget {
   const MainDashboardPage({
     super.key,
@@ -133,19 +132,25 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
     final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
     final httpAvatarUrl = hasAvatar
         ? (avatarUrl.startsWith('r2://')
-            ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-            : avatarUrl)
+              ? avatarUrl.replaceFirst(
+                  'r2://',
+                  'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+                )
+              : avatarUrl)
         : '';
 
     // Role-based avatar decoration styling (Solid Sharp Colors)
     final role = widget.user.role;
     BoxDecoration borderDecoration;
-    
+
     if (role == 'admin') {
       borderDecoration = BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFFF1F5F9),
-        border: Border.all(color: const Color(0xFFFFD700), width: 2.5), // Solid Gold
+        border: Border.all(
+          color: const Color(0xFFFFD700),
+          width: 2.5,
+        ), // Solid Gold
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFFFD700).withValues(alpha: 0.5),
@@ -158,7 +163,10 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
       borderDecoration = BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFFF1F5F9),
-        border: Border.all(color: const Color(0xFFA855F7), width: 2.5), // Solid Purple
+        border: Border.all(
+          color: const Color(0xFFA855F7),
+          width: 2.5,
+        ), // Solid Purple
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFA855F7).withValues(alpha: 0.4),
@@ -171,118 +179,72 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
       borderDecoration = BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFFF1F5F9),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.4),
+          width: 1.5,
+        ),
       );
     }
 
     return Scaffold(
       backgroundColor: workBackground,
       body: RefreshIndicator(
+        color: workBlue,
+        backgroundColor: Colors.white,
         onRefresh: _loadData,
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
           children: [
-            // 1. Premium Gradient Header with Liquid Floating Animation
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(32),
-                bottomRight: Radius.circular(32),
-              ),
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [workBlue, workSky],
-                  ),
-                ),
-                child: Stack(
+            _buildHeroHeader(
+              borderDecoration: borderDecoration,
+              hasAvatar: hasAvatar,
+              avatarUrl: httpAvatarUrl,
+            ),
+            const SizedBox(height: 24),
+            _StaggeredFadeIn(
+              delayIndex: 1,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Moving background blob 1
-                    Positioned(
-                      top: -30,
-                      left: -20,
-                      child: _FloatingBubble(
-                        size: 130,
-                        color: Colors.white.withValues(alpha: 0.12),
-                        duration: const Duration(seconds: 10),
-                      ),
+                    const _SectionHeading(
+                      title: 'ทำรายการด่วน',
+                      subtitle: 'จัดการงานสำคัญของคุณได้ในไม่กี่แตะ',
                     ),
-                    // Moving background blob 2
-                    Positioned(
-                      bottom: -40,
-                      right: -30,
-                      child: _FloatingBubble(
-                        size: 160,
-                        color: Colors.white.withValues(alpha: 0.08),
-                        duration: const Duration(seconds: 14),
-                      ),
-                    ),
-                    // Foreground content (Aligned Horizontally using Row)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        MediaQuery.paddingOf(context).top + 16,
-                        20,
-                        32,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      height: 128,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.only(right: 20),
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _getGreeting(),
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  widget.user.fullName,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  widget.user.position.isEmpty ? 'พนักงานทั่วไป' : widget.user.position,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.75),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          _buildQuickActionCard(
+                            title: 'ลงเวลาทำงาน',
+                            sub: _todayAttendance != null
+                                ? (_todayAttendance!.checkOutAt != null
+                                      ? 'ลงเวลาเสร็จสิ้นวันนี้'
+                                      : 'เข้างานแล้ว / รอเช็คเอาท์')
+                                : 'เช็คอิน / เช็คเอาท์',
+                            icon: Icons.fingerprint_rounded,
+                            color: workBlue,
+                            onTap: () => widget.onSelectTab(1),
                           ),
-                          const SizedBox(width: 12),
-                          // Custom Bordered Avatar (Role-Based & Solid Color)
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: borderDecoration.copyWith(
-                              image: hasAvatar
-                                  ? DecorationImage(
-                                      image: NetworkImage(httpAvatarUrl),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
-                            ),
-                            child: hasAvatar
-                                ? null
-                                : const Icon(
-                                    Icons.person_rounded,
-                                    color: workMuted,
-                                    size: 24,
-                                  ),
+                          _buildQuickActionCard(
+                            title: 'ยื่นคำขอใบลา',
+                            sub: 'ลาป่วย, ลากิจ, ลาพักร้อน',
+                            icon: Icons.event_busy_rounded,
+                            color: const Color(0xFFDC4A4A),
+                            onTap: () => widget.onSelectTab(2),
+                          ),
+                          _buildQuickActionCard(
+                            title: 'ขอออกหน้างาน',
+                            sub: 'ปฏิบัติหน้าที่นอกสถานที่',
+                            icon: Icons.directions_car_rounded,
+                            color: const Color(0xFF0F9F83),
+                            onTap: () => widget.onSelectTab(2),
                           ),
                         ],
                       ),
@@ -291,67 +253,7 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 ),
               ),
             ),
-
-            // 2. Quick Actions (การ์ดเลื่อนแนวนอน)
-            _StaggeredFadeIn(
-              delayIndex: 1,
-              child: Transform.translate(
-                offset: const Offset(0, -20),
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'เมนูด่วนสำหรับวันนี้',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: workText,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 110,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          children: [
-                            _buildQuickActionCard(
-                              title: 'ลงเวลาทำงาน',
-                              sub: _todayAttendance != null
-                                  ? (_todayAttendance!.checkOutAt != null
-                                      ? 'ลงเวลาเสร็จสิ้นวันนี้'
-                                      : 'เข้างานแล้ว / รอเช็คเอาท์')
-                                  : 'เช็คอิน / เช็คเอาท์',
-                              icon: Icons.fingerprint_rounded,
-                              color: workBlue,
-                              onTap: () => widget.onSelectTab(1),
-                            ),
-                            _buildQuickActionCard(
-                              title: 'ยื่นคำขอใบลา',
-                              sub: 'ลาป่วย, ลากิจ, ลาพักร้อน',
-                              icon: Icons.event_busy_rounded,
-                              color: const Color(0xFFEF4444),
-                              onTap: () => widget.onSelectTab(2),
-                            ),
-                            _buildQuickActionCard(
-                              title: 'ขอออกหน้างาน',
-                              sub: 'ปฏิบัติหน้าที่นอกสถานที่',
-                              icon: Icons.directions_car_rounded,
-                              color: const Color(0xFF10B981),
-                              onTap: () => widget.onSelectTab(2),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. Frequently Used (ปุ่มวงกลมเรียงแถว)
+            const SizedBox(height: 28),
             _StaggeredFadeIn(
               delayIndex: 2,
               child: Padding(
@@ -359,17 +261,12 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'ฟังก์ชันที่ใช้งานบ่อย',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: workText,
-                      ),
+                    const _SectionHeading(
+                      title: 'ทางลัดของคุณ',
+                      subtitle: 'สิ่งที่ใช้บ่อยและเข้าถึงได้ทันที',
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         _buildCircularMenu(
                           label: 'มอบหมายงาน',
@@ -377,17 +274,20 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => AdminTasksPage(service: widget.service),
+                              builder: (context) =>
+                                  AdminTasksPage(service: widget.service),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 24),
+                        const SizedBox(width: 20),
                         _buildCircularMenu(
                           label: 'เว็บไซต์บริษัท',
                           icon: Icons.language_rounded,
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const CompanyWebsitesPage()),
+                            MaterialPageRoute(
+                              builder: (context) => const CompanyWebsitesPage(),
+                            ),
                           ),
                         ),
                       ],
@@ -396,7 +296,7 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 28),
             _StaggeredFadeIn(
               delayIndex: 3,
               child: Padding(
@@ -404,16 +304,132 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 child: _buildTodayCompanySummaryCard(),
               ),
             ),
-            const SizedBox(height: 100),
+            const SizedBox(height: 120),
           ],
         ),
       ),
     );
   }
 
-
-
-
+  Widget _buildHeroHeader({
+    required BoxDecoration borderDecoration,
+    required bool hasAvatar,
+    required String avatarUrl,
+  }) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(32),
+        bottomRight: Radius.circular(32),
+      ),
+      child: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF172B62), workBlue, Color(0xFF0C8FA8)],
+            stops: [0, 0.56, 1],
+          ),
+        ),
+        child: Stack(
+          children: [
+            const Positioned(
+              top: -36,
+              right: -20,
+              child: _AmbientBlob(size: 148, color: Color(0x1FFFFFFF)),
+            ),
+            const Positioned(
+              bottom: -52,
+              left: -28,
+              child: _AmbientBlob(size: 128, color: Color(0x14FFFFFF)),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.paddingOf(context).top + 12,
+                20,
+                20,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'เปิดเมนู',
+                        onPressed: widget.onMenu,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.white.withValues(alpha: 0.14),
+                        ),
+                        icon: const Icon(Icons.menu_rounded),
+                      ),
+                      const Spacer(),
+                      Semantics(
+                        label: 'รูปโปรไฟล์ของ ${widget.user.fullName}',
+                        image: true,
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: borderDecoration.copyWith(
+                            image: hasAvatar
+                                ? DecorationImage(
+                                    image: NetworkImage(avatarUrl),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: hasAvatar
+                              ? null
+                              : const Icon(
+                                  Icons.person_rounded,
+                                  color: workMuted,
+                                  size: 25,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _getGreeting(),
+                    style: const TextStyle(
+                      color: Color(0xB3FFFFFF),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.user.fullName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 25,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.user.position.isEmpty
+                        ? 'พนักงานทั่วไป'
+                        : widget.user.position,
+                    style: const TextStyle(
+                      color: Color(0xBFFFFFFF),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildQuickActionCard({
     required String title,
@@ -422,66 +438,77 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
+    return Semantics(
+      button: true,
+      label: '$title: $sub',
       child: Container(
-        width: 170,
-        margin: const EdgeInsets.only(right: 14),
-        decoration: BoxDecoration(
+        width: 178,
+        margin: const EdgeInsets.only(right: 12),
+        child: Material(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFF1F5F9)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x060F172A),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            )
-          ],
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(20),
+            splashColor: color.withValues(alpha: 0.12),
+            highlightColor: color.withValues(alpha: 0.05),
+            child: Ink(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE8EEF5)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0A0F172A),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
                   ),
-                  child: Icon(icon, color: color, size: 18),
-                ),
-                const Icon(Icons.arrow_forward_ios_rounded, color: workMuted, size: 12),
-              ],
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: color, size: 20),
+                      ),
+                      Icon(Icons.arrow_forward_rounded, color: color, size: 20),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: workText,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        sub,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: workMuted),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: workText,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  sub,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: workMuted,
-                  ),
-                ),
-              ],
-            )
-          ],
+          ),
         ),
       ),
     );
@@ -492,42 +519,53 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFF1F5F9)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x0A0F172A),
-                  blurRadius: 6,
-                  offset: Offset(0, 2),
-                )
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          splashColor: workBlue.withValues(alpha: 0.12),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Column(
+              children: [
+                Ink(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFDCE7F3)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0A0F172A),
+                        blurRadius: 10,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, color: workBlue, size: 24),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: workText,
+                  ),
+                ),
               ],
             ),
-            child: Icon(icon, color: workBlue, size: 22),
           ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: workText,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
-
-
 
   Widget _buildTodayCompanySummaryCard() {
     return WorkCard(
@@ -605,88 +643,67 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
       ),
     );
   }
-
 }
 
+// ─── Dashboard Support Widgets ───
 
-
-
-// ─── Premium Animation Helper Widgets ───
-
-class _FloatingBubble extends StatefulWidget {
-  const _FloatingBubble({
-    required this.size,
-    required this.color,
-    required this.duration,
-  });
+class _AmbientBlob extends StatelessWidget {
+  const _AmbientBlob({required this.size, required this.color});
 
   final double size;
   final Color color;
-  final Duration duration;
-
-  @override
-  State<_FloatingBubble> createState() => _FloatingBubbleState();
-}
-
-class _FloatingBubbleState extends State<_FloatingBubble> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: widget.duration,
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(
-            20 * _animation.value,
-            30 * (1.0 - _animation.value),
-          ),
-          child: child,
-        );
-      },
+    return IgnorePointer(
       child: Container(
-        width: widget.size,
-        height: widget.size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: widget.color,
-        ),
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }
 }
 
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 17,
+            height: 1.25,
+            fontWeight: FontWeight.w700,
+            color: workText,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(subtitle, style: const TextStyle(fontSize: 12, color: workMuted)),
+      ],
+    );
+  }
+}
+
 class _StaggeredFadeIn extends StatelessWidget {
-  const _StaggeredFadeIn({
-    required this.child,
-    required this.delayIndex,
-  });
+  const _StaggeredFadeIn({required this.child, required this.delayIndex});
 
   final Widget child;
   final int delayIndex;
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return child;
+    }
+
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0),
       duration: Duration(milliseconds: 350 + (delayIndex * 120)),
@@ -694,14 +711,10 @@ class _StaggeredFadeIn extends StatelessWidget {
       builder: (context, value, child) {
         return Transform.translate(
           offset: Offset(0, 20 * (1.0 - value)),
-          child: Opacity(
-            opacity: value,
-            child: child,
-          ),
+          child: Opacity(opacity: value, child: child),
         );
       },
       child: child,
     );
   }
 }
-

@@ -175,6 +175,7 @@ class AuthFlowService {
   Future<AppUser> registerProfile({
     required String firstName,
     required String lastName,
+    String nickname = '',
     required String avatarUrl,
     required List<double> faceVector,
   }) async {
@@ -187,6 +188,7 @@ class AuthFlowService {
       final data = {
         'first_name': firstName.trim(),
         'last_name': lastName.trim(),
+        'nickname': nickname.trim(),
         'avatar_url': avatarUrl.trim(),
         'face_vector': faceVector,
       };
@@ -214,12 +216,14 @@ class AuthFlowService {
   Future<AppUser> updateProfileInfo({
     required String firstName,
     required String lastName,
+    String nickname = '',
     required String avatarUrl,
   }) async {
     try {
       final data = {
         'first_name': firstName.trim(),
         'last_name': lastName.trim(),
+        'nickname': nickname.trim(),
         'avatar_url': avatarUrl.trim(),
       };
       await _dio.put<Map<String, dynamic>>(
