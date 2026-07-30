@@ -55,8 +55,8 @@ class _BoardDockButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(11),
         child: Container(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: active ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(11),
@@ -293,7 +293,8 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('โหลดข้อมูลบอร์ดล้มเหลว: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFDC2626),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -331,7 +332,8 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('เรียงลำดับการ์ดล้มเหลว: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFDC2626),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -388,7 +390,8 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('สลับตำแหน่งรายการล้มเหลว: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFDC2626),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -451,7 +454,8 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('เพิ่มรายการล้มเหลว: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: const Color(0xFFDC2626),
+              duration: const Duration(seconds: 3),
             ),
           );
         }
@@ -981,7 +985,8 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('สร้างการ์ดล้มเหลว: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: const Color(0xFFDC2626),
+              duration: const Duration(seconds: 3),
             ),
           );
         }
@@ -2194,7 +2199,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                       }
                       return ListView.builder(
                         physics: const ClampingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(5, 6, 5, 92),
+                        padding: EdgeInsets.fromLTRB(5, 6, 5, 92 + MediaQuery.paddingOf(context).bottom),
                         itemCount: filteredCards.length,
                         itemBuilder: (context, index) {
                           final card = filteredCards[index];
@@ -2209,7 +2214,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
                     return ReorderableListView.builder(
                       physics: const ClampingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(5, 6, 5, 92),
+                      padding: EdgeInsets.fromLTRB(5, 6, 5, 92 + MediaQuery.paddingOf(context).bottom),
                       itemCount: list.cards.length,
                       onReorderItem: (oldIndex, newIndex) =>
                           _reorderCards(list, oldIndex, newIndex),
@@ -2423,41 +2428,51 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tick checkbox
-            GestureDetector(
-              onTap: () async {
-                final newStatus = isCompleted ? 'pending' : 'completed';
-                try {
-                  await widget.service.updateTaskCard(
-                    card.id,
-                    status: newStatus,
-                  );
-                  _loadBoard();
-                } catch (_) {}
-              },
-              child: Container(
-                width: 20,
-                height: 20,
-                margin: const EdgeInsets.only(top: 1, right: 8),
-                decoration: BoxDecoration(
-                  color: isCompleted
-                      ? const Color(0xFF10B981)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(
-                    color: isCompleted
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFFCBD5E1),
-                    width: 1.5,
+            // Tick checkbox — touch target 44×44 ตาม WCAG
+            Semantics(
+              label: isCompleted ? 'ทำเครื่องหมายว่ายังไม่เสร็จ' : 'ทำเครื่องหมายว่าเสร็จแล้ว',
+              button: true,
+              child: GestureDetector(
+                onTap: () async {
+                  final newStatus = isCompleted ? 'pending' : 'completed';
+                  try {
+                    await widget.service.updateTaskCard(
+                      card.id,
+                      status: newStatus,
+                    );
+                    _loadBoard();
+                  } catch (_) {}
+                },
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Center(
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      margin: const EdgeInsets.only(right: 0),
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? const Color(0xFF10B981)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: isCompleted
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFCBD5E1),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: isCompleted
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 13,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
                   ),
                 ),
-                child: isCompleted
-                    ? const Icon(
-                        Icons.check_rounded,
-                        size: 13,
-                        color: Colors.white,
-                      )
-                    : null,
               ),
             ),
             // Card content
@@ -2487,11 +2502,11 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                       ),
                       const SizedBox(width: 6),
                       if (card.priority !=
-                          'medium') // Show priority only if it's not medium to save space, or show always? Let's show always for now.
+                          'medium')
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 4,
-                            vertical: 1.5,
+                            vertical: 2,
                           ),
                           margin: const EdgeInsets.only(right: 4),
                           decoration: BoxDecoration(
@@ -2502,7 +2517,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                             priorityLabel,
                             style: TextStyle(
                               color: priorityText,
-                              fontSize: 8,
+                              fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -2510,7 +2525,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 5,
-                          vertical: 1.5,
+                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
                           color: badgeBg,
@@ -2520,7 +2535,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                           badgeLabel,
                           style: TextStyle(
                             color: badgeText,
-                            fontSize: 8.5,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -2617,7 +2632,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                               child: Text(
                                 '+${card.subItems.length - 2} รายการย่อย',
                                 style: const TextStyle(
-                                  fontSize: 9.5,
+                                  fontSize: 10,
                                   color: workMuted,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -2796,6 +2811,7 @@ class _CardDetailSheet extends StatefulWidget {
 
 class _CardDetailSheetState extends State<_CardDetailSheet> {
   late String _cardTitle;
+  int _selectedTab = 0;
   final ScrollController _detailScrollController = ScrollController();
   late List<TaskSubItem> _subItems;
   late List<CardAttachment> _attachments;
@@ -3650,11 +3666,123 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 4),
+
+              // ─── 2-Tab Segmented Switcher (รายละเอียด vs กิจกรรม/คอมเมนต์) ───
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _selectedTab = 0),
+                        borderRadius: BorderRadius.circular(8),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(vertical: 7),
+                          decoration: BoxDecoration(
+                            color: _selectedTab == 0
+                                ? Colors.white
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: _selectedTab == 0
+                                ? const [
+                                    BoxShadow(
+                                      color: Color(0x0C0F172A),
+                                      blurRadius: 4,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.assignment_outlined,
+                                size: 14,
+                                color: _selectedTab == 0 ? workBlue : workMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'รายละเอียดงาน',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: _selectedTab == 0
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color:
+                                      _selectedTab == 0 ? workBlue : workMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _selectedTab = 1),
+                        borderRadius: BorderRadius.circular(8),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(vertical: 7),
+                          decoration: BoxDecoration(
+                            color: _selectedTab == 1
+                                ? Colors.white
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: _selectedTab == 1
+                                ? const [
+                                    BoxShadow(
+                                      color: Color(0x0C0F172A),
+                                      blurRadius: 4,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 14,
+                                color: _selectedTab == 1 ? workBlue : workMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'กิจกรรม & คอมเมนต์',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: _selectedTab == 1
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color:
+                                      _selectedTab == 1 ? workBlue : workMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
 
               // Scrollable content area
               Expanded(
-                child: SingleChildScrollView(
+                child: _selectedTab == 0
+                    ? SingleChildScrollView(
                   controller: _detailScrollController,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
@@ -4122,18 +4250,17 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                           ],
                         ),
                       ],
-                      const SizedBox(height: 24),
-
-                      // 5. ความคิดเห็น (Rich Text & Activities)
-                      CardCommentSection(
-                        service: widget.service,
-                        cardId: widget.card.id,
-                        taskId: widget.taskId,
-                        isReadOnly: !widget.canEdit,
-                        parentScrollController: _detailScrollController,
-                      ),
                       const SizedBox(height: 20),
                     ],
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: CardCommentSection(
+                    service: widget.service,
+                    cardId: widget.card.id,
+                    taskId: widget.taskId,
+                    isReadOnly: !widget.canEdit,
                   ),
                 ),
               ),

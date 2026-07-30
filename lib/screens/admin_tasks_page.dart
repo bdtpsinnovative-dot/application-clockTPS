@@ -444,21 +444,18 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _selectedOwnership = value),
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(
-              color: isSelected ? const Color(0xFFBFDBFE) : Colors.transparent,
-            ),
+            borderRadius: BorderRadius.circular(10),
             boxShadow: isSelected
                 ? const [
                     BoxShadow(
-                      color: Color(0x0F0F172A),
+                      color: Color(0x0C0F172A),
                       blurRadius: 6,
                       offset: Offset(0, 2),
                     ),
@@ -472,8 +469,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: isSelected ? workBlue : workMuted,
-              fontSize: 11.5,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
         ),
@@ -846,77 +843,92 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           ),
         );
       },
-
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x05000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
+              color: Color(0x060F172A),
+              blurRadius: 10,
+              offset: Offset(0, 3),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tags row
-            if (brand != null || category != null) ...[
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  if (brand != null)
-                    _buildTag(
-                      brand.name,
-                      const Color(0xFFEFF6FF),
-                      workBlue,
-                      const Color(0xFFBFDBFE),
-                    ),
-                  if (category != null)
-                    _buildTag(
-                      category.name,
-                      const Color(0xFFFEF3C7),
-                      const Color(0xFFB45309),
-                      const Color(0xFFFDE68A),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-            ],
-            // Title & Actions
+            // Top Row: Tags & Ownership Tag & Actions
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text(
-                        task.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
-                          color: workText,
+                      if (brand != null)
+                        _buildTag(
+                          brand.name,
+                          const Color(0xFFEFF6FF),
+                          workBlue,
+                          const Color(0xFFBFDBFE),
                         ),
-                      ),
-                      if (task.description.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          task.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: workMuted,
+                      if (category != null)
+                        _buildTag(
+                          category.name,
+                          const Color(0xFFFEF3C7),
+                          const Color(0xFFB45309),
+                          const Color(0xFFFDE68A),
+                        ),
+                      // Soft Owner Tag
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isBoardCreator
+                              ? const Color(0xFFFEF2F2)
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isBoardCreator
+                                ? const Color(0xFFFECACA)
+                                : const Color(0xFFE2E8F0),
                           ),
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isBoardCreator
+                                  ? Icons.star_rounded
+                                  : Icons.people_outline_rounded,
+                              size: 11,
+                              color: isBoardCreator
+                                  ? const Color(0xFFDC2626)
+                                  : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isBoardCreator
+                                  ? 'คุณเป็นเจ้าของ'
+                                  : 'บอร์ดของ $boardCreatorName',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: isBoardCreator
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -934,161 +946,110 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
               ],
             ),
 
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: isBoardCreator
-                    ? const Color(0xFFFEF2F2)
-                    : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isBoardCreator ? Icons.star_rounded : Icons.group_rounded,
-                    size: 11,
-                    color: isBoardCreator
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF64748B),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    isBoardCreator
-                        ? 'คุณเป็นเจ้าของบอร์ด'
-                        : 'บอร์ดของ $boardCreatorName (คุณเข้าร่วม)',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: isBoardCreator
-                          ? const Color(0xFFDC2626)
-                          : const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 10),
+
+            // Title & Description
+            Text(
+              task.title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14.5,
+                color: workText,
+                height: 1.3,
               ),
             ),
+            if (task.description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                task.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: workMuted,
+                  height: 1.45,
+                ),
+              ),
+            ],
 
-            // Progress: การ์ดงาน (Kanban) or รายการย่อย
+            const SizedBox(height: 12),
+
+            // Progress Section
             Builder(
               builder: (context) {
-                // ลำดับความสำคัญ: card progress > sub_items progress
-                if (task.cardTotal > 0) {
-                  final pct = (task.cardDone / task.cardTotal * 100).toInt();
-                  final isAllDone = task.cardDone == task.cardTotal;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.view_kanban_rounded,
-                                size: 12,
+                final hasCards = task.cardTotal > 0;
+                final hasSubItems = task.subItems.isNotEmpty;
+                if (!hasCards && !hasSubItems) return const SizedBox.shrink();
+
+                final int total = hasCards ? task.cardTotal : task.subItems.length;
+                final int done = hasCards
+                    ? task.cardDone
+                    : task.subItems.where((s) => s.isDone).length;
+                final double ratio = total > 0 ? (done / total) : 0;
+                final int pct = (ratio * 100).toInt();
+                final bool isAllDone = total > 0 && done == total;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              hasCards
+                                  ? Icons.view_kanban_rounded
+                                  : Icons.checklist_rounded,
+                              size: 13,
+                              color: workMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              hasCards
+                                  ? '$done/$total การ์ด'
+                                  : '$done/$total รายการ',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
                                 color: workMuted,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${task.cardDone}/${task.cardTotal} การ์ด',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: workMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '$pct%',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isAllDone
-                                  ? const Color(0xFF10B981)
-                                  : workBlue,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: task.cardDone / task.cardTotal,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          color: isAllDone ? const Color(0xFF10B981) : workBlue,
-                          minHeight: 4,
+                          ],
                         ),
-                      ),
-                    ],
-                  );
-                } else if (task.subItems.isNotEmpty) {
-                  final doneCount = task.subItems.where((s) => s.isDone).length;
-                  final totalCount = task.subItems.length;
-                  final pct = (doneCount / totalCount * 100).toInt();
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.checklist_rounded,
-                                size: 12,
-                                color: workMuted,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$doneCount/$totalCount รายการ',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: workMuted,
-                                ),
-                              ),
-                            ],
+                        Text(
+                          '$pct%',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: isAllDone
+                                ? const Color(0xFF16A34A)
+                                : workBlue,
                           ),
-                          Text(
-                            '$pct%',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: workBlue,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: doneCount / totalCount,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          color: workBlue,
-                          minHeight: 4,
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: ratio,
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        color: isAllDone ? const Color(0xFF16A34A) : workBlue,
+                        minHeight: 5,
                       ),
-                    ],
-                  );
-                }
-                return const SizedBox.shrink();
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                );
               },
             ),
 
-            const SizedBox(height: 8),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            const SizedBox(height: 8),
-
-            // Footer: assignee list + due date
+            // Footer Row: Assignees Avatar Stack & Due Date
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Render overlapping avatars for assignees
+                // Assignees Stack
                 Row(
                   children: [
                     if (assignees.isEmpty)
@@ -1100,52 +1061,64 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                     else
                       SizedBox(
                         height: 24,
-                        width: 24.0 + (assignees.length - 1) * 12.0,
+                        width: 24.0 +
+                            (assignees.length > 1
+                                ? (assignees.length > 3 ? 2 : assignees.length - 1) * 12.0
+                                : 0),
                         child: Stack(
-                          children: List.generate(assignees.length, (index) {
-                            final u = assignees[index];
-                            final avatarUrl = u.avatarUrl;
-                            final hasAvatar =
-                                avatarUrl != null &&
-                                avatarUrl.trim().isNotEmpty;
-                            final resolvedAvatar = hasAvatar
-                                ? (avatarUrl.startsWith('r2://')
+                          children: List.generate(
+                            assignees.length > 3 ? 3 : assignees.length,
+                            (index) {
+                              final u = assignees[index];
+                              final avatarUrl = u.avatarUrl;
+                              final hasAvatar = avatarUrl != null &&
+                                  avatarUrl.trim().isNotEmpty;
+                              final resolvedAvatar = hasAvatar
+                                  ? (avatarUrl.startsWith('r2://')
                                       ? avatarUrl.replaceFirst(
                                           'r2://',
                                           'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
                                         )
                                       : avatarUrl)
-                                : null;
+                                  : null;
 
-                            return Positioned(
-                              left: index * 12.0,
-                              child: Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFFEFF6FF),
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 1.5,
+                              return Positioned(
+                                left: index * 12.0,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFFEFF6FF),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 1.5,
+                                    ),
+                                    image: resolvedAvatar != null
+                                        ? DecorationImage(
+                                            image: NetworkImage(resolvedAvatar),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
                                   ),
-                                  image: resolvedAvatar != null
-                                      ? DecorationImage(
-                                          image: NetworkImage(resolvedAvatar),
-                                          fit: BoxFit.cover,
+                                  child: resolvedAvatar == null
+                                      ? Center(
+                                          child: Text(
+                                            u.firstName.isNotEmpty
+                                                ? u.firstName[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: workBlue,
+                                            ),
+                                          ),
                                         )
                                       : null,
                                 ),
-                                child: resolvedAvatar == null
-                                    ? const Icon(
-                                        Icons.person_rounded,
-                                        size: 10,
-                                        color: workBlue,
-                                      )
-                                    : null,
-                              ),
-                            );
-                          }),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     const SizedBox(width: 6),
