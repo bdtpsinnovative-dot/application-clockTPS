@@ -641,6 +641,79 @@ extension _TaskBoardRendering on _TaskBoardPageState {
     );
   }
 
+  Widget _buildAssigneeAvatars(List<UserSummary> assignees) {
+    if (assignees.isEmpty) return const SizedBox.shrink();
+    final visible = assignees.take(3).toList();
+    return SizedBox(
+      height: 22,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < visible.length; i++) ...[
+            Align(
+              widthFactor: 0.65,
+              child: Builder(
+                builder: (context) {
+                  final user = visible[i];
+                  final avatarUrl = user.resolvedAvatarUrl;
+                  final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+                  return Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: CircleAvatar(
+                      radius: 10,
+                      backgroundColor: const Color(0xFFDBEAFE),
+                      backgroundImage:
+                          hasAvatar ? NetworkImage(avatarUrl) : null,
+                      onBackgroundImageError:
+                          hasAvatar ? (error, stack) {} : null,
+                      child: !hasAvatar
+                          ? Text(
+                              user.firstName.isNotEmpty
+                                  ? user.firstName[0]
+                                  : '?',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF1E40AF),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+          if (assignees.length > 3)
+            Align(
+              widthFactor: 0.65,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: CircleAvatar(
+                  radius: 10,
+                  backgroundColor: const Color(0xFFE2E8F0),
+                  child: Text(
+                    '+${assignees.length - 3}',
+                    style: const TextStyle(
+                      fontSize: 8.5,
+                      color: Color(0xFF475569),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCardContent(TaskCardRecord card) {
     final doneCount = card.subItems.where((s) => s.isDone).length;
     final totalCount = card.subItems.length;
@@ -652,33 +725,6 @@ extension _TaskBoardRendering on _TaskBoardPageState {
     final badgeBg = _statusBgColors[card.status] ?? const Color(0xFFF1F5F9);
     final badgeText = _statusTextColors[card.status] ?? workMuted;
     final badgeLabel = _statusLabels[card.status] ?? 'รอทำ';
-
-    Color priorityBg = const Color(0xFFE2E8F0);
-    Color priorityText = const Color(0xFF64748B);
-    String priorityLabel = 'Medium';
-
-    switch (card.priority) {
-      case 'low':
-        priorityBg = const Color(0xFFE0F2FE);
-        priorityText = const Color(0xFF0284C7);
-        priorityLabel = 'Low';
-        break;
-      case 'medium':
-        priorityBg = const Color(0xFFFEF3C7);
-        priorityText = const Color(0xFFD97706);
-        priorityLabel = 'Medium';
-        break;
-      case 'high':
-        priorityBg = const Color(0xFFFFEDD5);
-        priorityText = const Color(0xFFEA580C);
-        priorityLabel = 'High';
-        break;
-      case 'urgent':
-        priorityBg = const Color(0xFFFEE2E2);
-        priorityText = const Color(0xFFDC2626);
-        priorityLabel = 'Urgent';
-        break;
-    }
 
     return InkWell(
       onTap: () => _showCardDetailSheet(card),
@@ -781,26 +827,13 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      if (card.priority != 'medium')
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 2,
-                          ),
-                          margin: const EdgeInsets.only(right: 4),
-                          decoration: BoxDecoration(
-                            color: priorityBg,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            priorityLabel,
-                            style: TextStyle(
-                              color: priorityText,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: PriorityBadge(
+                          priority: card.priority,
+                          isCompact: true,
                         ),
+                      ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 5,
@@ -830,30 +863,40 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                       style: const TextStyle(color: workMuted, fontSize: 10.5),
                     ),
                   ],
-                  if (card.startDate != null || card.dueDate != null) ...[
+                  if (card.startDate != null ||
+                      card.dueDate != null ||
+                      card.assignees.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(
-                          dateColor == workMuted
-                              ? Icons.calendar_today_outlined
-                              : Icons.schedule_rounded,
-                          size: 10.5,
-                          color: dateColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            dateLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: dateColor,
-                              fontWeight: FontWeight.w500,
+                        if (card.startDate != null || card.dueDate != null) ...[
+                          Icon(
+                            dateColor == workMuted
+                                ? Icons.calendar_today_outlined
+                                : Icons.schedule_rounded,
+                            size: 10.5,
+                            color: dateColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              dateLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: dateColor,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
-                        ),
+                        ] else ...[
+                          const Spacer(),
+                        ],
+                        if (card.assignees.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          _buildAssigneeAvatars(card.assignees),
+                        ],
                       ],
                     ),
                   ],

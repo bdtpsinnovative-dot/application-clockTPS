@@ -174,7 +174,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
     if (name != null && name.isNotEmpty) {
       setState(() => _loading = true);
       try {
-        await widget.service.createTaskList(widget.task.id, name);
+        await widget.service.createTaskList(widget.task.id, name: name);
         widget.onRefreshNeeded();
         _loadBoard();
       } catch (e) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/priority_selector.dart';
+import 'package:hr_management/widgets/priority_badge.dart';
 import 'package:hr_management/widgets/skeleton_loading.dart';
 import 'package:hr_management/widgets/work_ui.dart';
 import 'package:file_picker/file_picker.dart' as fp;
@@ -18,6 +19,34 @@ part 'task_board/board_support_widgets.dart';
 part 'task_board/task_board_operations.dart';
 part 'task_board/task_board_filters.dart';
 part 'task_board/task_board_rendering.dart';
+
+Future<void> showProjectTaskDetailSheet({
+  required BuildContext context,
+  required String projectId,
+  required String groupName,
+  required TaskCardRecord task,
+  required AuthFlowService service,
+  required bool canEdit,
+  required VoidCallback onChanged,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (context) => _CardDetailSheet(
+      taskId: projectId,
+      listName: groupName,
+      card: task,
+      service: service,
+      canEdit: canEdit,
+      onChanged: onChanged,
+    ),
+  );
+}
 
 String _formatDate(DateTime? dt) {
   if (dt == null) return '';

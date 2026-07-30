@@ -6,7 +6,8 @@ import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/work_ui.dart';
 import 'package:hr_management/widgets/skeleton_loading.dart';
 import 'package:hr_management/widgets/work_due_date_picker.dart';
-import 'package:hr_management/screens/task_board_page.dart';
+import 'package:hr_management/screens/project_detail/project_detail_page.dart';
+import 'package:hr_management/screens/project_detail/project_detail_style.dart';
 import 'task_assignment/task_assignment_domain.dart';
 import 'task_assignment/task_assignment_view_model.dart';
 
@@ -190,24 +191,21 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         users: _users,
         brands: _brands,
         categories: _categories,
-        onSubmit:
-            (title, desc, assignees, due, brand, category, cardNames) async {
-              final validLists = cardNames
-                  .map((name) => name.trim())
-                  .where((name) => name.isNotEmpty)
-                  .toList(growable: false);
-              await widget.service.createTask(
-                title: title,
-                description: desc,
-                assignedTo: assignees.isNotEmpty ? assignees.first : '',
-                brandId: brand,
-                categoryId: category,
-                dueDate: due,
-                assigneeIds: assignees,
-                listNames: validLists,
-              );
-              _loadData();
-            },
+        onSubmit: (title, desc, assignees, due, brand, category) async {
+          await widget.service.createTask(
+            title: title,
+            description: desc,
+            assignedTo: assignees.isNotEmpty ? assignees.first : '',
+            brandId: brand,
+            categoryId: category,
+            dueDate: due,
+            assigneeIds: assignees,
+            // Every new project starts with one deliverable using the
+            // entered work title. Legacy task cards are no longer created.
+            listNames: [title.trim()],
+          );
+          _loadData();
+        },
       ),
     );
   }
@@ -597,7 +595,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     );
   }
 
-  // ─── Kanban board ───────────────────────────────────────────────
+  // ─── Project list ───────────────────────────────────────────────
 
   Widget _buildDraggableTaskCard(TaskRecord task) {
     return _buildTaskCardContent(task);
@@ -630,13 +628,14 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
+        Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => TaskBoardPage(
-              task: task,
+            builder: (context) => ProjectDetailPage(
+              project: task,
               service: widget.service,
-              onRefreshNeeded: _loadData,
+              brandName: brand?.name,
+              categoryName: category?.name,
+              onChanged: _loadData,
             ),
           ),
         );
@@ -645,16 +644,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x060F172A),
-              blurRadius: 10,
-              offset: Offset(0, 3),
-            ),
-          ],
+          color: ProjectDetailStyle.surface,
+          borderRadius: BorderRadius.circular(ProjectDetailStyle.cardRadius),
+          border: Border.all(color: ProjectDetailStyle.line),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -671,16 +663,16 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                       if (brand != null)
                         _buildTag(
                           brand.name,
-                          const Color(0xFFEFF6FF),
-                          workBlue,
-                          const Color(0xFFBFDBFE),
+                          ProjectDetailStyle.soft,
+                          ProjectDetailStyle.secondary,
+                          ProjectDetailStyle.line,
                         ),
                       if (category != null)
                         _buildTag(
                           category.name,
-                          const Color(0xFFFEF3C7),
-                          const Color(0xFFB45309),
-                          const Color(0xFFFDE68A),
+                          ProjectDetailStyle.soft,
+                          ProjectDetailStyle.secondary,
+                          ProjectDetailStyle.line,
                         ),
                       // Soft Owner Tag
                       Container(
@@ -689,27 +681,17 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: isBoardCreator
-                              ? const Color(0xFFFEF2F2)
-                              : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isBoardCreator
-                                ? const Color(0xFFFECACA)
-                                : const Color(0xFFE2E8F0),
-                          ),
+                          color: ProjectDetailStyle.soft,
+                          borderRadius: BorderRadius.circular(7),
+                          border: Border.all(color: ProjectDetailStyle.line),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isBoardCreator
-                                  ? Icons.star_rounded
-                                  : Icons.people_outline_rounded,
+                              Icons.person_outline_rounded,
                               size: 11,
-                              color: isBoardCreator
-                                  ? const Color(0xFFDC2626)
-                                  : const Color(0xFF64748B),
+                              color: ProjectDetailStyle.muted,
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -719,9 +701,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color: isBoardCreator
-                                    ? const Color(0xFFDC2626)
-                                    : const Color(0xFF64748B),
+                                color: ProjectDetailStyle.secondary,
                               ),
                             ),
                           ],
@@ -772,78 +752,78 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
 
             const SizedBox(height: 12),
 
-            // Progress Section
-            Builder(
-              builder: (context) {
-                final hasCards = task.cardTotal > 0;
-                final hasSubItems = task.subItems.isNotEmpty;
-                if (!hasCards && !hasSubItems) return const SizedBox.shrink();
-
-                final int total = hasCards
-                    ? task.cardTotal
-                    : task.subItems.length;
-                final int done = hasCards
-                    ? task.cardDone
-                    : task.subItems.where((s) => s.isDone).length;
-                final double ratio = total > 0 ? (done / total) : 0;
-                final int pct = (ratio * 100).toInt();
-                final bool isAllDone = total > 0 && done == total;
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              hasCards
-                                  ? Icons.view_kanban_rounded
-                                  : Icons.checklist_rounded,
-                              size: 13,
-                              color: workMuted,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              hasCards
-                                  ? '$done/$total การ์ด'
-                                  : '$done/$total รายการ',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: workMuted,
-                              ),
-                            ),
-                          ],
+            Container(
+              padding: const EdgeInsets.all(11),
+              decoration: BoxDecoration(
+                color: ProjectDetailStyle.canvas,
+                borderRadius: BorderRadius.circular(
+                  ProjectDetailStyle.controlRadius,
+                ),
+                border: Border.all(color: ProjectDetailStyle.line),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'รายการงาน',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: ProjectDetailStyle.secondary,
+                          fontWeight: FontWeight.w700,
                         ),
-                        Text(
-                          '$pct%',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: isAllDone
-                                ? const Color(0xFF16A34A)
-                                : workBlue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: ratio,
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        color: isAllDone ? const Color(0xFF16A34A) : workBlue,
-                        minHeight: 5,
                       ),
+                      const Spacer(),
+                      Text(
+                        '${task.cardDone}/${task.cardTotal} งาน',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: ProjectDetailStyle.ink,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: task.cardTotal == 0
+                          ? 0
+                          : task.cardDone / task.cardTotal,
+                      minHeight: 5,
+                      backgroundColor: ProjectDetailStyle.line,
+                      color:
+                          task.cardTotal > 0 && task.cardDone == task.cardTotal
+                          ? ProjectDetailStyle.success
+                          : ProjectDetailStyle.accent,
                     ),
-                    const SizedBox(height: 10),
-                  ],
-                );
-              },
+                  ),
+                  const SizedBox(height: 8),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        'เปิดโปรเจกต์',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: ProjectDetailStyle.secondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(width: 3),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: ProjectDetailStyle.secondary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
+
+            const SizedBox(height: 8),
 
             // Footer Row: Assignees Avatar Stack & Due Date
             Row(
@@ -894,7 +874,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                                   height: 24,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: const Color(0xFFEFF6FF),
+                                    color: ProjectDetailStyle.soft,
                                     border: Border.all(
                                       color: Colors.white,
                                       width: 1.5,
@@ -915,7 +895,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                                             style: const TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
-                                              color: workBlue,
+                                              color: ProjectDetailStyle.accent,
                                             ),
                                           ),
                                         )
@@ -974,12 +954,12 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(7),
         border: Border.all(color: border),
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg),
       ),
     );
   }

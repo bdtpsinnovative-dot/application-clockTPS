@@ -97,7 +97,11 @@ class WorkRequestRecord {
         }
       } catch (_) {}
     }
-    return urlStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    return urlStr
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 }
 
@@ -175,9 +179,11 @@ class TaskRecord {
   factory TaskRecord.fromJson(Map<String, dynamic> json) {
     final rawSubs = json['sub_items'];
     final subs = rawSubs is List
-        ? rawSubs.map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawSubs
+              .map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <TaskSubItem>[];
-    
+
     final rawAssignees = json['assignee_ids'];
     final assigneeList = rawAssignees is List
         ? rawAssignees.map((e) => e.toString()).toList()
@@ -242,7 +248,11 @@ class TaskSubItem {
   factory TaskSubItem.fromJson(Map<String, dynamic> json) {
     final rawVerifications = json['verifications'];
     final verificationList = rawVerifications is List
-        ? rawVerifications.map((e) => SubItemVerification.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawVerifications
+              .map(
+                (e) => SubItemVerification.fromJson(e as Map<String, dynamic>),
+              )
+              .toList()
         : <SubItemVerification>[];
 
     return TaskSubItem(
@@ -253,8 +263,12 @@ class TaskSubItem {
       isDone: json['is_done'] as bool? ?? false,
       status: json['status'] as String? ?? 'pending',
       sortOrder: json['sort_order'] as int? ?? 0,
-      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'] as String)?.toLocal() : null,
-      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'] as String)?.toLocal() : null,
+      startDate: json['start_date'] != null
+          ? DateTime.tryParse(json['start_date'] as String)?.toLocal()
+          : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'] as String)?.toLocal()
+          : null,
       linkUrl: json['link_url'] as String?,
       attachmentUrl: json['attachment_url'] as String?,
       verificationNotes: json['verification_notes'] as String?,
@@ -334,7 +348,9 @@ class SubItemVerification {
       round: json['round'] as int? ?? 0,
       status: json['status'] as String? ?? '',
       notes: json['notes'] as String?,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String).toLocal() : DateTime.now(),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String).toLocal()
+          : DateTime.now(),
     );
   }
 
@@ -357,14 +373,33 @@ class TaskListRecord {
     required this.sortOrder,
     this.startDate,
     this.dueDate,
+    this.priority = 'medium',
+    this.status = 'in_progress',
+    this.adminComment = '',
+    this.attachments = const [],
+    this.assigneeIds = const [],
     this.cards = const [],
   });
 
   factory TaskListRecord.fromJson(Map<String, dynamic> json) {
     final rawCards = json['cards'];
     final cardsList = rawCards is List
-        ? rawCards.map((e) => TaskCardRecord.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawCards
+              .map((e) => TaskCardRecord.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <TaskCardRecord>[];
+    final rawAttachments = json['attachments'];
+    final attachments = rawAttachments is List
+        ? rawAttachments
+              .whereType<Map>()
+              .map(
+                (item) => TaskListAttachment.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .toList()
+        : <TaskListAttachment>[];
+    final rawAssigneeIds = json['assignee_ids'];
 
     return TaskListRecord(
       id: json['id'] as String? ?? '',
@@ -372,8 +407,19 @@ class TaskListRecord {
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
       sortOrder: json['sort_order'] as int? ?? 0,
-      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'] as String)?.toLocal() : null,
-      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'] as String)?.toLocal() : null,
+      startDate: json['start_date'] != null
+          ? DateTime.tryParse(json['start_date'] as String)?.toLocal()
+          : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'] as String)?.toLocal()
+          : null,
+      priority: json['priority'] as String? ?? 'medium',
+      status: json['status'] as String? ?? 'in_progress',
+      adminComment: json['admin_comment'] as String? ?? '',
+      attachments: attachments,
+      assigneeIds: rawAssigneeIds is List
+          ? rawAssigneeIds.map((id) => id.toString()).toList()
+          : const [],
       cards: cardsList,
     );
   }
@@ -385,7 +431,37 @@ class TaskListRecord {
   final int sortOrder;
   final DateTime? startDate;
   final DateTime? dueDate;
+  final String priority;
+  final String status;
+  final String adminComment;
+  final List<TaskListAttachment> attachments;
+  final List<String> assigneeIds;
+
+  /// Legacy task cards are retained for data compatibility but are no longer
+  /// part of the employee-facing Project → Deliverable experience.
   final List<TaskCardRecord> cards;
+}
+
+class TaskListAttachment {
+  const TaskListAttachment({
+    required this.name,
+    required this.url,
+    required this.type,
+  });
+
+  factory TaskListAttachment.fromJson(Map<String, dynamic> json) {
+    return TaskListAttachment(
+      name: json['name'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      type: json['type'] as String? ?? 'file',
+    );
+  }
+
+  final String name;
+  final String url;
+  final String type;
+
+  Map<String, dynamic> toJson() => {'name': name, 'url': url, 'type': type};
 }
 
 class TaskCardRecord {
@@ -409,17 +485,23 @@ class TaskCardRecord {
   factory TaskCardRecord.fromJson(Map<String, dynamic> json) {
     final rawSubs = json['sub_items'];
     final subs = rawSubs is List
-        ? rawSubs.map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawSubs
+              .map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <TaskSubItem>[];
 
     final rawAttachments = json['attachments'];
     final attachments = rawAttachments is List
-        ? rawAttachments.map((e) => CardAttachment.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawAttachments
+              .map((e) => CardAttachment.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <CardAttachment>[];
 
     final rawAssigneesJson = json['assignees'];
     final rawAssignees = rawAssigneesJson is List
-        ? rawAssigneesJson.map((e) => UserSummary.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawAssigneesJson
+              .map((e) => UserSummary.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <UserSummary>[];
 
     final rawAssigneeIds = rawAssignees.map((e) => e.id).toList();
@@ -432,8 +514,12 @@ class TaskCardRecord {
       status: json['status'] as String? ?? 'pending',
       sortOrder: json['sort_order'] as int? ?? 0,
       priority: json['priority'] as String? ?? 'medium',
-      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'].toString())?.toLocal() : null,
-      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'].toString())?.toLocal() : null,
+      startDate: json['start_date'] != null
+          ? DateTime.tryParse(json['start_date'].toString())?.toLocal()
+          : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'].toString())?.toLocal()
+          : null,
       subItems: subs,
       attachments: attachments,
       adminComment: json['admin_comment'] as String?,
@@ -456,7 +542,7 @@ class TaskCardRecord {
   final String? adminComment;
   List<String> assigneeIds;
   List<UserSummary> assignees;
-  
+
   List<CardAttachment> get attachments => _attachments ?? const [];
 }
 
@@ -487,6 +573,70 @@ class UserSummary {
   final String? avatarUrl;
 
   String get fullName => '$firstName $lastName';
+
+  String? get resolvedAvatarUrl {
+    if (avatarUrl == null || avatarUrl!.trim().isEmpty) return null;
+    final url = avatarUrl!.trim();
+    if (url.startsWith('r2://')) {
+      return url.replaceFirst(
+        'r2://',
+        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+      );
+    }
+    return url;
+  }
+}
+
+/// A comment or immutable activity item attached to a project deliverable.
+class TaskEventRecord {
+  const TaskEventRecord({
+    required this.id,
+    required this.taskId,
+    required this.userId,
+    required this.eventType,
+    required this.action,
+    required this.content,
+    required this.createdAt,
+    this.listId,
+    this.userFirstName = '',
+    this.userLastName = '',
+    this.userAvatarUrl,
+  });
+
+  factory TaskEventRecord.fromJson(Map<String, dynamic> json) {
+    return TaskEventRecord(
+      id: json['id']?.toString() ?? '',
+      taskId: json['task_id']?.toString() ?? '',
+      listId: json['list_id']?.toString(),
+      userId: json['user_id']?.toString() ?? '',
+      eventType: json['event_type'] as String? ?? 'system',
+      action: json['action'] as String? ?? '',
+      content: json['content'] as String? ?? '',
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
+      userFirstName: json['user_first_name'] as String? ?? '',
+      userLastName: json['user_last_name'] as String? ?? '',
+      userAvatarUrl: json['user_avatar_url'] as String?,
+    );
+  }
+
+  final String id;
+  final String taskId;
+  final String? listId;
+  final String userId;
+  final String eventType;
+  final String action;
+  final String content;
+  final DateTime createdAt;
+  final String userFirstName;
+  final String userLastName;
+  final String? userAvatarUrl;
+
+  String get userFullName {
+    final name = '$userFirstName $userLastName'.trim();
+    return name.isEmpty ? 'ผู้ใช้' : name;
+  }
 }
 
 /// A rich-text comment on a task card
@@ -513,7 +663,9 @@ class CardComment {
 
     final rawAttachments = json['attachments'];
     final attachments = rawAttachments is List
-        ? rawAttachments.map((e) => CommentAttachment.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawAttachments
+              .map((e) => CommentAttachment.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <CommentAttachment>[];
 
     return CardComment(
@@ -523,9 +675,15 @@ class CardComment {
       contentDelta: json['content_delta'], // Passed directly for Quill
       plainText: json['plain_text'] as String? ?? '',
       isEdited: json['is_edited'] as bool? ?? false,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'].toString()).toLocal() : DateTime.now(),
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'].toString()).toLocal() : DateTime.now(),
-      author: json['author'] != null ? UserSummary.fromJson(json['author'] as Map<String, dynamic>) : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'].toString()).toLocal()
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'].toString()).toLocal()
+          : DateTime.now(),
+      author: json['author'] != null
+          ? UserSummary.fromJson(json['author'] as Map<String, dynamic>)
+          : null,
       mentionedUserIds: mentions,
       attachments: attachments,
     );
@@ -565,8 +723,12 @@ class CommentAttachment {
       url: json['url'] as String? ?? '',
       name: json['name'] as String? ?? '',
       type: json['type'] as String? ?? 'file',
-      sizeBytes: json['size_bytes'] != null ? int.tryParse(json['size_bytes'].toString()) : null,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'].toString()).toLocal() : DateTime.now(),
+      sizeBytes: json['size_bytes'] != null
+          ? int.tryParse(json['size_bytes'].toString())
+          : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'].toString()).toLocal()
+          : DateTime.now(),
     );
   }
 
@@ -599,7 +761,8 @@ class CardAttachment {
       name: json['name'] as String? ?? '',
       type: json['type'] as String? ?? 'file', // 'image' | 'file' | 'link'
       createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())?.toLocal() ?? DateTime.now()
+          ? DateTime.tryParse(json['created_at'].toString())?.toLocal() ??
+                DateTime.now()
           : DateTime.now(),
       createdBy: json['created_by'] as String?,
     );
@@ -613,7 +776,6 @@ class CardAttachment {
   final DateTime createdAt;
   final String? createdBy;
 }
-
 
 class BrandRecord {
   const BrandRecord({required this.id, required this.name});

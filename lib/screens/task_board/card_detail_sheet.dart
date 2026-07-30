@@ -1022,38 +1022,12 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                                     ),
                                   ),
                                 ),
-                                if (widget.card.priority != 'medium')
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    margin: const EdgeInsets.only(left: 8),
-                                    decoration: BoxDecoration(
-                                      color: widget.card.priority == 'urgent'
-                                          ? const Color(0xFFFEE2E2)
-                                          : widget.card.priority == 'high'
-                                          ? const Color(0xFFFFEDD5)
-                                          : const Color(0xFFE0F2FE),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      widget.card.priority == 'urgent'
-                                          ? 'Urgent'
-                                          : widget.card.priority == 'high'
-                                          ? 'High'
-                                          : 'Low',
-                                      style: TextStyle(
-                                        color: widget.card.priority == 'urgent'
-                                            ? const Color(0xFFDC2626)
-                                            : widget.card.priority == 'high'
-                                            ? const Color(0xFFEA580C)
-                                            : const Color(0xFF0284C7),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
+                                 Padding(
+                                   padding: const EdgeInsets.only(left: 8),
+                                   child: PriorityBadge(
+                                     priority: widget.card.priority,
+                                   ),
+                                 ),
                               ],
                             ),
                             const SizedBox(height: 8),

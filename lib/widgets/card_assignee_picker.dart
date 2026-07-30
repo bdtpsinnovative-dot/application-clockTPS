@@ -222,13 +222,23 @@ class _CardAssigneePickerState extends State<CardAssigneePicker> {
 
                           return ListTile(
                             enabled: !_isSaving,
-                            leading: CircleAvatar(
-                              backgroundImage: member.avatarUrl != null && member.avatarUrl!.isNotEmpty
-                                  ? NetworkImage(member.avatarUrl!)
-                                  : null,
-                              child: member.avatarUrl == null || member.avatarUrl!.isEmpty
-                                  ? Text(member.firstName.isNotEmpty ? member.firstName[0] : '?')
-                                  : null,
+                            leading: Builder(
+                              builder: (context) {
+                                final avatarUrl = member.resolvedAvatarUrl;
+                                final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+                                return CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Colors.blue[100],
+                                  backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
+                                  onBackgroundImageError: hasAvatar ? (error, stack) {} : null,
+                                  child: !hasAvatar
+                                      ? Text(
+                                          member.firstName.isNotEmpty ? member.firstName[0] : '?',
+                                          style: const TextStyle(fontSize: 14, color: Colors.blue, fontWeight: FontWeight.bold),
+                                        )
+                                      : null,
+                                );
+                              },
                             ),
                             title: Text(member.fullName),
                             subtitle: Text(member.position, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
@@ -319,18 +329,19 @@ class _CardAssigneePickerState extends State<CardAssigneePicker> {
               _selectedAssignees.length > 3 ? 3 : _selectedAssignees.length,
               (index) {
                 final assignee = _selectedAssignees[index];
+                final avatarUrl = assignee.resolvedAvatarUrl;
+                final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
                 return Align(
                   widthFactor: 0.7,
                   child: CircleAvatar(
                     radius: 16,
                     backgroundColor: Colors.blue[100],
-                    backgroundImage: assignee.avatarUrl != null && assignee.avatarUrl!.isNotEmpty
-                        ? NetworkImage(assignee.avatarUrl!)
-                        : null,
-                    child: assignee.avatarUrl == null || assignee.avatarUrl!.isEmpty
+                    backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
+                    onBackgroundImageError: hasAvatar ? (error, stack) {} : null,
+                    child: !hasAvatar
                         ? Text(
                             assignee.firstName.isNotEmpty ? assignee.firstName[0] : '?',
-                            style: const TextStyle(fontSize: 12, color: Colors.blue),
+                            style: const TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold),
                           )
                         : null,
                   ),

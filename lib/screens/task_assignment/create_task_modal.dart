@@ -12,15 +12,7 @@ class _CreateTaskModal extends StatefulWidget {
   final List<AppUser> users;
   final List<BrandRecord> brands;
   final List<TaskCategoryRecord> categories;
-  final Function(
-    String,
-    String,
-    List<String>,
-    DateTime,
-    String?,
-    String?,
-    List<String>,
-  )
+  final Function(String, String, List<String>, DateTime, String?, String?)
   onSubmit;
 
   @override
@@ -34,21 +26,7 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
   String _formTitle = '';
   String _formDesc = '';
   DateTime _formDue = DateTime.now().add(const Duration(days: 1));
-  final List<TextEditingController> _subControllers = [];
   bool _formLoading = false;
-
-  void _addSubItem() =>
-      setState(() => _subControllers.add(TextEditingController()));
-  void _removeSubItem(int i) {
-    _subControllers[i].dispose();
-    setState(() => _subControllers.removeAt(i));
-  }
-
-  @override
-  void dispose() {
-    for (final c in _subControllers) c.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -393,101 +371,6 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
             ),
             const SizedBox(height: 16),
 
-            // ── Cards (การ์ดงาน) ──
-            Row(
-              children: [
-                const Icon(
-                  Icons.view_kanban_rounded,
-                  color: workBlue,
-                  size: 16,
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  'การ์ดงาน',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: workText,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _addSubItem,
-                  icon: const Icon(Icons.add_rounded, size: 16),
-                  label: const Text(
-                    '+ เพิ่มการ์ดงาน',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: workBlue,
-                    backgroundColor: const Color(0xFFEFF6FF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ...List.generate(
-              _subControllers.length,
-              (i) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${i + 1}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: workBlue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _subControllers[i],
-                        decoration: _inputDeco(
-                          'ชื่อการ์ดงาน / สิ่งที่ต้องทำ...',
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      onPressed: () => _removeSubItem(i),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: workMuted,
-                        size: 16,
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        padding: const EdgeInsets.all(6),
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             const SizedBox(height: 24),
 
             // ── Submit ──
@@ -526,10 +409,6 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                         }
                         setState(() => _formLoading = true);
                         try {
-                          final subItems = _subControllers
-                              .map((c) => c.text.trim())
-                              .where((s) => s.isNotEmpty)
-                              .toList();
                           await widget.onSubmit(
                             _formTitle,
                             _formDesc,
@@ -537,7 +416,6 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                             _formDue,
                             _formBrand,
                             _formCategory,
-                            subItems,
                           );
                           if (mounted) Navigator.pop(context);
                         } catch (e) {
