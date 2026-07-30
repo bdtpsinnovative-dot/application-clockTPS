@@ -613,7 +613,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     final boardCreatorName = task.assignedByName.isNotEmpty
         ? task.assignedByName
         : 'เพื่อนร่วมงาน';
-    // Multiple assignees mapping
+
     final assignees = isEmployee && currentUser != null
         ? [currentUser]
         : _users.where((u) {
@@ -625,6 +625,17 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     final assigneeCount = task.assigneeIds.isNotEmpty
         ? task.assigneeIds.length
         : assignees.length;
+
+    final primaryAssignee = assignees.isNotEmpty ? assignees.first : null;
+    final avatarUrl = primaryAssignee?.avatarUrl;
+    final resolvedAvatar = (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+        ? (avatarUrl.startsWith('r2://')
+            ? avatarUrl.replaceFirst(
+                'r2://',
+                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+              )
+            : avatarUrl)
+        : null;
 
     return GestureDetector(
       onTap: () {
@@ -641,80 +652,44 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: ProjectDetailStyle.surface,
-          borderRadius: BorderRadius.circular(ProjectDetailStyle.cardRadius),
-          border: Border.all(color: ProjectDetailStyle.line),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0C0F172A),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: Tags & Ownership Tag & Actions
+            // 1. Title & Action Menu
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      if (brand != null)
-                        _buildTag(
-                          brand.name,
-                          ProjectDetailStyle.soft,
-                          ProjectDetailStyle.secondary,
-                          ProjectDetailStyle.line,
-                        ),
-                      if (category != null)
-                        _buildTag(
-                          category.name,
-                          ProjectDetailStyle.soft,
-                          ProjectDetailStyle.secondary,
-                          ProjectDetailStyle.line,
-                        ),
-                      // Soft Owner Tag
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: ProjectDetailStyle.soft,
-                          borderRadius: BorderRadius.circular(7),
-                          border: Border.all(color: ProjectDetailStyle.line),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.person_outline_rounded,
-                              size: 11,
-                              color: ProjectDetailStyle.muted,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              isBoardCreator
-                                  ? 'คุณเป็นเจ้าของ'
-                                  : 'บอร์ดของ $boardCreatorName',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: ProjectDetailStyle.secondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    task.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                      color: Color(0xFF0F172A),
+                      height: 1.25,
+                      letterSpacing: -0.3,
+                    ),
                   ),
                 ),
                 if (widget.service.currentUser?.role == 'admin')
                   IconButton(
                     icon: const Icon(
                       Icons.more_horiz,
-                      color: workMuted,
+                      color: Color(0xFF94A3B8),
                       size: 20,
                     ),
                     padding: EdgeInsets.zero,
@@ -724,228 +699,305 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
               ],
             ),
 
-            const SizedBox(height: 10),
-
-            // Title & Description
-            Text(
-              task.title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14.5,
-                color: workText,
-                height: 1.3,
-              ),
-            ),
+            // 2. Subtitle / Description
             if (task.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 task.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 12,
-                  color: workMuted,
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
                   height: 1.45,
                 ),
               ),
             ],
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            Container(
-              padding: const EdgeInsets.all(11),
-              decoration: BoxDecoration(
-                color: ProjectDetailStyle.canvas,
-                borderRadius: BorderRadius.circular(
-                  ProjectDetailStyle.controlRadius,
-                ),
-                border: Border.all(color: ProjectDetailStyle.line),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Text(
-                        'รายการงาน',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: ProjectDetailStyle.secondary,
-                          fontWeight: FontWeight.w700,
-                        ),
+            // 3. Tags Row (Solid Pill + Outlined Pill)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (category != null || brand != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF08A), // Soft neon yellow
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      category?.name ?? brand?.name ?? '',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF422006),
                       ),
-                      const Spacer(),
-                      Text(
-                        '${task.cardDone}/${task.cardTotal} งาน',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: ProjectDetailStyle.ink,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: LinearProgressIndicator(
-                      value: task.cardTotal == 0
-                          ? 0
-                          : task.cardDone / task.cardTotal,
-                      minHeight: 5,
-                      backgroundColor: ProjectDetailStyle.line,
-                      color:
-                          task.cardTotal > 0 && task.cardDone == task.cardTotal
-                          ? ProjectDetailStyle.success
-                          : ProjectDetailStyle.accent,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                // Priority / Status Tag (Outlined Pill)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isOverdue ? const Color(0xFFFCA5A5) : const Color(0xFFCBD5E1),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Text(
+                    isOverdue ? 'เกินกำหนดส่ง' : 'ความสำคัญปกติ',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+                // Soft Owner Tag
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    isBoardCreator ? 'คุณเป็นเจ้าของ' : 'บอร์ดของ $boardCreatorName',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // 4. Meta Information Grid (Clean text + icons, NO nested boxes!)
+            Row(
+              children: [
+                // Due date
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'เปิดโปรเจกต์',
+                      const Text(
+                        'Due date',
                         style: TextStyle(
                           fontSize: 11,
-                          color: ProjectDetailStyle.secondary,
-                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      SizedBox(width: 3),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: ProjectDetailStyle.secondary,
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 15,
+                            color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            DateFormat('MMM dd, yyyy').format(task.dueDate),
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                // Tracked time / Progress
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tracked time',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.hourglass_empty_rounded,
+                            size: 15,
+                            color: Color(0xFF0F172A),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            '${task.cardDone}/${task.cardTotal} งาน',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 20),
 
-            // Footer Row: Assignees Avatar Stack & Due Date
+            // 5. Footer Row: Overlapping Avatar Stack + Name / Count on left, Dark Chevron Circle on right
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Assignees Stack
                 Row(
                   children: [
-                    if (assignees.isEmpty)
-                      const Icon(
-                        Icons.person_outline_rounded,
-                        size: 16,
-                        color: workMuted,
-                      )
-                    else
-                      SizedBox(
-                        height: 24,
-                        width:
-                            24.0 +
-                            (assignees.length > 1
-                                ? (assignees.length > 3
-                                          ? 2
-                                          : assignees.length - 1) *
-                                      12.0
-                                : 0),
-                        child: Stack(
-                          children: List.generate(
-                            assignees.length > 3 ? 3 : assignees.length,
-                            (index) {
-                              final u = assignees[index];
-                              final avatarUrl = u.avatarUrl;
-                              final hasAvatar =
-                                  avatarUrl != null &&
-                                  avatarUrl.trim().isNotEmpty;
-                              final resolvedAvatar = hasAvatar
-                                  ? (avatarUrl.startsWith('r2://')
-                                        ? avatarUrl.replaceFirst(
-                                            'r2://',
-                                            'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-                                          )
-                                        : avatarUrl)
-                                  : null;
-
-                              return Positioned(
-                                left: index * 12.0,
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: ProjectDetailStyle.soft,
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 1.5,
-                                    ),
-                                    image: resolvedAvatar != null
-                                        ? DecorationImage(
-                                            image: NetworkImage(resolvedAvatar),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
-                                  ),
-                                  child: resolvedAvatar == null
-                                      ? Center(
-                                          child: Text(
-                                            u.firstName.isNotEmpty
-                                                ? u.firstName[0].toUpperCase()
-                                                : '?',
-                                            style: const TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: ProjectDetailStyle.accent,
-                                            ),
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    const SizedBox(width: 6),
+                    _buildAssigneeAvatarStack(assignees, assigneeCount),
+                    const SizedBox(width: 10),
                     Text(
-                      assigneeCount == 1 && assignees.isNotEmpty
-                          ? assignees.first.firstName
-                          : (assigneeCount > 1
-                                ? '$assigneeCount คน'
-                                : 'ไม่ระบุ'),
+                      assigneeCount == 0
+                          ? 'ไม่ระบุผู้รับผิดชอบ'
+                          : (assigneeCount == 1 && primaryAssignee != null
+                              ? primaryAssignee.fullName
+                              : '$assigneeCount คน'),
                       style: const TextStyle(
-                        fontSize: 11,
-                        color: workText,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 13.5,
+                        color: Color(0xFF0F172A),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
-                Row(
-                  children: [
-                    Icon(
-                      isOverdue
-                          ? Icons.warning_amber_rounded
-                          : Icons.calendar_month_rounded,
-                      size: 12,
-                      color: isOverdue ? Colors.red : workMuted,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      DateFormat('dd MMM yy').format(task.dueDate),
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: isOverdue ? Colors.red : workMuted,
-                      ),
-                    ),
-                  ],
+                // Circular Action Chevron
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF334155),
+                  ),
                 ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAssigneeAvatarStack(List<AppUser> assignees, int totalCount) {
+    if (assignees.isEmpty || totalCount == 0) {
+      return Container(
+        width: 36,
+        height: 36,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFFF1F5F9),
+        ),
+        child: const Icon(
+          Icons.person_outline_rounded,
+          size: 18,
+          color: Color(0xFF94A3B8),
+        ),
+      );
+    }
+
+    final visible = assignees.take(3).toList();
+    final extraCount = totalCount > 3 ? totalCount - 3 : 0;
+    final totalItems = visible.length + (extraCount > 0 ? 1 : 0);
+
+    return SizedBox(
+      height: 36,
+      width: totalItems == 0 ? 36 : 36.0 + ((totalItems - 1) * 20.0),
+      child: Stack(
+        children: [
+          for (int i = 0; i < visible.length; i++) ...[
+            Positioned(
+              left: i * 20.0,
+              child: _buildAvatarCircle(visible[i]),
+            ),
+          ],
+          if (extraCount > 0)
+            Positioned(
+              left: visible.length * 20.0,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF1E293B),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Center(
+                  child: Text(
+                    '+$extraCount',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarCircle(AppUser u) {
+    final avatarUrl = u.avatarUrl;
+    final resolvedAvatar = (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+        ? (avatarUrl.startsWith('r2://')
+            ? avatarUrl.replaceFirst(
+                'r2://',
+                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+              )
+            : avatarUrl)
+        : null;
+
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFFEFF6FF),
+        border: Border.all(color: Colors.white, width: 2),
+        image: resolvedAvatar != null
+            ? DecorationImage(
+                image: NetworkImage(resolvedAvatar),
+                fit: BoxFit.cover,
+              )
+            : null,
+      ),
+      child: resolvedAvatar == null
+          ? Center(
+              child: Text(
+                u.firstName.isNotEmpty ? u.firstName[0].toUpperCase() : '?',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+            )
+          : null,
     );
   }
 

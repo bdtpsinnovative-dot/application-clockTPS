@@ -103,6 +103,12 @@ class ProjectDetailViewModel extends ChangeNotifier {
     });
   }
 
+  Future<void> updateDeliverableStatus(String deliverableId, String newStatus) {
+    return _mutate('update-status-$deliverableId', () async {
+      await _service.updateTaskList(deliverableId, status: newStatus);
+    });
+  }
+
   Future<void> refreshAfterDetailChange() => load();
 
   Future<void> _mutate(String busyId, Future<void> Function() action) async {

@@ -137,7 +137,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     return Scaffold(
       backgroundColor: ProjectDetailStyle.canvas,
       appBar: AppBar(
-        toolbarHeight: 124,
+        toolbarHeight: 64,
         backgroundColor: ProjectDetailStyle.header,
         surfaceTintColor: ProjectDetailStyle.header,
         foregroundColor: Colors.white,
@@ -147,32 +147,48 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         leading: IconButton(
           tooltip: 'ย้อนกลับ',
           onPressed: () => Navigator.maybePop(context),
-          iconSize: ProjectDetailStyle.iconMedium,
+          iconSize: 18,
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
         titleSpacing: 0,
-        title: _ProjectHeaderTitle(
-          project: widget.project,
-          brandName: widget.brandName,
-          categoryName: widget.categoryName,
-          completed: _viewModel.completedCount,
-          total: _viewModel.totalCount,
-          progress: _viewModel.progress,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              widget.project.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.3,
+              ),
+            ),
+            if (widget.brandName != null || widget.categoryName != null)
+              Text(
+                [if (widget.brandName != null) widget.brandName, if (widget.categoryName != null) widget.categoryName].join(' • '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFDBEAFE),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
         ),
         actions: [
           IconButton(
             tooltip: 'รีโหลดข้อมูล',
             onPressed: _viewModel.isLoading ? null : _refresh,
-            iconSize: ProjectDetailStyle.iconMedium,
+            iconSize: 18,
             visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints(
-              minWidth: ProjectDetailStyle.tapTarget,
-              minHeight: ProjectDetailStyle.tapTarget,
-            ),
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
           ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 4),
         ],
       ),
       floatingActionButton: _canEdit
@@ -183,10 +199,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               tooltip: 'เพิ่มงาน',
               backgroundColor: ProjectDetailStyle.accent,
               foregroundColor: Colors.white,
-              elevation: 1,
+              elevation: 2,
               child: const Icon(
                 Icons.add_rounded,
-                size: ProjectDetailStyle.iconMedium,
+                size: 20,
               ),
             )
           : null,
@@ -197,34 +213,88 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 104),
           children: [
+            // Project Progress Banner Box
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: ProjectDetailStyle.cardShadow,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_rounded,
+                        size: 13,
+                        color: Color(0xFF2563EB),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'กำหนดส่ง: ${DateFormat('dd MMMM yyyy', 'th').format(widget.project.dueDate)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF475569),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${_viewModel.completedCount}/${_viewModel.totalCount} งาน',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: _viewModel.progress,
+                      minHeight: 5,
+                      color: const Color(0xFF2563EB),
+                      backgroundColor: const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
             Row(
               children: [
                 const Expanded(
                   child: Text(
-                    'รายการงาน',
+                    'รายการงานในโปรเจกต์',
                     style: TextStyle(
-                      color: ProjectDetailStyle.ink,
-                      fontSize: 18,
-                      letterSpacing: -0.25,
-                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      fontSize: 16,
+                      letterSpacing: -0.2,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 Text(
                   '${_viewModel.visibleDeliverables.length} รายการ',
                   style: const TextStyle(
-                    color: ProjectDetailStyle.muted,
-                    fontSize: 11,
+                    color: Color(0xFF64748B),
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             _buildSearch(),
             const SizedBox(height: 10),
             _buildStatusFilters(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             _buildDeliverableList(),
           ],
         ),
@@ -358,6 +428,28 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             assigneeCount: _assigneeIdsFor(deliverable).length,
             baseUrl: widget.service.baseUrl,
             onTap: () => _openDeliverable(deliverable),
+            onStatusChanged: _canEdit
+                ? (newStatus) async {
+                    try {
+                      await _viewModel.updateDeliverableStatus(
+                        deliverable.id,
+                        newStatus,
+                      );
+                      widget.onChanged();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('อัปเดตสถานะงานเรียบร้อย'),
+                        ),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('อัปเดตสถานะล้มเหลว: $e')),
+                      );
+                    }
+                  }
+                : null,
           ),
           const SizedBox(height: 10),
         ],
@@ -480,35 +572,32 @@ class _QuietFilter extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(ProjectDetailStyle.controlRadius),
-        child: SizedBox(
-          height: ProjectDetailStyle.tapTarget,
-          child: Center(
-            child: Container(
-              height: ProjectDetailStyle.compactControlHeight,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: selected
-                    ? ProjectDetailStyle.accent
-                    : ProjectDetailStyle.surface,
-                borderRadius: BorderRadius.circular(
-                  ProjectDetailStyle.controlRadius,
-                ),
-                border: Border.all(
-                  color: selected
-                      ? ProjectDetailStyle.accent
-                      : ProjectDetailStyle.line,
-                ),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.white : ProjectDetailStyle.secondary,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF2563EB) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : const Color(0xFF475569),
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.bold : FontWeight.w500,
             ),
           ),
         ),

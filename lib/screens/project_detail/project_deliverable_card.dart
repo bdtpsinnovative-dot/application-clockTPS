@@ -14,6 +14,7 @@ class ProjectDeliverableCard extends StatelessWidget {
     this.assignees = const [],
     this.assigneeCount,
     this.baseUrl = '',
+    this.onStatusChanged,
   });
 
   final TaskListRecord deliverable;
@@ -21,97 +22,319 @@ class ProjectDeliverableCard extends StatelessWidget {
   final List<UserSummary> assignees;
   final int? assigneeCount;
   final String baseUrl;
+  final ValueChanged<String>? onStatusChanged;
+
+  void _showStatusPicker(BuildContext context) {
+    if (onStatusChanged == null) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'เปลี่ยนสถานะงาน',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final option in const [
+                ('ยังไม่เริ่ม', 'pending', Color(0xFFF1F5F9), Color(0xFF475569)),
+                ('กำลังทำ', 'in_progress', Color(0xFFFEF08A), Color(0xFF854D0E)),
+                ('ส่งงานแล้ว', 'in_review', Color(0xFFDBEAFE), Color(0xFF1E40AF)),
+                ('เสร็จแล้ว', 'completed', Color(0xFFDCFCE7), Color(0xFF166534)),
+              ]) ...[
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  tileColor: deliverable.status == option.$2
+                      ? const Color(0xFFF8FAFC)
+                      : Colors.transparent,
+                  leading: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: option.$3,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      option.$1,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: option.$4,
+                      ),
+                    ),
+                  ),
+                  trailing: deliverable.status == option.$2
+                      ? const Icon(Icons.check_rounded, color: Color(0xFF2563EB))
+                      : null,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onStatusChanged!(option.$2);
+                  },
+                ),
+                const SizedBox(height: 4),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final status = deliverableStatusStyle(deliverable.status);
+    final statusColorTuple = deliverableStatusColors(deliverable.status);
     final isOverdue =
         deliverable.status != 'completed' &&
         deliverable.dueDate != null &&
         _dateOnly(deliverable.dueDate!).isBefore(_dateOnly(DateTime.now()));
 
     return Material(
-      color: ProjectDetailStyle.surface,
+      color: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(ProjectDetailStyle.cardRadius),
-        side: const BorderSide(color: ProjectDetailStyle.line),
+        borderRadius: BorderRadius.circular(24),
+        side: const BorderSide(color: Color(0xFFF1F5F9)),
       ),
+      elevation: 0,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(ProjectDetailStyle.cardRadius),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 15, 12, 14),
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0C0F172A),
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  _StatusLabel(style: status),
-                  const SizedBox(width: 10),
-                  PriorityBadge(
-                    priority: deliverable.priority,
-                    isCompact: true,
-                  ),
-                  const Spacer(),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: ProjectDetailStyle.secondary,
-                    size: ProjectDetailStyle.iconMedium,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 11),
+              // 1. Title
               Text(
                 deliverable.name,
                 style: const TextStyle(
-                  color: ProjectDetailStyle.ink,
-                  fontSize: 15.5,
-                  height: 1.35,
-                  letterSpacing: -0.15,
+                  color: Color(0xFF0F172A),
+                  fontSize: 17,
+                  height: 1.25,
+                  letterSpacing: -0.3,
                   fontWeight: FontWeight.w800,
                 ),
               ),
+
+              // 2. Subtitle / Description
               if (deliverable.description.trim().isNotEmpty) ...[
-                const SizedBox(height: 5),
+                const SizedBox(height: 6),
                 Text(
                   deliverable.description,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: ProjectDetailStyle.secondary,
-                    fontSize: 12,
-                    height: 1.5,
+                    color: Color(0xFF64748B),
+                    fontSize: 13,
+                    height: 1.45,
                   ),
                 ),
               ],
-              const SizedBox(height: 14),
+
+              const SizedBox(height: 16),
+
+              // 3. Tags Row (Dynamic Status Pill + Priority Outlined Pill)
               Wrap(
-                spacing: 14,
+                spacing: 8,
                 runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  if (deliverable.dueDate != null)
-                    _Meta(
-                      icon: isOverdue
-                          ? Icons.error_outline_rounded
-                          : Icons.calendar_today_outlined,
-                      label: DateFormat(
-                        'dd MMM yyyy',
-                        'th',
-                      ).format(deliverable.dueDate!),
-                      color: isOverdue
-                          ? ProjectDetailStyle.danger
-                          : ProjectDetailStyle.secondary,
+                  // Interactive Status Pill
+                  GestureDetector(
+                    onTap: onStatusChanged != null ? () => _showStatusPicker(context) : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColorTuple.$1,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            status.label,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: statusColorTuple.$2,
+                            ),
+                          ),
+                          if (onStatusChanged != null) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 14,
+                              color: statusColorTuple.$2,
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
+                  ),
+                  // Priority Outlined Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFFCA5A5),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Text(
+                      deliverablePriorityLabel(deliverable.priority),
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // 4. Meta Information Grid (Clean un-nested text with icons!)
+              Row(
+                children: [
+                  // Due Date
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Due date',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 15,
+                              color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                            ),
+                            const SizedBox(width: 7),
+                            Text(
+                              deliverable.dueDate != null
+                                  ? DateFormat('MMM dd, yyyy').format(deliverable.dueDate!)
+                                  : 'ไม่ระบุ',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Files / Links count (Formerly Tracked time)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'ไฟล์/ลิงก์',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.attach_file_rounded,
+                              size: 15,
+                              color: Color(0xFF0F172A),
+                            ),
+                            const SizedBox(width: 7),
+                            Text(
+                              deliverable.attachments.isNotEmpty
+                                  ? '${deliverable.attachments.length} รายการ'
+                                  : '0 รายการ',
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // 5. Footer Row: Assignee & Action Chevron
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   _AssigneeSummary(
                     assignees: assignees,
                     count: assigneeCount ?? deliverable.assigneeIds.length,
                     baseUrl: baseUrl,
                   ),
-                  if (deliverable.attachments.isNotEmpty)
-                    _Meta(
-                      icon: Icons.attach_file_rounded,
-                      label: '${deliverable.attachments.length} รายการ',
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
                     ),
+                    child: const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -136,35 +359,65 @@ class _AssigneeSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visible = assignees.take(3).toList(growable: false);
+    final extraCount = count > 3 ? count - 3 : 0;
+    final totalItems = visible.length + (extraCount > 0 ? 1 : 0);
+    final firstName = assignees.isNotEmpty ? assignees.first.fullName : 'ไม่ระบุ';
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (count > 0) ...[
           SizedBox(
-            width: visible.isEmpty ? 20 : 20 + ((visible.length - 1) * 14),
-            height: 20,
+            width: totalItems == 0 ? 36 : 36.0 + ((totalItems - 1) * 22.0),
+            height: 36,
             child: Stack(
               children: [
                 if (visible.isEmpty)
                   const _AssigneeAvatar(user: null, left: 0, baseUrl: '')
-                else
+                else ...[
                   for (final entry in visible.indexed)
                     _AssigneeAvatar(
                       user: entry.$2,
-                      left: entry.$1 * 14,
+                      left: entry.$1 * 22.0,
                       baseUrl: baseUrl,
                     ),
+                  if (extraCount > 0)
+                    Positioned(
+                      left: visible.length * 22.0,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF1E293B),
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '+$extraCount',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 10),
         ],
         Text(
-          count == 0 ? 'ยังไม่ระบุ' : '$count คน',
+          count == 0
+              ? 'ยังไม่ระบุ'
+              : (count == 1 ? firstName : '$count คน'),
           style: const TextStyle(
-            color: ProjectDetailStyle.secondary,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -193,24 +446,24 @@ class _AssigneeAvatar extends StatelessWidget {
     return Positioned(
       left: left,
       child: Container(
-        width: 20,
-        height: 20,
-        padding: const EdgeInsets.all(1.5),
+        width: 36,
+        height: 36,
+        padding: const EdgeInsets.all(2),
         decoration: const BoxDecoration(
-          color: ProjectDetailStyle.surface,
+          color: Colors.white,
           shape: BoxShape.circle,
         ),
         child: CircleAvatar(
-          backgroundColor: ProjectDetailStyle.accentSoft,
+          backgroundColor: const Color(0xFFEFF6FF),
           backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
           onBackgroundImageError: hasAvatar ? (error, stack) {} : null,
           child: !hasAvatar
               ? Text(
                   initial,
                   style: const TextStyle(
-                    color: ProjectDetailStyle.accent,
-                    fontSize: 7.5,
-                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2563EB),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
                   ),
                 )
               : null,
@@ -309,6 +562,19 @@ DeliverableStatusStyle deliverableStatusStyle(String status) {
         'กำลังทำ',
         ProjectDetailStyle.secondary,
       );
+  }
+}
+
+(Color, Color) deliverableStatusColors(String status) {
+  switch (status) {
+    case 'completed':
+      return (const Color(0xFFDCFCE7), const Color(0xFF166534));
+    case 'in_review':
+      return (const Color(0xFFDBEAFE), const Color(0xFF1E40AF));
+    case 'pending':
+      return (const Color(0xFFF1F5F9), const Color(0xFF475569));
+    default:
+      return (const Color(0xFFFEF08A), const Color(0xFF854D0E));
   }
 }
 

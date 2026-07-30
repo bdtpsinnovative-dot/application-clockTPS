@@ -26,12 +26,22 @@ abstract final class ProjectDetailStyle {
   static const danger = Color(0xFFDC2626);
   static const dangerSoft = Color(0xFFFEF2F2);
 
-  static const cardRadius = 14.0;
-  static const controlRadius = 10.0;
+  static const cardRadius = 16.0;
+  static const controlRadius = 12.0;
+  static const pillRadius = 24.0;
   static const tapTarget = 44.0;
   static const compactControlHeight = 32.0;
   static const actionHeight = 44.0;
   static const iconTiny = 13.0;
   static const iconSmall = 16.0;
   static const iconMedium = 18.0;
+
+  static const cardShadow = [
+    BoxShadow(
+      color: Color(0x0A0F172A),
+      blurRadius: 12,
+      offset: Offset(0, 4),
+    ),
+  ];
 }
+
