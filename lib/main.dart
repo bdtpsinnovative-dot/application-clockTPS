@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:camera_android/camera_android.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import 'config/app_config.dart';
 import 'screens/auth_gate.dart';
@@ -52,6 +53,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Clock in TPS',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [quill.FlutterQuillLocalizations.delegate],
       theme: ThemeData(
         colorScheme: colorScheme,
         scaffoldBackgroundColor: Colors.white,
@@ -65,7 +67,10 @@ class MyApp extends StatelessWidget {
           filled: true,
           fillColor: const Color(0xFFF5F7FA),
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,

@@ -105,8 +105,11 @@ class _LoginPageState extends State<LoginPage> {
         value.contains('socket') ||
         value.contains('connection') ||
         value.contains('failed host lookup') ||
-        value.contains('clientexception')) {
-      return 'อินเทอร์เน็ตมีปัญหา กรุณาตรวจสัญญาณแล้วลองอีกครั้ง';
+        value.contains('clientexception') ||
+        value.contains('os error') ||
+        value.contains('operation not permitted') ||
+        value.contains('errno')) {
+      return 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสัญญาณหรือ URL แล้วลองอีกครั้ง';
     }
     return 'ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง';
   }

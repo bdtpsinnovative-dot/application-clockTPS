@@ -5,6 +5,7 @@ class AppUser {
     required this.email,
     required this.firstName,
     required this.lastName,
+    this.nickname = '',
     required this.department,
     required this.position,
     required this.role,
@@ -20,6 +21,7 @@ class AppUser {
       email: json['email'] as String? ?? '',
       firstName: json['first_name'] as String? ?? '',
       lastName: json['last_name'] as String? ?? '',
+      nickname: json['nickname'] as String? ?? '',
       department: json['department'] as String? ?? '',
       position: json['position'] as String? ?? '',
       role: json['role'] as String? ?? 'employee',
@@ -34,6 +36,7 @@ class AppUser {
   final String email;
   final String firstName;
   final String lastName;
+  final String nickname;
   final String department;
   final String position;
   final String role;
@@ -44,11 +47,16 @@ class AppUser {
   bool get isProfileComplete =>
       firstName.trim().isNotEmpty &&
       lastName.trim().isNotEmpty &&
+      nickname.trim().isNotEmpty &&
       (avatarUrl?.trim().isNotEmpty ?? false) &&
       hasFaceEmbedding;
 
   String get fullName {
-    final value = '$firstName $lastName'.trim();
-    return value.isEmpty ? email : value;
+    final name = '$firstName $lastName'.trim();
+    if (name.isEmpty) return email;
+    if (nickname.trim().isNotEmpty) {
+      return '$name ($nickname)';
+    }
+    return name;
   }
 }

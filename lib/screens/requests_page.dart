@@ -8,7 +8,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
-import '../widgets/work_ui.dart';
+import 'package:hr_management/widgets/work_ui.dart';
+import 'package:hr_management/widgets/skeleton_loading.dart';
 
 class RequestsPage extends StatefulWidget {
   const RequestsPage({
@@ -169,8 +170,8 @@ class _RequestsPageState extends State<RequestsPage> {
                       title: 'ประวัติคำขอของฉัน',
                     ),
                     const SizedBox(height: 12),
-                    if (_loading)
-                      const LinearProgressIndicator(minHeight: 3)
+                    if (_loading && _requests.isEmpty)
+                      const RequestListSkeleton()
                     else if (_error != null)
                       _RequestEmpty(
                         icon: Icons.cloud_off_rounded,

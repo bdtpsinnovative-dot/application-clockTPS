@@ -9,33 +9,6 @@ import 'package:path_provider/path_provider.dart';
 
 import '../services/face_ml_service.dart';
 
-/// Data class to pass camera image data across isolate boundary.
-class _CropFaceParams {
-  final List<Uint8List> planeBytes;
-  final List<int> planeBytesPerRow;
-  final List<int?> planeBytesPerPixel;
-  final int imageWidth;
-  final int imageHeight;
-  final double boxLeft;
-  final double boxTop;
-  final double boxWidth;
-  final double boxHeight;
-  final int sensorOrientation;
-
-  _CropFaceParams({
-    required this.planeBytes,
-    required this.planeBytesPerRow,
-    required this.planeBytesPerPixel,
-    required this.imageWidth,
-    required this.imageHeight,
-    required this.boxLeft,
-    required this.boxTop,
-    required this.boxWidth,
-    required this.boxHeight,
-    required this.sensorOrientation,
-  });
-}
-
 /// Top-level function for running heavy image processing in an isolate.
 img.Image _cropFaceInIsolate(_CropFaceParams params) {
   // 1) Convert camera bytes to RGB
@@ -109,7 +82,40 @@ img.Image _cropFaceInIsolate(_CropFaceParams params) {
     cropped = img.copyRotate(cropped, angle: params.sensorOrientation);
   }
 
+  // 4) Flip horizontal if front camera to avoid mirrored final image
+  if (params.isFrontCamera) {
+    cropped = img.flipHorizontal(cropped);
+  }
+
   return cropped;
+}
+
+class _CropFaceParams {
+  final List<Uint8List> planeBytes;
+  final List<int> planeBytesPerRow;
+  final List<int?> planeBytesPerPixel;
+  final int imageWidth;
+  final int imageHeight;
+  final double boxLeft;
+  final double boxTop;
+  final double boxWidth;
+  final double boxHeight;
+  final num sensorOrientation;
+  final bool isFrontCamera;
+
+  _CropFaceParams({
+    required this.planeBytes,
+    required this.planeBytesPerRow,
+    required this.planeBytesPerPixel,
+    required this.imageWidth,
+    required this.imageHeight,
+    required this.boxLeft,
+    required this.boxTop,
+    required this.boxWidth,
+    required this.boxHeight,
+    required this.sensorOrientation,
+    required this.isFrontCamera,
+  });
 }
 
 class FaceScannerResult {
@@ -403,6 +409,7 @@ class _FaceScannerPageState extends State<FaceScannerPage> {
       boxHeight: box.height,
       sensorOrientation:
           _cameraController?.description.sensorOrientation ?? 0,
+      isFrontCamera: _cameraController?.description.lensDirection == CameraLensDirection.front,
     );
     return compute(_cropFaceInIsolate, params);
   }

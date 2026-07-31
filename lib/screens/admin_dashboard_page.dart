@@ -4,6 +4,7 @@ import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/skeleton_loading.dart';
 import '../widgets/app_loading_view.dart';
 import '../services/fcm_service.dart';
 import 'admin_users_page.dart';
@@ -151,7 +152,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (_loading) {
         return const Scaffold(
           backgroundColor: workBackground,
-          body: AppLoadingView(message: 'กำลังโหลดข้อมูลแอดมิน...'),
+          body: DashboardSkeleton(),
         );
       }
 

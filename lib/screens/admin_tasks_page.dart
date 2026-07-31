@@ -4,38 +4,19 @@ import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/app_user.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/work_ui.dart';
-import 'package:hr_management/widgets/app_loading_view.dart';
-import 'package:hr_management/screens/subtask_board_page.dart';
+import 'package:hr_management/widgets/skeleton_loading.dart';
+import 'package:hr_management/widgets/work_due_date_picker.dart';
+import 'package:hr_management/screens/project_detail/project_detail_page.dart';
+import 'package:hr_management/screens/project_detail/project_detail_style.dart';
+import 'task_assignment/task_assignment_domain.dart';
+import 'task_assignment/task_assignment_view_model.dart';
 
-// ─── Status config ───────────────────────────────────────────────
-const _statusConfig = {
-  'pending': _StatusMeta(
-    'รอทำ',
-    Color(0xFF64748B),
-    Color(0xFFF1F5F9),
-    Color(0xFFCBD5E1),
-  ),
-  'in_progress': _StatusMeta(
-    'กำลังทำ',
-    Color(0xFFEA580C),
-    Color(0xFFFFF7ED),
-    Color(0xFFFED7AA),
-  ),
-  'completed': _StatusMeta(
-    'เสร็จสิ้น',
-    Color(0xFF16A34A),
-    Color(0xFFF0FDF4),
-    Color(0xFFBBF7D0),
-  ),
-};
+export 'task_assignment/task_assignment_domain.dart';
 
-class _StatusMeta {
-  const _StatusMeta(this.label, this.color, this.bg, this.border);
-  final String label;
-  final Color color;
-  final Color bg;
-  final Color border;
-}
+part 'task_assignment/create_task_modal.dart';
+part 'task_assignment/edit_task_modal.dart';
+part 'task_assignment/task_detail_sheet.dart';
+part 'task_assignment/filter_bottom_sheet.dart';
 
 class AdminTasksPage extends StatefulWidget {
   const AdminTasksPage({super.key, required this.service});
@@ -47,149 +28,48 @@ class AdminTasksPage extends StatefulWidget {
 }
 
 class _AdminTasksPageState extends State<AdminTasksPage> {
-  List<TaskRecord> _tasks = [];
-  List<AppUser> _users = [];
-  List<BrandRecord> _brands = [];
-  List<TaskCategoryRecord> _categories = [];
-  Map<String, AppUser> _userMap = {};
-  Map<String, BrandRecord> _brandMap = {};
-  Map<String, TaskCategoryRecord> _catMap = {};
-  int _selectedTabIndex = 0; // 0: งานที่เราสร้าง, 1: งานที่เข้าร่วม
-  bool _loading = true;
-  String? _error;
+  late final TaskAssignmentViewModel _viewModel;
+  final TextEditingController _searchController = TextEditingController();
+
+  List<TaskRecord> get _tasks => _viewModel.tasks;
+  List<AppUser> get _users => _viewModel.users;
+  List<BrandRecord> get _brands => _viewModel.brands;
+  List<TaskCategoryRecord> get _categories => _viewModel.categories;
+  Map<String, BrandRecord> get _brandMap => _viewModel.brandMap;
+  Map<String, TaskCategoryRecord> get _catMap => _viewModel.categoryMap;
+  bool get _loading => _viewModel.isLoading;
+  String? get _error => _viewModel.error;
+  String get _searchQuery => _viewModel.searchQuery;
+  String? get _selectedBrandId => _viewModel.selectedBrandId;
+  String? get _selectedCategoryId => _viewModel.selectedCategoryId;
+  String? get _selectedOwnership => _viewModel.selectedOwnership;
 
   @override
   void initState() {
     super.initState();
+    _viewModel = TaskAssignmentViewModel(service: widget.service)
+      ..addListener(_onViewModelChanged);
     _loadData();
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final isEmployee = widget.service.currentUser?.role == 'employee';
-
-      final tasksFuture = isEmployee
-          ? widget.service.getMyTasks()
-          : widget.service.getAdminTasks();
-      final usersFuture =
-          (isEmployee
-                  ? widget.service.getActiveUsers()
-                  : widget.service.getAdminUsers())
-              .catchError((_) => <AppUser>[]);
-      final brandsFuture = widget.service.getBrands().catchError(
-        (_) => <BrandRecord>[],
-      );
-      final catsFuture = widget.service.getTaskCategories().catchError(
-        (_) => <TaskCategoryRecord>[],
-      );
-
-      final results = await Future.wait([
-        tasksFuture,
-        usersFuture,
-        brandsFuture,
-        catsFuture,
-      ]);
-
-      final tasks = results[0] as List<TaskRecord>;
-      final users = (results[1] as List<AppUser>)
-          .where((u) => u.status == 'active')
-          .toList();
-      final brands = results[2] as List<BrandRecord>;
-      final cats = results[3] as List<TaskCategoryRecord>;
-
-      final Map<String, AppUser> userMap = {for (final u in users) u.id: u};
-      final Map<String, BrandRecord> brandMap = {
-        for (final b in brands) b.id: b,
-      };
-      final Map<String, TaskCategoryRecord> catMap = {
-        for (final c in cats) c.id: c,
-      };
-
-      if (mounted) {
-        setState(() {
-          _tasks = tasks;
-          _users = users;
-          _brands = brands;
-          _categories = cats;
-          _userMap = userMap;
-          _brandMap = brandMap;
-          _catMap = catMap;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted)
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-    }
+  @override
+  void dispose() {
+    _viewModel
+      ..removeListener(_onViewModelChanged)
+      ..dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
-  // ─── Delete task ────────────────────────────────────────────────
-  Future<void> _deleteTask(TaskRecord task) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('ยืนยันการลบงาน'),
-        content: Text('ต้องการลบงาน "${task.title}" หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('ลบงาน'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted || confirm != true) return;
-    try {
-      await widget.service.deleteTask(task.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ลบงานสำเร็จ'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadData();
-      }
-    } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ลบงานล้มเหลว: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-    }
+  void _onViewModelChanged() {
+    if (mounted) setState(() {});
   }
 
-  // ─── Change status ──────────────────────────────────────────────
-  Future<void> _changeStatus(TaskRecord task, String newStatus) async {
-    try {
-      await widget.service.updateTaskStatus(task.id, newStatus);
-      if (mounted) _loadData();
-    } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('เปลี่ยนสถานะล้มเหลว: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-    }
+  Future<void> _loadData() {
+    return _viewModel.loadData();
   }
 
-  void _showTaskDetails(TaskRecord task) {
+  void _showTaskDetailSheet(TaskRecord task) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -197,26 +77,105 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => FractionallySizedBox(
-        heightFactor: 0.92,
-        child: _TaskDetailSheet(
-          task: task,
-          service: widget.service,
-          userMap: _userMap,
-          brandMap: _brandMap,
-          catMap: _catMap,
-          statusConfig: _statusConfig,
-          onChangeStatus: (status) async {
-            await _changeStatus(task, status);
-            if (mounted) Navigator.pop(context);
-          },
-          onDelete: () async {
+      builder: (_) => _TaskDetailSheet(
+        task: task,
+        userMap: {for (var u in _users) u.id: u},
+        brandMap: _brandMap,
+        catMap: _catMap,
+        statusConfig: taskStatusConfig,
+        onEdit: () => _showEditTaskModal(task),
+        onChangeStatus: (status) async {
+          try {
+            await widget.service.updateTaskStatus(task.id, status);
+            if (!mounted) return;
+            _loadData();
             Navigator.pop(context);
-            await _deleteTask(task);
-          },
-        ),
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('เปลี่ยนสถานะล้มเหลว: $e')));
+          }
+        },
+        onDelete: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('ยืนยันการลบงาน'),
+              content: Text('ต้องการลบงาน “${task.title}” หรือไม่?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('ยกเลิก'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('ลบงาน'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
+          try {
+            await widget.service.deleteTask(task.id);
+            if (!mounted) return;
+            _loadData();
+            Navigator.pop(context);
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('ลบงานล้มเหลว: $e')));
+          }
+        },
       ),
     );
+  }
+
+  Future<void> _showEditTaskModal(TaskRecord task) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _EditTaskModal(
+        task: task,
+        users: _users,
+        onSave:
+            ({
+              required title,
+              required description,
+              required assigneeIds,
+              required dueDate,
+            }) async {
+              await widget.service.updateTask(
+                id: task.id,
+                title: title,
+                description: description,
+                assigneeIds: assigneeIds,
+                dueDate: dueDate,
+                brandId: task.brandId,
+                categoryId: task.categoryId,
+              );
+            },
+      ),
+    );
+    if (saved == true && mounted) {
+      Navigator.of(context).pop();
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('แก้ไขงานสำเร็จ'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      }
+    }
   }
 
   // ─── Create task modal sheet (โมดูล) ──────────────────────────────
@@ -232,23 +191,118 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         users: _users,
         brands: _brands,
         categories: _categories,
-        onSubmit:
-            (title, desc, assignees, due, brand, category, cardNames) async {
-              final validCards = cardNames
-                  .where((n) => n.trim().isNotEmpty)
-                  .toList();
-              await widget.service.createTask(
-                title: title,
-                description: desc,
-                assignedTo: assignees.isNotEmpty ? assignees.first : '',
-                brandId: brand,
-                categoryId: category,
-                dueDate: due,
-                assigneeIds: assignees,
-                subItems: validCards,
-              );
-              _loadData();
-            },
+        onSubmit: (title, desc, assignees, due, brand, category) async {
+          await widget.service.createTask(
+            title: title,
+            description: desc,
+            assignedTo: assignees.isNotEmpty ? assignees.first : '',
+            brandId: brand,
+            categoryId: category,
+            dueDate: due,
+            assigneeIds: assignees,
+            // Every new project starts with one deliverable using the
+            // entered work title. Legacy task cards are no longer created.
+            listNames: [title.trim()],
+          );
+          _loadData();
+        },
+      ),
+    );
+  }
+
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _FilterBottomSheetContent(
+        brands: _brands,
+        categories: _categories,
+        initialBrandId: _selectedBrandId,
+        initialCategoryId: _selectedCategoryId,
+        onApply: _viewModel.applySheetFilters,
+      ),
+    );
+  }
+
+  void _clearAllFilters() {
+    _viewModel.clearFilters();
+    _searchController.clear();
+  }
+
+  Widget _buildCategoryChip(String? id, String name) {
+    final isSelected = _selectedCategoryId == id;
+    return GestureDetector(
+      onTap: () => _viewModel.setCategory(id),
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? workBlue : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? workBlue : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(
+                color: workBlue.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+          ],
+        ),
+        child: Text(
+          name,
+          style: TextStyle(
+            color: isSelected ? Colors.white : workText,
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOwnershipOption({
+    required String label,
+    required String? value,
+  }) {
+    final isSelected = _selectedOwnership == value;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _viewModel.setOwnership(value),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected
+                ? const [
+                    BoxShadow(
+                      color: Color(0x0C0F172A),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isSelected ? workBlue : workMuted,
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -256,7 +310,18 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   // ─── Build ──────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const AppLoadingView(message: 'กำลังโหลดข้อมูลงาน...');
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: workBackground,
+        appBar: AppBar(
+          title: const Text(
+            'รายการมอบหมายงาน',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ),
+        body: const AssignmentListSkeleton(),
+      );
+    }
     if (_error != null) {
       return Center(
         child: Column(
@@ -278,15 +343,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       );
     }
 
-    final currentUserId = widget.service.currentUserId;
-    final createdTasks = _tasks.where((t) {
-      if (t.assignedBy != null && t.assignedBy!.isNotEmpty) {
-        return t.assignedBy == currentUserId;
-      }
-      return t.assignedTo == currentUserId;
-    }).toList();
-    final joinedTasks = _tasks.where((t) => !createdTasks.contains(t)).toList();
-    final activeList = _selectedTabIndex == 0 ? createdTasks : joinedTasks;
+    final filteredTasks = _viewModel.filteredTasks;
+    final hasSheetFilters = _viewModel.hasSheetFilters;
 
     return Scaffold(
       backgroundColor: workBackground,
@@ -296,11 +354,12 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         actions: [
-          IconButton(
-            onPressed: _showCreateTaskModal,
-            icon: const Icon(Icons.add_task_rounded, color: workBlue),
-            tooltip: 'สร้างงานใหม่',
-          ),
+          if (widget.service.currentUser?.role != 'employee')
+            IconButton(
+              onPressed: _showCreateTaskModal,
+              icon: const Icon(Icons.add_task_rounded, color: workBlue),
+              tooltip: 'มอบหมายงานใหม่',
+            ),
           IconButton(
             onPressed: _loadData,
             icon: const Icon(Icons.refresh_rounded, color: workMuted),
@@ -310,154 +369,222 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       ),
       body: Column(
         children: [
-          // ── Tab Bar Toggle ──
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE2E8F0),
-              borderRadius: BorderRadius.circular(14),
+          if (_tasks.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    _buildOwnershipOption(label: 'ทั้งหมด', value: null),
+                    _buildOwnershipOption(
+                      label: 'งานที่ฉันสร้าง',
+                      value: 'created_by_me',
+                    ),
+                    _buildOwnershipOption(
+                      label: 'งานที่ถูกเพิ่มเข้า',
+                      value: 'joined',
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = 0),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
                       decoration: BoxDecoration(
-                        color: _selectedTabIndex == 0
-                            ? Colors.white
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: _selectedTabIndex == 0
-                            ? const [
-                                BoxShadow(
-                                  color: Color(0x10000000),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.edit_note_rounded,
-                            size: 18,
-                            color: _selectedTabIndex == 0
-                                ? workBlue
-                                : workMuted,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'สร้างเอง (${createdTasks.length})',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: _selectedTabIndex == 0
-                                  ? FontWeight.bold
-                                  : FontWeight.w500,
-                              color: _selectedTabIndex == 0
-                                  ? workText
-                                  : workMuted,
-                            ),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _searchQuery.isNotEmpty
+                              ? workBlue.withValues(alpha: 0.5)
+                              : const Color(0xFFE2E8F0),
+                          width: _searchQuery.isNotEmpty ? 1.5 : 1,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x05000000),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
                           ),
                         ],
                       ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _viewModel.setSearchQuery,
+                        style: const TextStyle(fontSize: 13.5, color: workText),
+                        decoration: InputDecoration(
+                          hintText: 'ค้นหาบอร์ดงาน...',
+                          hintStyle: const TextStyle(
+                            color: workMuted,
+                            fontSize: 13,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: workMuted,
+                            size: 20,
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    color: workMuted,
+                                    size: 18,
+                                  ),
+                                  onPressed: () {
+                                    _viewModel.setSearchQuery('');
+                                    _searchController.clear();
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = 1),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _selectedTabIndex == 1
-                            ? Colors.white
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: _selectedTabIndex == 1
-                            ? const [
-                                BoxShadow(
-                                  color: Color(0x10000000),
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.group_rounded,
-                            size: 18,
-                            color: _selectedTabIndex == 1
-                                ? workBlue
-                                : workMuted,
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: _showFilterBottomSheet,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: hasSheetFilters
+                                ? workBlue.withValues(alpha: 0.1)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: hasSheetFilters
+                                  ? workBlue
+                                  : const Color(0xFFE2E8F0),
+                              width: 1,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x05000000),
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'เข้าร่วม (${joinedTasks.length})',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: _selectedTabIndex == 1
-                                  ? FontWeight.bold
-                                  : FontWeight.w500,
-                              color: _selectedTabIndex == 1
-                                  ? workText
-                                  : workMuted,
+                          child: Icon(
+                            Icons.tune_rounded,
+                            color: hasSheetFilters ? workBlue : workText,
+                            size: 20,
+                          ),
+                        ),
+                        if (hasSheetFilters)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: const BoxDecoration(
+                                color: workBlue,
+                                shape: BoxShape.circle,
+                              ),
                             ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Row(
+                children: [
+                  _buildCategoryChip(null, 'ทั้งหมด'),
+                  ..._categories.map((c) => _buildCategoryChip(c.id, c.name)),
+                ],
+              ),
+            ),
+          ],
           Expanded(
             child: RefreshIndicator(
               onRefresh: _loadData,
-              child: activeList.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _selectedTabIndex == 0
-                                ? Icons.note_add_outlined
-                                : Icons.group_off_outlined,
-                            size: 40,
-                            color: workMuted,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _selectedTabIndex == 0
-                                ? 'ยังไม่มีงานที่คุณสร้าง'
-                                : 'ยังไม่มีงานที่เข้าร่วม',
-                            style: const TextStyle(
-                              color: workMuted,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
+              child: _tasks.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'ยังไม่มีงานมอบหมายในตอนนี้',
+                        style: TextStyle(color: workMuted, fontSize: 13),
                       ),
+                    )
+                  : filteredTasks.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.2,
+                        ),
+                        Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.filter_list_off_rounded,
+                                size: 48,
+                                color: workMuted.withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'ไม่พบบอร์ดงานที่ตรงตามตัวกรอง',
+                                style: TextStyle(
+                                  color: workMuted,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              OutlinedButton(
+                                onPressed: _clearAllFilters,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: workBlue,
+                                  side: const BorderSide(color: workBlue),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'ล้างตัวกรองทั้งหมด',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     )
                   : ListView.separated(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                      itemCount: activeList.length,
+                      itemCount: filteredTasks.length,
                       separatorBuilder: (context, index) =>
                           const SizedBox(height: 12),
                       itemBuilder: (context, index) {
-                        final t = activeList[index];
+                        final t = filteredTasks[index];
                         return _buildDraggableTaskCard(t);
                       },
                     ),
@@ -468,7 +595,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     );
   }
 
-  // ─── Kanban board ───────────────────────────────────────────────
+  // ─── Project list ───────────────────────────────────────────────
 
   Widget _buildDraggableTaskCard(TaskRecord task) {
     return _buildTaskCardContent(task);
@@ -477,55 +604,72 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   Widget _buildTaskCardContent(TaskRecord task) {
     final brand = task.brandId != null ? _brandMap[task.brandId] : null;
     final category = task.categoryId != null ? _catMap[task.categoryId] : null;
-    final isOverdue =
-        task.status != 'completed' && task.dueDate.isBefore(DateTime.now());
-    final currentUserId = widget.service.currentUserId;
-    final isOwner = task.assignedBy != null && task.assignedBy!.isNotEmpty
-        ? task.assignedBy == currentUserId
-        : task.assignedTo == currentUserId;
+    final isOverdue = isAssignmentOverdue(task.dueDate, task.status);
 
-    // Multiple assignees mapping
-    final assignees = _users.where((u) {
-      if (task.assigneeIds.isNotEmpty) {
-        return task.assigneeIds.contains(u.id);
-      }
-      return u.id == task.assignedTo;
-    }).toList();
+    final isEmployee = widget.service.currentUser?.role == 'employee';
+    final currentUser = widget.service.currentUser;
+    final isBoardCreator =
+        currentUser != null && task.assignedBy == currentUser.id;
+    final boardCreatorName = task.assignedByName.isNotEmpty
+        ? task.assignedByName
+        : 'เพื่อนร่วมงาน';
+
+    final assignees = isEmployee && currentUser != null
+        ? [currentUser]
+        : _users.where((u) {
+            if (task.assigneeIds.isNotEmpty) {
+              return task.assigneeIds.contains(u.id);
+            }
+            return u.id == task.assignedTo;
+          }).toList();
+    final assigneeCount = task.assigneeIds.isNotEmpty
+        ? task.assigneeIds.length
+        : assignees.length;
+
+    final primaryAssignee = assignees.isNotEmpty ? assignees.first : null;
+    final avatarUrl = primaryAssignee?.avatarUrl;
+    final resolvedAvatar = (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+        ? (avatarUrl.startsWith('r2://')
+            ? avatarUrl.replaceFirst(
+                'r2://',
+                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+              )
+            : avatarUrl)
+        : null;
 
     return GestureDetector(
-      onLongPress: () => _showTaskDetails(task),
       onTap: () {
-        Navigator.push(
-          context,
+        Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => SubtaskBoardPage(
-              task: task,
+            builder: (context) => ProjectDetailPage(
+              project: task,
               service: widget.service,
-              onRefreshNeeded: _loadData,
+              brandName: brand?.name,
+              categoryName: category?.name,
+              onChanged: _loadData,
             ),
           ),
         );
       },
-
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFFF1F5F9)),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x05000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
+              color: Color(0x0C0F172A),
+              blurRadius: 16,
+              offset: Offset(0, 6),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: Title (Left) + Owner Icon Badge (Top Right)
+            // 1. Title & Action Menu
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -533,310 +677,327 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                   child: Text(
                     task.title,
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: workText,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                      color: Color(0xFF0F172A),
+                      height: 1.25,
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: isOwner
-                      ? 'เจ้าของบอร์ด'
-                      : 'บอร์ดของ ${task.assignedByName?.isNotEmpty == true ? task.assignedByName : "เพื่อนร่วมงาน"}',
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: isOwner
-                          ? const Color(0xFFFEF2F2)
-                          : const Color(0xFFF1F5F9),
-                      shape: BoxShape.circle,
+                if (widget.service.currentUser?.role == 'admin')
+                  IconButton(
+                    icon: const Icon(
+                      Icons.more_horiz,
+                      color: Color(0xFF94A3B8),
+                      size: 20,
                     ),
-                    child: Icon(
-                      isOwner ? Icons.star_rounded : Icons.group_rounded,
-                      size: 14,
-                      color: isOwner
-                          ? const Color(0xFFDC2626)
-                          : const Color(0xFF64748B),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => _showTaskDetailSheet(task),
+                  ),
+              ],
+            ),
+
+            // 2. Subtitle / Description
+            if (task.description.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                task.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                  height: 1.45,
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+
+            // 3. Tags Row (Solid Pill + Outlined Pill)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (category != null || brand != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF08A), // Soft neon yellow
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      category?.name ?? brand?.name ?? '',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF422006),
+                      ),
+                    ),
+                  ),
+                // Priority / Status Tag (Outlined Pill)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isOverdue ? const Color(0xFFFCA5A5) : const Color(0xFFCBD5E1),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Text(
+                    isOverdue ? 'เกินกำหนดส่ง' : 'ความสำคัญปกติ',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+                // Soft Owner Tag
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    isBoardCreator ? 'คุณเป็นเจ้าของ' : 'บอร์ดของ $boardCreatorName',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
                     ),
                   ),
                 ),
               ],
             ),
 
-            // Description
-            if (task.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                task.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: workMuted),
-              ),
-            ],
+            const SizedBox(height: 20),
 
-            // Tags row (Brand & Category)
-            if (brand != null || category != null) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  if (brand != null)
-                    _buildTag(
-                      brand.name,
-                      const Color(0xFFEFF6FF),
-                      workBlue,
-                      const Color(0xFFBFDBFE),
-                    ),
-                  if (category != null)
-                    _buildTag(
-                      category.name,
-                      const Color(0xFFFEF3C7),
-                      const Color(0xFFB45309),
-                      const Color(0xFFFDE68A),
-                    ),
-                ],
-              ),
-            ],
-
-            // Progress: การ์ดงาน (Kanban) or รายการย่อย
-            Builder(
-              builder: (context) {
-                // ลำดับความสำคัญ: card progress > sub_items progress
-                if (task.cardTotal > 0) {
-                  final pct = (task.cardDone / task.cardTotal * 100).toInt();
-                  final isAllDone = task.cardDone == task.cardTotal;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.view_kanban_rounded,
-                                size: 12,
-                                color: workMuted,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${task.cardDone}/${task.cardTotal} การ์ด',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: workMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '$pct%',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isAllDone
-                                  ? const Color(0xFF10B981)
-                                  : workBlue,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: task.cardDone / task.cardTotal,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          color: isAllDone ? const Color(0xFF10B981) : workBlue,
-                          minHeight: 4,
-                        ),
-                      ),
-                    ],
-                  );
-                } else if (task.subItems.isNotEmpty) {
-                  final doneCount = task.subItems.where((s) => s.isDone).length;
-                  final totalCount = task.subItems.length;
-                  final pct = (doneCount / totalCount * 100).toInt();
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.checklist_rounded,
-                                size: 12,
-                                color: workMuted,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$doneCount/$totalCount รายการ',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: workMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '$pct%',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: workBlue,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: doneCount / totalCount,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          color: workBlue,
-                          minHeight: 4,
-                        ),
-                      ),
-                    ],
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-
-            const SizedBox(height: 8),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            const SizedBox(height: 8),
-
-            // Footer: assignee list + due date
+            // 4. Meta Information Grid (Clean text + icons, NO nested boxes!)
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Render overlapping avatars for assignees
+                // Due date
                 Expanded(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (assignees.isEmpty) ...[
-                        // fallback: ใช้ข้อมูลจาก task โดยตรง (กรณี _users โหลดไม่ได้)
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFFEFF6FF),
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          child: const Icon(
-                            Icons.person_rounded,
-                            size: 10,
-                            color: workBlue,
-                          ),
+                      const Text(
+                        'Due date',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
                         ),
-                      ] else
-                        SizedBox(
-                          height: 24,
-                          width: 24.0 + (assignees.length - 1) * 12.0,
-                          child: Stack(
-                            children: List.generate(assignees.length, (index) {
-                              final u = assignees[index];
-                              final avatarUrl = u.avatarUrl;
-                              final hasAvatar =
-                                  avatarUrl != null &&
-                                  avatarUrl.trim().isNotEmpty;
-                              final resolvedAvatar = hasAvatar
-                                  ? (avatarUrl.startsWith('r2://')
-                                        ? avatarUrl.replaceFirst(
-                                            'r2://',
-                                            'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-                                          )
-                                        : avatarUrl)
-                                  : null;
-
-                              return Positioned(
-                                left: index * 12.0,
-                                child: Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: const Color(0xFFEFF6FF),
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 1.5,
-                                    ),
-                                    image: resolvedAvatar != null
-                                        ? DecorationImage(
-                                            image: NetworkImage(resolvedAvatar),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
-                                  ),
-                                  child: resolvedAvatar == null
-                                      ? const Icon(
-                                          Icons.person_rounded,
-                                          size: 10,
-                                          color: workBlue,
-                                        )
-                                      : null,
-                                ),
-                              );
-                            }),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 15,
+                            color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
                           ),
-                        ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          assignees.length == 1
-                              ? assignees.first.firstName
-                              : assignees.length > 1
-                              ? '${assignees.length} คน'
-                              // fallback: ดึงชื่อจาก task โดยตรง
-                              : (task.assignedToName.isNotEmpty
-                                    ? task.assignedToName
-                                    : 'ไม่ระบุ'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: workText,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(width: 7),
+                          Text(
+                            DateFormat('MMM dd, yyyy').format(task.dueDate),
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
                 ),
+                // Tracked time / Progress
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tracked time',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.hourglass_empty_rounded,
+                            size: 15,
+                            color: Color(0xFF0F172A),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            '${task.cardDone}/${task.cardTotal} งาน',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // 5. Footer Row: Overlapping Avatar Stack + Name / Count on left, Dark Chevron Circle on right
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
                 Row(
                   children: [
-                    Icon(
-                      isOverdue
-                          ? Icons.warning_amber_rounded
-                          : Icons.calendar_month_rounded,
-                      size: 12,
-                      color: isOverdue ? Colors.red : workMuted,
-                    ),
-                    const SizedBox(width: 3),
+                    _buildAssigneeAvatarStack(assignees, assigneeCount),
+                    const SizedBox(width: 10),
                     Text(
-                      DateFormat('dd MMM yy').format(task.dueDate),
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: isOverdue ? Colors.red : workMuted,
+                      assigneeCount == 0
+                          ? 'ไม่ระบุผู้รับผิดชอบ'
+                          : (assigneeCount == 1 && primaryAssignee != null
+                              ? primaryAssignee.fullName
+                              : '$assigneeCount คน'),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        color: Color(0xFF0F172A),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
+                ),
+                // Circular Action Chevron
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF334155),
+                  ),
                 ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAssigneeAvatarStack(List<AppUser> assignees, int totalCount) {
+    if (assignees.isEmpty || totalCount == 0) {
+      return Container(
+        width: 36,
+        height: 36,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFFF1F5F9),
+        ),
+        child: const Icon(
+          Icons.person_outline_rounded,
+          size: 18,
+          color: Color(0xFF94A3B8),
+        ),
+      );
+    }
+
+    final visible = assignees.take(3).toList();
+    final extraCount = totalCount > 3 ? totalCount - 3 : 0;
+    final totalItems = visible.length + (extraCount > 0 ? 1 : 0);
+
+    return SizedBox(
+      height: 36,
+      width: totalItems == 0 ? 36 : 36.0 + ((totalItems - 1) * 20.0),
+      child: Stack(
+        children: [
+          for (int i = 0; i < visible.length; i++) ...[
+            Positioned(
+              left: i * 20.0,
+              child: _buildAvatarCircle(visible[i]),
+            ),
+          ],
+          if (extraCount > 0)
+            Positioned(
+              left: visible.length * 20.0,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF1E293B),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Center(
+                  child: Text(
+                    '+$extraCount',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarCircle(AppUser u) {
+    final avatarUrl = u.avatarUrl;
+    final resolvedAvatar = (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+        ? (avatarUrl.startsWith('r2://')
+            ? avatarUrl.replaceFirst(
+                'r2://',
+                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+              )
+            : avatarUrl)
+        : null;
+
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFFEFF6FF),
+        border: Border.all(color: Colors.white, width: 2),
+        image: resolvedAvatar != null
+            ? DecorationImage(
+                image: NetworkImage(resolvedAvatar),
+                fit: BoxFit.cover,
+              )
+            : null,
+      ),
+      child: resolvedAvatar == null
+          ? Center(
+              child: Text(
+                u.firstName.isNotEmpty ? u.firstName[0].toUpperCase() : '?',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -845,1447 +1006,12 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(7),
         border: Border.all(color: border),
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
-      ),
-    );
-  }
-}
-
-// ─── Create Task Modal Sheet widget ──────────────────────────────
-class _CreateTaskModal extends StatefulWidget {
-  const _CreateTaskModal({
-    required this.users,
-    required this.brands,
-    required this.categories,
-    required this.onSubmit,
-  });
-
-  final List<AppUser> users;
-  final List<BrandRecord> brands;
-  final List<TaskCategoryRecord> categories;
-  final Function(
-    String,
-    String,
-    List<String>,
-    DateTime,
-    String?,
-    String?,
-    List<String>,
-  )
-  onSubmit;
-
-  @override
-  State<_CreateTaskModal> createState() => _CreateTaskModalState();
-}
-
-class _CreateTaskModalState extends State<_CreateTaskModal> {
-  String? _formBrand;
-  String? _formCategory;
-  final List<String> _formAssignees = [];
-  String _formTitle = '';
-  String _formDesc = '';
-  DateTime _formDue = DateTime.now().add(const Duration(days: 1));
-  final List<TextEditingController> _subControllers = [];
-  bool _formLoading = false;
-
-  void _addSubItem() =>
-      setState(() => _subControllers.add(TextEditingController()));
-  void _removeSubItem(int i) {
-    _subControllers[i].dispose();
-    setState(() => _subControllers.removeAt(i));
-  }
-
-  @override
-  void dispose() {
-    for (final c in _subControllers) c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            Row(
-              children: [
-                const Icon(Icons.add_task_rounded, color: workBlue, size: 22),
-                const SizedBox(width: 8),
-                const Text(
-                  'มอบหมายงานใหม่',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                    color: workText,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: workMuted,
-                    size: 20,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    padding: const EdgeInsets.all(8),
-                    minimumSize: Size.zero,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 24, color: Color(0xFFF1F5F9)),
-
-            // ── Row 1: Brand + Category ──
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDropdown(
-                    label: 'แบรนด์',
-                    icon: Icons.label_outline_rounded,
-                    value: _formBrand,
-                    items: <DropdownMenuItem<String?>>[
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('— ไม่ระบุ —'),
-                      ),
-                      ...widget.brands.map(
-                        (b) => DropdownMenuItem<String?>(
-                          value: b.id,
-                          child: Text(
-                            b.name,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _formBrand = v),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildDropdown(
-                    label: 'หมวดหมู่',
-                    icon: Icons.folder_outlined,
-                    value: _formCategory,
-                    items: <DropdownMenuItem<String?>>[
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('— ไม่ระบุ —'),
-                      ),
-                      ...widget.categories.map(
-                        (c) => DropdownMenuItem<String?>(
-                          value: c.id,
-                          child: Text(
-                            c.name,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _formCategory = v),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // ── Row 2: Multi-assignee Selector Horizontal list with Avatars ──
-            _fieldLabel(
-              'ผู้รับผิดชอบ (เลือกได้มากกว่า 1 คน)',
-              Icons.people_outline_rounded,
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 72,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: widget.users.length,
-                itemBuilder: (context, i) {
-                  final u = widget.users[i];
-                  final isSelected = _formAssignees.contains(u.id);
-                  final resolvedAvatar =
-                      u.avatarUrl != null && u.avatarUrl!.trim().isNotEmpty
-                      ? (u.avatarUrl!.startsWith('r2://')
-                            ? u.avatarUrl!.replaceFirst(
-                                'r2://',
-                                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-                              )
-                            : u.avatarUrl)
-                      : null;
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _formAssignees.remove(u.id);
-                        } else {
-                          _formAssignees.add(u.id);
-                        }
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      margin: const EdgeInsets.only(
-                        right: 10,
-                        top: 2,
-                        bottom: 6,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFFEFF6FF)
-                            : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isSelected
-                              ? workBlue
-                              : const Color(0xFFE2E8F0),
-                          width: isSelected ? 1.5 : 1,
-                        ),
-                        boxShadow: isSelected
-                            ? const [
-                                BoxShadow(
-                                  color: Color(0x0F2563EB),
-                                  blurRadius: 6,
-                                  offset: Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            children: [
-                              CircleAvatar(
-                                backgroundImage: resolvedAvatar != null
-                                    ? NetworkImage(resolvedAvatar)
-                                    : null,
-                                radius: 16,
-                                child: resolvedAvatar == null
-                                    ? Text(
-                                        u.firstName[0],
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                              if (isSelected)
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(1.5),
-                                    decoration: const BoxDecoration(
-                                      color: workBlue,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.check,
-                                      size: 7,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(width: 8),
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                u.fullName,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: workText,
-                                ),
-                              ),
-                              Text(
-                                u.position.isEmpty ? '-' : u.position,
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: workMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 6),
-            // Hint: ถ้าไม่เลือก งานจะถูกมอบหมายให้ตัวเอง
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: const [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    size: 13,
-                    color: Color(0xFF94A3B8),
-                  ),
-                  SizedBox(width: 6),
-                  Text(
-                    'หากไม่เลือก งานจะถูกมอบหมายให้คุณอัตโนมัติ',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF94A3B8),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Row 3: Due date ──
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _fieldLabel('กำหนดส่ง *', Icons.calendar_month_rounded),
-                const SizedBox(height: 4),
-                InkWell(
-                  onTap: () async {
-                    final p = await showDatePicker(
-                      context: context,
-                      initialDate: _formDue,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (p != null) setState(() => _formDue = p);
-                  },
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    height: 52,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            DateFormat('dd MMMM yyyy', 'th').format(_formDue),
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              color: workText,
-                            ),
-                          ),
-                        ),
-                        const Icon(
-                          Icons.calendar_month_rounded,
-                          color: workBlue,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // ── Title ──
-            _fieldLabel('ชื่องาน *', Icons.title_rounded),
-            const SizedBox(height: 4),
-            TextField(
-              decoration: _inputDeco('กรอกชื่องาน / หัวข้อ'),
-              onChanged: (v) => _formTitle = v,
-              style: const TextStyle(fontSize: 13.5),
-            ),
-            const SizedBox(height: 16),
-
-            // ── Description ──
-            _fieldLabel('รายละเอียดงาน', Icons.notes_rounded),
-            const SizedBox(height: 4),
-            TextField(
-              maxLines: 3,
-              decoration: _inputDeco('อธิบายรายละเอียดงาน...'),
-              onChanged: (v) => _formDesc = v,
-              style: const TextStyle(fontSize: 13.5),
-            ),
-            const SizedBox(height: 16),
-
-            // ── Cards (การ์ดงาน) ──
-            Row(
-              children: [
-                const Icon(
-                  Icons.view_kanban_rounded,
-                  color: workBlue,
-                  size: 16,
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  'การ์ดงาน',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: workText,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _addSubItem,
-                  icon: const Icon(Icons.add_rounded, size: 16),
-                  label: const Text(
-                    '+ เพิ่มการ์ดงาน',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: workBlue,
-                    backgroundColor: const Color(0xFFEFF6FF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ...List.generate(
-              _subControllers.length,
-              (i) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${i + 1}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: workBlue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _subControllers[i],
-                        decoration: _inputDeco(
-                          'ชื่อการ์ดงาน / สิ่งที่ต้องทำ...',
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      onPressed: () => _removeSubItem(i),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: workMuted,
-                        size: 16,
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        padding: const EdgeInsets.all(6),
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Submit ──
-            Container(
-              width: double.infinity,
-              height: 52,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [workBlue, workSky],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x3F2563EB),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ElevatedButton(
-                onPressed: _formLoading
-                    ? null
-                    : () async {
-                        if (_formTitle.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('กรุณากรอกชื่องาน')),
-                          );
-                          return;
-                        }
-                        setState(() => _formLoading = true);
-                        try {
-                          final subItems = _subControllers
-                              .map((c) => c.text.trim())
-                              .where((s) => s.isNotEmpty)
-                              .toList();
-                          await widget.onSubmit(
-                            _formTitle,
-                            _formDesc,
-                            _formAssignees,
-                            _formDue,
-                            _formBrand,
-                            _formCategory,
-                            subItems,
-                          );
-                          if (mounted) Navigator.pop(context);
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-                          );
-                        } finally {
-                          if (mounted) setState(() => _formLoading = false);
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: _formLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'มอบหมายงาน',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDropdown<T>({
-    required String label,
-    required IconData icon,
-    required T? value,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _fieldLabel(label, icon),
-        const SizedBox(height: 4),
-        DropdownButtonFormField<T>(
-          value: value,
-          decoration: _inputDeco('').copyWith(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          ),
-          isExpanded: true,
-          items: items,
-          onChanged: onChanged,
-          style: const TextStyle(fontSize: 13.5, color: workText),
-        ),
-      ],
-    );
-  }
-
-  Widget _fieldLabel(String label, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: workBlue),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: workMuted,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
-  InputDecoration _inputDeco(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(fontSize: 13, color: workMuted),
-      filled: true,
-      fillColor: const Color(0xFFF8FAFC),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: workBlue, width: 1.5),
-      ),
-    );
-  }
-}
-
-// ─── Task Detail Bottom Sheet ────────────────────────────────────
-class _TaskDetailSheet extends StatefulWidget {
-  const _TaskDetailSheet({
-    required this.task,
-    required this.service,
-    required this.userMap,
-    required this.brandMap,
-    required this.catMap,
-    required this.statusConfig,
-    required this.onChangeStatus,
-    required this.onDelete,
-  });
-
-  final TaskRecord task;
-  final AuthFlowService service;
-  final Map<String, AppUser> userMap;
-  final Map<String, BrandRecord> brandMap;
-  final Map<String, TaskCategoryRecord> catMap;
-  final Map<String, _StatusMeta> statusConfig;
-  final ValueChanged<String> onChangeStatus;
-  final VoidCallback onDelete;
-
-  @override
-  State<_TaskDetailSheet> createState() => _TaskDetailSheetState();
-}
-
-class _TaskDetailSheetState extends State<_TaskDetailSheet> {
-  final _commentController = TextEditingController();
-  List<TaskEvent> _events = [];
-  List<TaskSubItem> _subItems = [];
-  bool _isLoadingEvents = true;
-  bool _isLoadingSubItems = true;
-  bool _isAddingSubItem = false;
-  bool _isPostingComment = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _subItems = List<TaskSubItem>.from(widget.task.subItems);
-    _loadEvents();
-    _loadSubItems();
-  }
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadEvents() async {
-    try {
-      final events = await widget.service.fetchTaskEvents(widget.task.id);
-      if (mounted) {
-        setState(() {
-          _events = events;
-          _isLoadingEvents = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingEvents = false);
-      }
-    }
-  }
-
-  Future<void> _loadSubItems() async {
-    try {
-      final items = await widget.service.getTaskSubItems(widget.task.id);
-      if (mounted) {
-        setState(() {
-          _subItems = items;
-          _isLoadingSubItems = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingSubItems = false);
-    }
-  }
-
-  Future<void> _addSubItem() async {
-    final controller = TextEditingController();
-    final title = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('เพิ่มงานย่อย'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'ชื่องานย่อย'),
-          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, controller.text.trim()),
-            child: const Text('เพิ่ม'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (title == null || title.isEmpty || !mounted) return;
-
-    setState(() => _isAddingSubItem = true);
-    try {
-      final item = await widget.service.createTaskSubItem(
-        widget.task.id,
-        title,
-      );
-      if (mounted) setState(() => _subItems.add(item));
-    } finally {
-      if (mounted) setState(() => _isAddingSubItem = false);
-    }
-  }
-
-  Future<void> _toggleSubItem(TaskSubItem item) async {
-    final nextStatus = item.isDone ? 'pending' : 'completed';
-    await widget.service.toggleTaskSubItem(item.id, nextStatus);
-    if (!mounted) return;
-
-    setState(() {
-      final index = _subItems.indexWhere((value) => value.id == item.id);
-      if (index != -1) {
-        _subItems[index] = item.copyWith(
-          status: nextStatus,
-          isDone: nextStatus == 'completed',
-        );
-      }
-    });
-  }
-
-  Future<void> _postComment() async {
-    final text = _commentController.text.trim();
-    if (text.isEmpty) return;
-    setState(() => _isPostingComment = true);
-    try {
-      final newEvent = await widget.service.addTaskComment(
-        widget.task.id,
-        text,
-      );
-      if (mounted) {
-        setState(() {
-          _events.add(newEvent);
-          _commentController.clear();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isPostingComment = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final assignees = widget.task.assigneeIds.isNotEmpty
-        ? widget.task.assigneeIds
-              .map((id) => widget.userMap[id])
-              .where((u) => u != null)
-              .cast<AppUser>()
-              .toList()
-        : [
-            widget.userMap[widget.task.assignedTo],
-          ].where((u) => u != null).cast<AppUser>().toList();
-    final assigneesText = assignees.isEmpty
-        ? (widget.task.assignedToName.isNotEmpty
-              ? widget.task.assignedToName
-              : 'ไม่ระบุ')
-        : assignees.map((u) => u.firstName).join(', ');
-    final brand = widget.task.brandId != null
-        ? widget.brandMap[widget.task.brandId]
-        : null;
-    final category = widget.task.categoryId != null
-        ? widget.catMap[widget.task.categoryId]
-        : null;
-    final meta = widget.statusConfig[widget.task.status]!;
-    final isOverdue =
-        widget.task.status != 'completed' &&
-        widget.task.dueDate.isBefore(DateTime.now());
-    const otherStatuses = ['pending', 'in_progress', 'completed'];
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Tags
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                // Status tag
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: meta.bg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: meta.border),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: meta.color,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        meta.label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: meta.color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (brand != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.label_outline_rounded,
-                          size: 12,
-                          color: workBlue,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          brand.name,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: workBlue,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (category != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.folder_outlined,
-                          size: 12,
-                          color: Color(0xFFB45309),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          category.name,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFB45309),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            // Title
-            Text(
-              widget.task.title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: workText,
-              ),
-            ),
-            if (widget.task.description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                widget.task.description,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: workMuted,
-                  height: 1.6,
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-
-            // Assignee + Due date
-            Row(
-              children: [
-                Expanded(
-                  child: _infoCard(
-                    icon: Icons.person_rounded,
-                    label: 'ผู้รับผิดชอบ',
-                    value: assigneesText,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _infoCard(
-                    icon: isOverdue
-                        ? Icons.warning_amber_rounded
-                        : Icons.calendar_month_rounded,
-                    label: 'กำหนดส่ง',
-                    value: DateFormat(
-                      'dd MMMM yyyy',
-                      'th',
-                    ).format(widget.task.dueDate),
-                    valueColor: isOverdue ? Colors.red : workText,
-                    iconColor: isOverdue ? Colors.red : workBlue,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // งานย่อยของ Task (ใช้ข้อมูลชุดเดียวกับหน้า Admin web)
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'งานย่อย',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: workText,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _isAddingSubItem ? null : _addSubItem,
-                  tooltip: 'เพิ่มงานย่อย',
-                  icon: _isAddingSubItem
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(
-                          Icons.add_circle_outline_rounded,
-                          color: workBlue,
-                        ),
-                ),
-              ],
-            ),
-            if (_isLoadingSubItems)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(12),
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else if (_subItems.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'ยังไม่มีงานย่อย',
-                  style: TextStyle(fontSize: 13, color: workMuted),
-                ),
-              )
-            else ...[
-              const SizedBox(height: 8),
-              ..._subItems.map(
-                (item) => InkWell(
-                  onTap: () => _toggleSubItem(item),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 9,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          item.isDone
-                              ? Icons.check_circle_rounded
-                              : Icons.circle_outlined,
-                          color: item.isDone
-                              ? const Color(0xFF22C55E)
-                              : const Color(0xFFCBD5E1),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: item.isDone ? workMuted : workText,
-                              decoration: item.isDone
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // Change status
-            const Text(
-              'เปลี่ยนสถานะ',
-              style: TextStyle(
-                fontSize: 11,
-                color: workMuted,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: otherStatuses.where((s) => s != widget.task.status).map(
-                (s) {
-                  final m = widget.statusConfig[s]!;
-                  return OutlinedButton(
-                    onPressed: () => widget.onChangeStatus(s),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: m.color,
-                      side: BorderSide(color: m.border, width: 1.5),
-                      backgroundColor: m.bg,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                    ),
-                    child: Text(
-                      '→ ${m.label}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  );
-                },
-              ).toList(),
-            ),
-            const SizedBox(height: 20),
-
-            // Timeline & Comments
-            const Divider(color: Color(0xFFF1F5F9)),
-            const SizedBox(height: 12),
-            const Text(
-              'TIMELINE & COMMENTS',
-              style: TextStyle(
-                fontSize: 11,
-                color: workMuted,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            if (_isLoadingEvents)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else if (_events.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Text(
-                    'ยังไม่มีประวัติการพูดคุย',
-                    style: TextStyle(color: workMuted, fontSize: 13),
-                  ),
-                ),
-              )
-            else
-              Container(
-                constraints: const BoxConstraints(maxHeight: 250),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _events.length,
-                  itemBuilder: (context, index) {
-                    final ev = _events[index];
-                    final isSystem = ev.eventType == 'system';
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: isSystem
-                                  ? const Color(0xFFE2E8F0)
-                                  : const Color(0xFFDBEAFE),
-                              shape: BoxShape.circle,
-                            ),
-                            alignment: Alignment.center,
-                            child: isSystem
-                                ? const Icon(
-                                    Icons.smart_toy_rounded,
-                                    size: 14,
-                                    color: Color(0xFF64748B),
-                                  )
-                                : (ev.userAvatarUrl != null
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                          child: Image.network(
-                                            ev.userAvatarUrl!,
-                                            width: 28,
-                                            height: 28,
-                                            fit: BoxFit.cover,
-                                          ),
-                                        )
-                                      : Text(
-                                          ev.userFirstName?.isNotEmpty == true
-                                              ? ev.userFirstName![0]
-                                              : '?',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: workBlue,
-                                          ),
-                                        )),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isSystem ? 0 : 12,
-                                vertical: isSystem ? 4 : 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSystem
-                                    ? Colors.transparent
-                                    : const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        isSystem
-                                            ? 'ระบบ'
-                                            : (ev.userFirstName ?? 'Unknown'),
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: workText,
-                                        ),
-                                      ),
-                                      Text(
-                                        DateFormat(
-                                          'dd MMM HH:mm',
-                                          'th',
-                                        ).format(ev.createdAt),
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: workMuted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    ev.content ?? '',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: isSystem ? workMuted : workText,
-                                      fontStyle: isSystem
-                                          ? FontStyle.italic
-                                          : FontStyle.normal,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-            // Comment Input
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    decoration: InputDecoration(
-                      hintText: 'พิมพ์คอมเมนต์หรืออัปเดตงาน...',
-                      hintStyle: const TextStyle(
-                        fontSize: 13,
-                        color: workMuted,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: workBlue,
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                    style: const TextStyle(fontSize: 13),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _postComment(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: _isPostingComment ? null : _postComment,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: _isPostingComment ? workMuted : workBlue,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.center,
-                    child: _isPostingComment
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.send_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Delete
-            const Divider(color: Color(0xFFF1F5F9)),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: widget.onDelete,
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text(
-                  'ลบงานนี้',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Color(0xFFFECACA)),
-                  backgroundColor: const Color(0xFFFEF2F2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    Color? valueColor,
-    Color? iconColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 13, color: iconColor ?? workBlue),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 11, color: workMuted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: valueColor ?? workText,
-            ),
-          ),
-        ],
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg),
       ),
     );
   }

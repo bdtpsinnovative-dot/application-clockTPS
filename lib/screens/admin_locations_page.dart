@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/skeleton_loading.dart';
 import '../widgets/app_loading_view.dart';
 
 class AdminLocationsPage extends StatefulWidget {
@@ -210,8 +212,11 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
           )
         ],
       ),
-      body: _loading
-          ? const AppLoadingView(message: 'กำลังโหลดข้อมูลสถานที่...')
+      body: _loading && _locations.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: SimpleManagementListSkeleton(),
+            )
           : _error != null
               ? Center(
                   child: Column(

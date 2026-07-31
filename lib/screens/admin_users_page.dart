@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/app_user.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/skeleton_loading.dart';
 import '../widgets/app_loading_view.dart';
 
 class AdminUsersPage extends StatefulWidget {
@@ -222,8 +223,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
           ],
         ),
       ),
-      body: _loading
-          ? const AppLoadingView(message: 'กำลังโหลดข้อมูลพนักงาน...')
+      body: _loading && _allUsers.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: EmployeeListSkeleton(),
+            )
           : _error != null
               ? Center(
                   child: Column(

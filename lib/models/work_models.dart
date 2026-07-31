@@ -97,7 +97,11 @@ class WorkRequestRecord {
         }
       } catch (_) {}
     }
-    return urlStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    return urlStr
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 }
 
@@ -157,12 +161,12 @@ class TaskRecord {
     required this.id,
     required this.assignedTo,
     this.assignedToName = '',
+    this.assignedByName = '',
     required this.title,
     required this.description,
     required this.dueDate,
     required this.status,
     this.assignedBy,
-    this.assignedByName,
     this.brandId,
     this.categoryId,
     this.subItems = const [],
@@ -175,9 +179,11 @@ class TaskRecord {
   factory TaskRecord.fromJson(Map<String, dynamic> json) {
     final rawSubs = json['sub_items'];
     final subs = rawSubs is List
-        ? rawSubs.map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawSubs
+              .map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <TaskSubItem>[];
-    
+
     final rawAssignees = json['assignee_ids'];
     final assigneeList = rawAssignees is List
         ? rawAssignees.map((e) => e.toString()).toList()
@@ -187,12 +193,12 @@ class TaskRecord {
       id: json['id'] as String? ?? '',
       assignedTo: json['assigned_to'] as String? ?? '',
       assignedToName: json['assigned_to_name'] as String? ?? '',
+      assignedByName: json['assigned_by_name'] as String? ?? '',
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       dueDate: DateTime.parse(json['due_date'] as String),
       status: json['status'] as String? ?? 'pending',
       assignedBy: json['assigned_by'] as String?,
-      assignedByName: json['assigned_by_name'] as String?,
       brandId: json['brand_id'] as String?,
       categoryId: json['category_id'] as String?,
       subItems: subs,
@@ -206,12 +212,12 @@ class TaskRecord {
   final String id;
   final String assignedTo;
   final String assignedToName;
+  final String assignedByName;
   final String title;
   final String description;
   final DateTime dueDate;
   final String status; // "pending" | "in_progress" | "completed"
   final String? assignedBy;
-  final String? assignedByName;
   final String? brandId;
   final String? categoryId;
   final List<TaskSubItem> subItems;
@@ -219,44 +225,6 @@ class TaskRecord {
   final int cardTotal;
   final int cardDone;
   final List<String> assigneeIds;
-
-  TaskRecord copyWith({
-    String? id,
-    String? assignedTo,
-    String? assignedToName,
-    String? title,
-    String? description,
-    DateTime? dueDate,
-    String? status,
-    String? assignedBy,
-    String? assignedByName,
-    String? brandId,
-    String? categoryId,
-    List<TaskSubItem>? subItems,
-    DateTime? createdAt,
-    int? cardTotal,
-    int? cardDone,
-    List<String>? assigneeIds,
-  }) {
-    return TaskRecord(
-      id: id ?? this.id,
-      assignedTo: assignedTo ?? this.assignedTo,
-      assignedToName: assignedToName ?? this.assignedToName,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      dueDate: dueDate ?? this.dueDate,
-      status: status ?? this.status,
-      assignedBy: assignedBy ?? this.assignedBy,
-      assignedByName: assignedByName ?? this.assignedByName,
-      brandId: brandId ?? this.brandId,
-      categoryId: categoryId ?? this.categoryId,
-      subItems: subItems ?? this.subItems,
-      createdAt: createdAt ?? this.createdAt,
-      cardTotal: cardTotal ?? this.cardTotal,
-      cardDone: cardDone ?? this.cardDone,
-      assigneeIds: assigneeIds ?? this.assigneeIds,
-    );
-  }
 }
 
 class TaskSubItem {
@@ -280,7 +248,11 @@ class TaskSubItem {
   factory TaskSubItem.fromJson(Map<String, dynamic> json) {
     final rawVerifications = json['verifications'];
     final verificationList = rawVerifications is List
-        ? rawVerifications.map((e) => SubItemVerification.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawVerifications
+              .map(
+                (e) => SubItemVerification.fromJson(e as Map<String, dynamic>),
+              )
+              .toList()
         : <SubItemVerification>[];
 
     return TaskSubItem(
@@ -291,8 +263,12 @@ class TaskSubItem {
       isDone: json['is_done'] as bool? ?? false,
       status: json['status'] as String? ?? 'pending',
       sortOrder: json['sort_order'] as int? ?? 0,
-      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'] as String)?.toLocal() : null,
-      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'] as String)?.toLocal() : null,
+      startDate: json['start_date'] != null
+          ? DateTime.tryParse(json['start_date'] as String)?.toLocal()
+          : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'] as String)?.toLocal()
+          : null,
       linkUrl: json['link_url'] as String?,
       attachmentUrl: json['attachment_url'] as String?,
       verificationNotes: json['verification_notes'] as String?,
@@ -372,7 +348,9 @@ class SubItemVerification {
       round: json['round'] as int? ?? 0,
       status: json['status'] as String? ?? '',
       notes: json['notes'] as String?,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String).toLocal() : DateTime.now(),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String).toLocal()
+          : DateTime.now(),
     );
   }
 
@@ -395,14 +373,33 @@ class TaskListRecord {
     required this.sortOrder,
     this.startDate,
     this.dueDate,
+    this.priority = 'medium',
+    this.status = 'in_progress',
+    this.adminComment = '',
+    this.attachments = const [],
+    this.assigneeIds = const [],
     this.cards = const [],
   });
 
   factory TaskListRecord.fromJson(Map<String, dynamic> json) {
     final rawCards = json['cards'];
     final cardsList = rawCards is List
-        ? rawCards.map((e) => TaskCardRecord.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawCards
+              .map((e) => TaskCardRecord.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <TaskCardRecord>[];
+    final rawAttachments = json['attachments'];
+    final attachments = rawAttachments is List
+        ? rawAttachments
+              .whereType<Map>()
+              .map(
+                (item) => TaskListAttachment.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .toList()
+        : <TaskListAttachment>[];
+    final rawAssigneeIds = json['assignee_ids'];
 
     return TaskListRecord(
       id: json['id'] as String? ?? '',
@@ -410,8 +407,19 @@ class TaskListRecord {
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
       sortOrder: json['sort_order'] as int? ?? 0,
-      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'] as String)?.toLocal() : null,
-      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'] as String)?.toLocal() : null,
+      startDate: json['start_date'] != null
+          ? DateTime.tryParse(json['start_date'] as String)?.toLocal()
+          : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'] as String)?.toLocal()
+          : null,
+      priority: json['priority'] as String? ?? 'medium',
+      status: json['status'] as String? ?? 'in_progress',
+      adminComment: json['admin_comment'] as String? ?? '',
+      attachments: attachments,
+      assigneeIds: rawAssigneeIds is List
+          ? rawAssigneeIds.map((id) => id.toString()).toList()
+          : const [],
       cards: cardsList,
     );
   }
@@ -423,11 +431,41 @@ class TaskListRecord {
   final int sortOrder;
   final DateTime? startDate;
   final DateTime? dueDate;
+  final String priority;
+  final String status;
+  final String adminComment;
+  final List<TaskListAttachment> attachments;
+  final List<String> assigneeIds;
+
+  /// Legacy task cards are retained for data compatibility but are no longer
+  /// part of the employee-facing Project → Deliverable experience.
   final List<TaskCardRecord> cards;
 }
 
+class TaskListAttachment {
+  const TaskListAttachment({
+    required this.name,
+    required this.url,
+    required this.type,
+  });
+
+  factory TaskListAttachment.fromJson(Map<String, dynamic> json) {
+    return TaskListAttachment(
+      name: json['name'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      type: json['type'] as String? ?? 'file',
+    );
+  }
+
+  final String name;
+  final String url;
+  final String type;
+
+  Map<String, dynamic> toJson() => {'name': name, 'url': url, 'type': type};
+}
+
 class TaskCardRecord {
-  const TaskCardRecord({
+  TaskCardRecord({
     required this.id,
     required this.listId,
     required this.title,
@@ -440,18 +478,33 @@ class TaskCardRecord {
     this.subItems = const [],
     List<CardAttachment>? attachments = const [],
     this.adminComment,
+    this.assigneeIds = const [],
+    this.assignees = const [],
   }) : _attachments = attachments;
 
   factory TaskCardRecord.fromJson(Map<String, dynamic> json) {
     final rawSubs = json['sub_items'];
     final subs = rawSubs is List
-        ? rawSubs.map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawSubs
+              .map((e) => TaskSubItem.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <TaskSubItem>[];
 
     final rawAttachments = json['attachments'];
     final attachments = rawAttachments is List
-        ? rawAttachments.map((e) => CardAttachment.fromJson(e as Map<String, dynamic>)).toList()
+        ? rawAttachments
+              .map((e) => CardAttachment.fromJson(e as Map<String, dynamic>))
+              .toList()
         : <CardAttachment>[];
+
+    final rawAssigneesJson = json['assignees'];
+    final rawAssignees = rawAssigneesJson is List
+        ? rawAssigneesJson
+              .map((e) => UserSummary.fromJson(e as Map<String, dynamic>))
+              .toList()
+        : <UserSummary>[];
+
+    final rawAssigneeIds = rawAssignees.map((e) => e.id).toList();
 
     return TaskCardRecord(
       id: json['id'] as String? ?? '',
@@ -461,11 +514,17 @@ class TaskCardRecord {
       status: json['status'] as String? ?? 'pending',
       sortOrder: json['sort_order'] as int? ?? 0,
       priority: json['priority'] as String? ?? 'medium',
-      startDate: json['start_date'] != null ? DateTime.tryParse(json['start_date'].toString())?.toLocal() : null,
-      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'].toString())?.toLocal() : null,
+      startDate: json['start_date'] != null
+          ? DateTime.tryParse(json['start_date'].toString())?.toLocal()
+          : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'].toString())?.toLocal()
+          : null,
       subItems: subs,
       attachments: attachments,
       adminComment: json['admin_comment'] as String?,
+      assigneeIds: rawAssigneeIds,
+      assignees: rawAssignees,
     );
   }
 
@@ -481,7 +540,205 @@ class TaskCardRecord {
   final List<TaskSubItem> subItems;
   final List<CardAttachment>? _attachments;
   final String? adminComment;
+  List<String> assigneeIds;
+  List<UserSummary> assignees;
+
   List<CardAttachment> get attachments => _attachments ?? const [];
+}
+
+/// A lightweight representation of a user for cards/comments
+class UserSummary {
+  const UserSummary({
+    required this.id,
+    required this.firstName,
+    required this.lastName,
+    required this.position,
+    this.avatarUrl,
+  });
+
+  factory UserSummary.fromJson(Map<String, dynamic> json) {
+    return UserSummary(
+      id: json['id'] as String? ?? '',
+      firstName: json['first_name'] as String? ?? '',
+      lastName: json['last_name'] as String? ?? '',
+      position: json['position'] as String? ?? '',
+      avatarUrl: json['avatar_url'] as String?,
+    );
+  }
+
+  final String id;
+  final String firstName;
+  final String lastName;
+  final String position;
+  final String? avatarUrl;
+
+  String get fullName => '$firstName $lastName';
+
+  String? get resolvedAvatarUrl {
+    if (avatarUrl == null || avatarUrl!.trim().isEmpty) return null;
+    final url = avatarUrl!.trim();
+    if (url.startsWith('r2://')) {
+      return url.replaceFirst(
+        'r2://',
+        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+      );
+    }
+    return url;
+  }
+}
+
+/// A comment or immutable activity item attached to a project deliverable.
+class TaskEventRecord {
+  const TaskEventRecord({
+    required this.id,
+    required this.taskId,
+    required this.userId,
+    required this.eventType,
+    required this.action,
+    required this.content,
+    required this.createdAt,
+    this.listId,
+    this.userFirstName = '',
+    this.userLastName = '',
+    this.userAvatarUrl,
+  });
+
+  factory TaskEventRecord.fromJson(Map<String, dynamic> json) {
+    return TaskEventRecord(
+      id: json['id']?.toString() ?? '',
+      taskId: json['task_id']?.toString() ?? '',
+      listId: json['list_id']?.toString(),
+      userId: json['user_id']?.toString() ?? '',
+      eventType: json['event_type'] as String? ?? 'system',
+      action: json['action'] as String? ?? '',
+      content: json['content'] as String? ?? '',
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
+      userFirstName: json['user_first_name'] as String? ?? '',
+      userLastName: json['user_last_name'] as String? ?? '',
+      userAvatarUrl: json['user_avatar_url'] as String?,
+    );
+  }
+
+  final String id;
+  final String taskId;
+  final String? listId;
+  final String userId;
+  final String eventType;
+  final String action;
+  final String content;
+  final DateTime createdAt;
+  final String userFirstName;
+  final String userLastName;
+  final String? userAvatarUrl;
+
+  String get userFullName {
+    final name = '$userFirstName $userLastName'.trim();
+    return name.isEmpty ? 'ผู้ใช้' : name;
+  }
+}
+
+/// A rich-text comment on a task card
+class CardComment {
+  const CardComment({
+    required this.id,
+    required this.cardId,
+    required this.authorId,
+    required this.contentDelta,
+    required this.plainText,
+    required this.isEdited,
+    required this.createdAt,
+    required this.updatedAt,
+    this.author,
+    this.mentionedUserIds = const [],
+    this.attachments = const [],
+  });
+
+  factory CardComment.fromJson(Map<String, dynamic> json) {
+    final rawMentions = json['mentioned_user_ids'];
+    final mentions = rawMentions is List
+        ? rawMentions.map((e) => e.toString()).toList()
+        : <String>[];
+
+    final rawAttachments = json['attachments'];
+    final attachments = rawAttachments is List
+        ? rawAttachments
+              .map((e) => CommentAttachment.fromJson(e as Map<String, dynamic>))
+              .toList()
+        : <CommentAttachment>[];
+
+    return CardComment(
+      id: json['id'] as String? ?? '',
+      cardId: json['card_id'] as String? ?? '',
+      authorId: json['author_id'] as String? ?? '',
+      contentDelta: json['content_delta'], // Passed directly for Quill
+      plainText: json['plain_text'] as String? ?? '',
+      isEdited: json['is_edited'] as bool? ?? false,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'].toString()).toLocal()
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'].toString()).toLocal()
+          : DateTime.now(),
+      author: json['author'] != null
+          ? UserSummary.fromJson(json['author'] as Map<String, dynamic>)
+          : null,
+      mentionedUserIds: mentions,
+      attachments: attachments,
+    );
+  }
+
+  final String id;
+  final String cardId;
+  final String authorId;
+  final dynamic contentDelta; // JSON representation of Quill Delta
+  final String plainText;
+  final bool isEdited;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  // Joined fields
+  final UserSummary? author;
+  final List<String> mentionedUserIds;
+  final List<CommentAttachment> attachments;
+}
+
+/// An attachment specifically inside a comment
+class CommentAttachment {
+  const CommentAttachment({
+    required this.id,
+    required this.commentId,
+    required this.url,
+    required this.name,
+    required this.type,
+    this.sizeBytes,
+    required this.createdAt,
+  });
+
+  factory CommentAttachment.fromJson(Map<String, dynamic> json) {
+    return CommentAttachment(
+      id: json['id'] as String? ?? '',
+      commentId: json['comment_id'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      type: json['type'] as String? ?? 'file',
+      sizeBytes: json['size_bytes'] != null
+          ? int.tryParse(json['size_bytes'].toString())
+          : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'].toString()).toLocal()
+          : DateTime.now(),
+    );
+  }
+
+  final String id;
+  final String commentId;
+  final String url;
+  final String name;
+  final String type; // "image" | "file"
+  final int? sizeBytes;
+  final DateTime createdAt;
 }
 
 /// CardAttachment represents a file/image/link attached to a task card.
@@ -504,7 +761,8 @@ class CardAttachment {
       name: json['name'] as String? ?? '',
       type: json['type'] as String? ?? 'file', // 'image' | 'file' | 'link'
       createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())?.toLocal() ?? DateTime.now()
+          ? DateTime.tryParse(json['created_at'].toString())?.toLocal() ??
+                DateTime.now()
           : DateTime.now(),
       createdBy: json['created_by'] as String?,
     );
@@ -518,50 +776,6 @@ class CardAttachment {
   final DateTime createdAt;
   final String? createdBy;
 }
-
-class TaskEvent {
-  const TaskEvent({
-    required this.id,
-    required this.taskId,
-    required this.userId,
-    required this.eventType,
-    required this.action,
-    this.content,
-    required this.createdAt,
-    this.userFirstName,
-    this.userLastName,
-    this.userAvatarUrl,
-  });
-
-  factory TaskEvent.fromJson(Map<String, dynamic> json) {
-    return TaskEvent(
-      id: json['id'] as String? ?? '',
-      taskId: json['task_id'] as String? ?? '',
-      userId: json['user_id'] as String? ?? '',
-      eventType: json['event_type'] as String? ?? '',
-      action: json['action'] as String? ?? '',
-      content: json['content'] as String?,
-      createdAt: json['created_at'] != null 
-          ? DateTime.tryParse(json['created_at'].toString())?.toLocal() ?? DateTime.now()
-          : DateTime.now(),
-      userFirstName: json['user_first_name'] as String?,
-      userLastName: json['user_last_name'] as String?,
-      userAvatarUrl: json['user_avatar_url'] as String?,
-    );
-  }
-
-  final String id;
-  final String taskId;
-  final String userId;
-  final String eventType;
-  final String action;
-  final String? content;
-  final DateTime createdAt;
-  final String? userFirstName;
-  final String? userLastName;
-  final String? userAvatarUrl;
-}
-
 
 class BrandRecord {
   const BrandRecord({required this.id, required this.name});

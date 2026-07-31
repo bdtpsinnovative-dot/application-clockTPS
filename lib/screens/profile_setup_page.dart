@@ -30,6 +30,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _firstNameController;
   late final TextEditingController _lastNameController;
+  late final TextEditingController _nicknameController;
   List<double>? _faceVector;
   File? _avatarFile;
   bool _busy = false;
@@ -42,6 +43,9 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     );
     _lastNameController = TextEditingController(
       text: widget.initialUser?.lastName,
+    );
+    _nicknameController = TextEditingController(
+      text: widget.initialUser?.nickname,
     );
   }
 
@@ -62,6 +66,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _nicknameController.dispose();
     super.dispose();
   }
 
@@ -72,7 +77,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       _showMessage('กรุณาเลือกรูปภาพโปรไฟล์');
       return;
     }
-    if (_faceVector == null) {
+    if (_faceVector == null &&
+        !(widget.initialUser?.hasFaceEmbedding ?? false)) {
       _showMessage('กรุณาสแกนใบหน้าก่อนส่งข้อมูล');
       return;
     }
@@ -88,12 +94,22 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         );
       }
 
-      await widget.service.registerProfile(
-        firstName: _firstNameController.text,
-        lastName: _lastNameController.text,
-        avatarUrl: avatarUrl,
-        faceVector: _faceVector!,
-      );
+      if (_faceVector != null) {
+        await widget.service.registerProfile(
+          firstName: _firstNameController.text,
+          lastName: _lastNameController.text,
+          nickname: _nicknameController.text,
+          avatarUrl: avatarUrl,
+          faceVector: _faceVector!,
+        );
+      } else {
+        await widget.service.updateProfileInfo(
+          firstName: _firstNameController.text,
+          lastName: _lastNameController.text,
+          nickname: _nicknameController.text,
+          avatarUrl: avatarUrl,
+        );
+      }
       await widget.onProfileSaved();
     } on AuthFlowException catch (error) {
       _showMessage(error.message);
@@ -178,9 +194,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: _lastNameController,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) =>
-                                  FocusScope.of(context).unfocus(),
+                              textInputAction: TextInputAction.next,
                               decoration: const InputDecoration(
                                 labelText: 'นามสกุล',
                                 prefixIcon: Icon(Icons.badge_outlined),
@@ -192,74 +206,91 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 24),
-                            // ส่วนสแกนใบหน้า
-                            InkWell(
-                              onTap: _busy ? null : _scanFace,
-                              borderRadius: BorderRadius.circular(16),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 24,
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _faceVector != null
-                                      ? const Color(0xFFEFF6FF)
-                                      : const Color(0xFFF5F7FA),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: _faceVector != null
-                                        ? const Color(0xFF2563EB)
-                                        : const Color(0xFFE4E9F0),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      _faceVector != null
-                                          ? Icons.check_circle_rounded
-                                          : Icons
-                                                .face_retouching_natural_rounded,
-                                      size: 48,
-                                      color: _faceVector != null
-                                          ? const Color(0xFF2563EB)
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      _faceVector != null
-                                          ? 'ข้อมูลใบหน้าพร้อมใช้งาน'
-                                          : 'แตะเพื่อสแกนใบหน้า',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: _faceVector != null
-                                            ? const Color(0xFF1E40AF)
-                                            : Theme.of(
-                                                context,
-                                              ).colorScheme.onSurface,
-                                      ),
-                                    ),
-                                    if (_faceVector == null)
-                                      const Padding(
-                                        padding: EdgeInsets.only(top: 6),
-                                        child: Text(
-                                          'จำเป็นสำหรับการลงเวลาเข้างานด้วยใบหน้า',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF637083),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _nicknameController,
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) =>
+                                  FocusScope.of(context).unfocus(),
+                              decoration: const InputDecoration(
+                                labelText: 'ชื่อเล่น',
+                                prefixIcon: Icon(Icons.face_outlined),
                               ),
+                              validator: (value) {
+                                if ((value?.trim() ?? '').isEmpty) {
+                                  return 'กรุณากรอกชื่อเล่น';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 24),
-                            FilledButton.icon(
+                            // ส่วนสแกนใบหน้า
+                            Builder(
+                              builder: (context) {
+                                final bool hasFace = _faceVector != null || (widget.initialUser?.hasFaceEmbedding ?? false);
+                                return InkWell(
+                                  onTap: _busy ? null : _scanFace,
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 24,
+                                      horizontal: 16,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: hasFace
+                                          ? const Color(0xFFEFF6FF)
+                                          : const Color(0xFFF5F7FA),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: hasFace
+                                            ? const Color(0xFF2563EB)
+                                            : const Color(0xFFE4E9F0),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          hasFace
+                                              ? Icons.check_circle_rounded
+                                              : Icons.face_retouching_natural_rounded,
+                                          size: 48,
+                                          color: hasFace
+                                              ? const Color(0xFF2563EB)
+                                              : Theme.of(context).colorScheme.primary,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          hasFace
+                                              ? 'ข้อมูลใบหน้าพร้อมใช้งาน'
+                                              : 'แตะเพื่อสแกนใบหน้า',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: hasFace
+                                                ? const Color(0xFF1E40AF)
+                                                : Theme.of(context).colorScheme.onSurface,
+                                          ),
+                                        ),
+                                        if (!hasFace)
+                                          const Padding(
+                                            padding: EdgeInsets.only(top: 6),
+                                            child: Text(
+                                              'ใช้สำหรับยืนยันตัวตนตอนเข้า-ออกงาน',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  );
+                                }
+                              ),
+                              const SizedBox(height: 24),
+                              FilledButton.icon(
                               onPressed: _busy ? null : _save,
                               icon: const Icon(Icons.save_outlined),
                               label: const Text('บันทึกและส่งอนุมัติ'),

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/skeleton_loading.dart';
 
 class NotificationRecord {
   const NotificationRecord({
@@ -219,15 +220,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      if (_loading)
+                      if (_loading && _notifications.isEmpty)
                         const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3,
-                              color: workBlue,
-                            ),
-                          ),
+                          padding: EdgeInsets.only(top: 8),
+                          child: SimpleManagementListSkeleton(),
                         )
                       else if (_error != null)
                         Padding(

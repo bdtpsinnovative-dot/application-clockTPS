@@ -28,10 +28,19 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to the camera to scan your face for attendance.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>แอปนี้ขอเข้าถึงตำแหน่งที่ตั้งเพื่อใช้ในการตรวจสอบระยะรัศมีขณะลงเวลาเข้า-ออกงาน</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>แอปนี้ขอเข้าถึงตำแหน่งที่ตั้งเพื่อใช้ในการตรวจสอบระยะรัศมีขณะลงเวลาเข้า-ออกงาน</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs access to the microphone for recording videos if needed.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to the photo library to pick images.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -72,9 +81,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>แอปนี้ขอเข้าถึงตำแหน่งที่ตั้งเพื่อใช้ในการตรวจสอบระยะรัศมีขณะลงเวลาเข้า-ออกงาน</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>แอปนี้ขอเข้าถึงตำแหน่งที่ตั้งเพื่อใช้ในการตรวจสอบระยะรัศมีขณะลงเวลาเข้า-ออกงาน</string>
 </dict>
 </plist>
