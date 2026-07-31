@@ -63,6 +63,32 @@ void main() {
     expect(taskMatchesOwnershipFilter(joined, 'me', null), isTrue);
   });
 
+  test('admin visibility includes only created or assigned tasks', () {
+    final createdForSomeoneElse = _task(
+      id: 'created-for-someone-else',
+      assignedBy: 'me',
+      assigneeIds: const ['coworker'],
+    );
+    final assignedToMe = _task(
+      id: 'assigned-to-me',
+      assignedBy: 'owner',
+      assigneeIds: const ['me'],
+    );
+    final assignedToTeam = _task(
+      id: 'assigned-to-team',
+      assignedBy: 'owner',
+      assigneeIds: const ['coworker', 'another-coworker'],
+    );
+
+    expect(
+      taskMatchesAdminVisibilityFilter(createdForSomeoneElse, 'me'),
+      isTrue,
+    );
+    expect(taskMatchesAdminVisibilityFilter(assignedToMe, 'me'), isTrue);
+    expect(taskMatchesAdminVisibilityFilter(assignedToTeam, 'me'), isFalse);
+    expect(taskMatchesAdminVisibilityFilter(assignedToMe, null), isFalse);
+  });
+
   test('assignment becomes overdue only after the due calendar day', () {
     final dueDate = DateTime(2026, 7, 24);
 

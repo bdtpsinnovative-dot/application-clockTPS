@@ -52,6 +52,24 @@ String assignmentFilterUserId(AppUser? currentUser, String fallbackAuthId) {
   return databaseUserId.isNotEmpty ? databaseUserId : fallbackAuthId;
 }
 
+/// Keeps the admin assignment list scoped to the same work as the web app.
+///
+/// The admin endpoint intentionally returns all tasks so that privileged
+/// clients can perform their own views. The assignment screen, however,
+/// should show only boards created by the signed-in admin or boards where the
+/// admin is an assignee.
+bool taskMatchesAdminVisibilityFilter(TaskRecord task, String? currentUserId) {
+  final userId = currentUserId?.trim() ?? '';
+  if (userId.isEmpty) return false;
+
+  if (task.assignedBy == userId) return true;
+
+  final assignees = task.assigneeIds.isNotEmpty
+      ? task.assigneeIds
+      : <String>[task.assignedTo];
+  return assignees.contains(userId);
+}
+
 bool taskMatchesOwnershipFilter(
   TaskRecord task,
   String? currentUserId,

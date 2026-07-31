@@ -35,6 +35,11 @@ class TaskAssignmentViewModel extends ChangeNotifier {
 
     return tasks
         .where((task) {
+          final isEmployee = service.currentUser?.role == 'employee';
+          if (!isEmployee &&
+              !taskMatchesAdminVisibilityFilter(task, currentUserId)) {
+            return false;
+          }
           if (query.isNotEmpty &&
               !task.title.toLowerCase().contains(query) &&
               !task.description.toLowerCase().contains(query)) {
