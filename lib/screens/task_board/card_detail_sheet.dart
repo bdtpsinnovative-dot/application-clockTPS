@@ -880,124 +880,10 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
               ),
               const SizedBox(height: 4),
 
-              // ─── 2-Tab Segmented Switcher (รายละเอียด vs กิจกรรม/คอมเมนต์) ───
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => setState(() => _selectedTab = 0),
-                        borderRadius: BorderRadius.circular(8),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.symmetric(vertical: 7),
-                          decoration: BoxDecoration(
-                            color: _selectedTab == 0
-                                ? Colors.white
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: _selectedTab == 0
-                                ? const [
-                                    BoxShadow(
-                                      color: Color(0x0C0F172A),
-                                      blurRadius: 4,
-                                      offset: Offset(0, 1),
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.assignment_outlined,
-                                size: 14,
-                                color: _selectedTab == 0 ? workBlue : workMuted,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'รายละเอียดงาน',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: _selectedTab == 0
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: _selectedTab == 0
-                                      ? workBlue
-                                      : workMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => setState(() => _selectedTab = 1),
-                        borderRadius: BorderRadius.circular(8),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.symmetric(vertical: 7),
-                          decoration: BoxDecoration(
-                            color: _selectedTab == 1
-                                ? Colors.white
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: _selectedTab == 1
-                                ? const [
-                                    BoxShadow(
-                                      color: Color(0x0C0F172A),
-                                      blurRadius: 4,
-                                      offset: Offset(0, 1),
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                size: 14,
-                                color: _selectedTab == 1 ? workBlue : workMuted,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'กิจกรรม & คอมเมนต์',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: _selectedTab == 1
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: _selectedTab == 1
-                                      ? workBlue
-                                      : workMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 6),
-
               // Scrollable content area
               Expanded(
-                child: _selectedTab == 0
-                    ? SingleChildScrollView(
-                        controller: _detailScrollController,
+                child: SingleChildScrollView(
+                  controller: _detailScrollController,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1472,15 +1358,6 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                             ],
                             const SizedBox(height: 20),
                           ],
-                        ),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: CardCommentSection(
-                          service: widget.service,
-                          cardId: widget.card.id,
-                          taskId: widget.taskId,
-                          isReadOnly: !widget.canEdit,
                         ),
                       ),
               ),

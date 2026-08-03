@@ -5,7 +5,14 @@ class _FilterBottomSheetContent extends StatefulWidget {
   final List<TaskCategoryRecord> categories;
   final String? initialBrandId;
   final String? initialCategoryId;
-  final Function(String? brandId, String? categoryId) onApply;
+  final String? initialStatus;
+  final bool initialStarredOnly;
+  final Function(
+    String? brandId,
+    String? categoryId,
+    String? status,
+    bool starredOnly,
+  ) onApply;
 
   const _FilterBottomSheetContent({
     super.key,
@@ -13,6 +20,8 @@ class _FilterBottomSheetContent extends StatefulWidget {
     required this.categories,
     this.initialBrandId,
     this.initialCategoryId,
+    this.initialStatus,
+    this.initialStarredOnly = false,
     required this.onApply,
   });
 
@@ -24,12 +33,16 @@ class _FilterBottomSheetContent extends StatefulWidget {
 class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
   String? _tempBrandId;
   String? _tempCategoryId;
+  String? _tempStatus;
+  bool _tempStarredOnly = false;
 
   @override
   void initState() {
     super.initState();
     _tempBrandId = widget.initialBrandId;
     _tempCategoryId = widget.initialCategoryId;
+    _tempStatus = widget.initialStatus;
+    _tempStarredOnly = widget.initialStarredOnly;
   }
 
   @override
@@ -132,6 +145,66 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                 ),
               ],
             ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'สถานะงาน (Status)',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildFilterChip(
+                  label: 'ทั้งหมด',
+                  isSelected: _tempStatus == null,
+                  onTap: () => setState(() => _tempStatus = null),
+                ),
+                _buildFilterChip(
+                  label: 'เฉพาะงานที่ยังไม่เสร็จ',
+                  isSelected: _tempStatus == 'active',
+                  onTap: () => setState(() => _tempStatus = 'active'),
+                ),
+                _buildFilterChip(
+                  label: 'เฉพาะงานที่เสร็จสิ้น',
+                  isSelected: _tempStatus == 'completed',
+                  onTap: () => setState(() => _tempStatus == 'completed'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'การติดดาว (Star status)',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildFilterChip(
+                  label: 'งานทั้งหมด',
+                  isSelected: !_tempStarredOnly,
+                  onTap: () => setState(() => _tempStarredOnly = false),
+                ),
+                _buildFilterChip(
+                  label: '⭐ แสดงเฉพาะงานที่ติดดาว',
+                  isSelected: _tempStarredOnly,
+                  onTap: () => setState(() => _tempStarredOnly = true),
+                  activeColor: Colors.amber,
+                ),
+              ],
+            ),
             const SizedBox(height: 32),
 
             Row(
@@ -142,6 +215,8 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                       setState(() {
                         _tempBrandId = null;
                         _tempCategoryId = null;
+                        _tempStatus = null;
+                        _tempStarredOnly = false;
                       });
                     },
                     style: OutlinedButton.styleFrom(
@@ -162,7 +237,12 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      widget.onApply(_tempBrandId, _tempCategoryId);
+                      widget.onApply(
+                        _tempBrandId,
+                        _tempCategoryId,
+                        _tempStatus,
+                        _tempStarredOnly,
+                      );
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(

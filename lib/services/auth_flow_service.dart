@@ -613,6 +613,8 @@ class AuthFlowService {
     List<String>? subItems,
     List<String>? assigneeIds,
     List<String>? listNames,
+    String? priority,
+    String? status,
   }) async {
     final response = await _authorizedPost(
       '/admin/tasks',
@@ -628,6 +630,8 @@ class AuthFlowService {
         if (assigneeIds != null && assigneeIds.isNotEmpty)
           'assignee_ids': assigneeIds,
         if (listNames != null && listNames.isNotEmpty) 'list_names': listNames,
+        if (priority != null && priority.isNotEmpty) 'priority': priority,
+        if (status != null && status.isNotEmpty) 'status': status,
       },
     );
     return TaskRecord.fromJson(response['data'] as Map<String, dynamic>);
@@ -887,6 +891,10 @@ class AuthFlowService {
 
   Future<void> deleteTask(String id) async {
     await _authorizedDelete('/admin/tasks/$id');
+  }
+
+  Future<void> toggleStarTask(String id, bool isStarred) async {
+    await _authorizedPost('/api/tasks/$id/star', data: {'is_starred': isStarred});
   }
 
   Future<void> updateFcmToken(String token) async {

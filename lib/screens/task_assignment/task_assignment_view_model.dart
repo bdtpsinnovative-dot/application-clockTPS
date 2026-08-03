@@ -22,9 +22,14 @@ class TaskAssignmentViewModel extends ChangeNotifier {
   String? selectedBrandId;
   String? selectedCategoryId;
   String? selectedOwnership;
+  String? selectedStatus;
+  bool selectedStarredOnly = false;
 
   bool get hasSheetFilters =>
-      selectedBrandId != null || selectedCategoryId != null;
+      selectedBrandId != null ||
+      selectedCategoryId != null ||
+      selectedStatus != null ||
+      selectedStarredOnly;
 
   List<TaskRecord> get filteredTasks {
     final query = searchQuery.toLowerCase();
@@ -50,6 +55,15 @@ class TaskAssignmentViewModel extends ChangeNotifier {
           }
           if (selectedCategoryId != null &&
               task.categoryId != selectedCategoryId) {
+            return false;
+          }
+          if (selectedStatus == 'active' && task.status == 'completed') {
+            return false;
+          }
+          if (selectedStatus == 'completed' && task.status != 'completed') {
+            return false;
+          }
+          if (selectedStarredOnly && !task.isStarred) {
             return false;
           }
           return taskMatchesOwnershipFilter(
@@ -116,9 +130,16 @@ class TaskAssignmentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void applySheetFilters(String? brandId, String? categoryId) {
+  void applySheetFilters(
+    String? brandId,
+    String? categoryId, {
+    String? status,
+    bool starredOnly = false,
+  }) {
     selectedBrandId = brandId;
     selectedCategoryId = categoryId;
+    selectedStatus = status;
+    selectedStarredOnly = starredOnly;
     notifyListeners();
   }
 
@@ -127,6 +148,8 @@ class TaskAssignmentViewModel extends ChangeNotifier {
     selectedBrandId = null;
     selectedCategoryId = null;
     selectedOwnership = null;
+    selectedStatus = null;
+    selectedStarredOnly = false;
     notifyListeners();
   }
 }

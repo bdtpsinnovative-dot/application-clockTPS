@@ -544,7 +544,7 @@ DeliverableStatusStyle deliverableStatusStyle(String status) {
   switch (status) {
     case 'completed':
       return const DeliverableStatusStyle(
-        'เสร็จแล้ว',
+        'เสร็จสิ้น',
         ProjectDetailStyle.success,
       );
     case 'in_review':

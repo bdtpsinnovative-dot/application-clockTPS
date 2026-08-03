@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/work_models.dart';
 import '../../widgets/priority_badge.dart';
 import '../../services/auth_flow_service.dart';
-import 'deliverable_comment_section.dart';
 import 'deliverable_editor_sheet.dart';
 import 'project_detail_style.dart';
 import 'project_deliverable_card.dart';
@@ -146,14 +145,12 @@ class _ProjectDeliverableDetailPageState
 
   String get _primaryActionLabel {
     if (_deliverable.status == 'completed') return 'เปิดงานอีกครั้ง';
-    if (_isAdmin && _deliverable.status == 'in_review') return 'อนุมัติงาน';
-    return 'ส่งงาน';
+    return 'เสร็จสิ้น';
   }
 
   String get _primaryActionStatus {
     if (_deliverable.status == 'completed') return 'in_progress';
-    if (_isAdmin && _deliverable.status == 'in_review') return 'completed';
-    return 'in_review';
+    return 'completed';
   }
 
   @override
@@ -198,70 +195,19 @@ class _ProjectDeliverableDetailPageState
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 112),
         children: [
+          // 1. Deliverable name
           Text(
             _deliverable.name,
             style: const TextStyle(
               color: ProjectDetailStyle.ink,
-              fontSize: 25,
+              fontSize: 22,
               height: 1.25,
               letterSpacing: -0.55,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 18,
-            runSpacing: 12,
-            children: [
-              _DetailMeta(
-                label: 'สถานะ',
-                value: status.label,
-                icon: Icons.circle,
-                iconColor: status.color,
-              ),
-              _DetailMeta(
-                label: 'กำหนดส่ง',
-                value: _deliverable.dueDate == null
-                    ? 'ยังไม่กำหนด'
-                    : DateFormat(
-                        'dd MMM yyyy',
-                        'th',
-                      ).format(_deliverable.dueDate!),
-                icon: Icons.calendar_today_outlined,
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  children: [
-                    const Text(
-                      'ความสำคัญ: ',
-                      style: TextStyle(
-                        color: ProjectDetailStyle.secondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    PriorityBadge(
-                      priority: _deliverable.priority,
-                      isCompact: true,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const Divider(color: ProjectDetailStyle.line),
-          const SizedBox(height: 14),
-          const Text(
-            'รายละเอียด',
-            style: TextStyle(
-              color: ProjectDetailStyle.ink,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+          // 2. Description (รายละเอียด) right below the title
           Text(
             _deliverable.description.trim().isEmpty
                 ? 'ยังไม่มีรายละเอียดเพิ่มเติม'
@@ -271,34 +217,81 @@ class _ProjectDeliverableDetailPageState
                   ? ProjectDetailStyle.muted
                   : ProjectDetailStyle.secondary,
               fontSize: 13,
-              height: 1.65,
+              height: 1.5,
             ),
           ),
-          const SizedBox(height: 22),
-          const Text(
-            'ผู้รับผิดชอบ',
-            style: TextStyle(
-              color: ProjectDetailStyle.ink,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
+          const SizedBox(height: 16),
+          // 3. Status, Due date, and Priority in a single Row (Wrap)
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 7,
+                    color: status.color,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    status.label,
+                    style: const TextStyle(
+                      color: ProjectDetailStyle.ink,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    size: ProjectDetailStyle.iconTiny,
+                    color: ProjectDetailStyle.secondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _deliverable.dueDate == null
+                        ? 'ยังไม่กำหนด'
+                        : DateFormat(
+                            'dd MMM yyyy',
+                            'th',
+                          ).format(_deliverable.dueDate!),
+                    style: const TextStyle(
+                      color: ProjectDetailStyle.ink,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'ความสำคัญ: ',
+                    style: TextStyle(
+                      color: ProjectDetailStyle.secondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  PriorityBadge(
+                    priority: _deliverable.priority,
+                    isCompact: true,
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          if (assignees.isEmpty)
-            const Text(
-              'ใช้ผู้รับผิดชอบตามโปรเจกต์',
-              style: TextStyle(color: ProjectDetailStyle.muted, fontSize: 12),
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final user in assignees)
-                  _AssigneeChip(user: user, baseUrl: widget.service.baseUrl),
-              ],
-            ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          const Divider(color: ProjectDetailStyle.line),
+          const SizedBox(height: 12),
           Row(
             children: [
               const Expanded(
@@ -392,13 +385,7 @@ class _ProjectDeliverableDetailPageState
               ),
             ),
           ],
-          const SizedBox(height: 24),
-          DeliverableCommentSection(
-            service: widget.service,
-            taskId: widget.projectId,
-            deliverableId: _deliverable.id,
-            isReadOnly: !widget.canEdit,
-          ),
+
         ],
       ),
       bottomNavigationBar: widget.canEdit
@@ -419,20 +406,12 @@ class _ProjectDeliverableDetailPageState
                       onSelected: _setStatus,
                       itemBuilder: (context) => const [
                         PopupMenuItem(
-                          value: 'pending',
-                          child: Text('ยังไม่เริ่ม'),
-                        ),
-                        PopupMenuItem(
                           value: 'in_progress',
                           child: Text('กำลังทำ'),
                         ),
                         PopupMenuItem(
-                          value: 'in_review',
-                          child: Text('ส่งงานแล้ว'),
-                        ),
-                        PopupMenuItem(
                           value: 'completed',
-                          child: Text('เสร็จแล้ว'),
+                          child: Text('เสร็จสิ้น'),
                         ),
                       ],
                       child: Container(
@@ -556,58 +535,6 @@ class _DetailMeta extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AssigneeChip extends StatelessWidget {
-  const _AssigneeChip({required this.user, required this.baseUrl});
-
-  final UserSummary user;
-  final String baseUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final rawUrl = user.resolvedAvatarUrl ?? user.avatarUrl;
-    final avatarUrl = resolveProjectMediaUrl(rawUrl, baseUrl);
-    final hasAvatar = avatarUrl.isNotEmpty;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
-      decoration: BoxDecoration(
-        color: ProjectDetailStyle.surface,
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: ProjectDetailStyle.line),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: ProjectDetailStyle.soft,
-            backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
-            onBackgroundImageError: hasAvatar ? (error, stack) {} : null,
-            child: !hasAvatar
-                ? Text(
-                    user.firstName.isEmpty ? '?' : user.firstName[0],
-                    style: const TextStyle(
-                      color: ProjectDetailStyle.accent,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 7),
-          Text(
-            user.fullName,
-            style: const TextStyle(
-              color: ProjectDetailStyle.ink,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
           ),
         ],
       ),

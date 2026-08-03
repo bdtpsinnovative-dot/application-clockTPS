@@ -174,6 +174,8 @@ class TaskRecord {
     this.cardTotal = 0,
     this.cardDone = 0,
     this.assigneeIds = const [],
+    this.isStarred = false,
+    this.priority = 'medium',
   });
 
   factory TaskRecord.fromJson(Map<String, dynamic> json) {
@@ -206,6 +208,8 @@ class TaskRecord {
       cardTotal: (json['card_total'] as num?)?.toInt() ?? 0,
       cardDone: (json['card_done'] as num?)?.toInt() ?? 0,
       assigneeIds: assigneeList,
+      isStarred: json['is_starred'] as bool? ?? false,
+      priority: json['priority'] as String? ?? 'medium',
     );
   }
 
@@ -225,6 +229,8 @@ class TaskRecord {
   final int cardTotal;
   final int cardDone;
   final List<String> assigneeIds;
+  final bool isStarred;
+  final String priority;
 }
 
 class TaskSubItem {
@@ -553,6 +559,7 @@ class UserSummary {
     required this.firstName,
     required this.lastName,
     required this.position,
+    this.nickname,
     this.avatarUrl,
   });
 
@@ -562,6 +569,7 @@ class UserSummary {
       firstName: json['first_name'] as String? ?? '',
       lastName: json['last_name'] as String? ?? '',
       position: json['position'] as String? ?? '',
+      nickname: json['nickname'] as String?,
       avatarUrl: json['avatar_url'] as String?,
     );
   }
@@ -570,7 +578,15 @@ class UserSummary {
   final String firstName;
   final String lastName;
   final String position;
+  final String? nickname;
   final String? avatarUrl;
+
+  String get displayName {
+    if (nickname != null && nickname!.trim().isNotEmpty) {
+      return nickname!.trim();
+    }
+    return firstName;
+  }
 
   String get fullName => '$firstName $lastName';
 

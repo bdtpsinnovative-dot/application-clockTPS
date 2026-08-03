@@ -103,61 +103,10 @@ class _DeliverableEditorSheetState extends State<DeliverableEditorSheet> {
   }
 
   Future<void> _addLink() async {
-    final nameController = TextEditingController();
-    final urlController = TextEditingController();
     final attachment = await showDialog<TaskListAttachment>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('แนบลิงก์'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'ชื่อลิงก์',
-                hintText: 'เช่น ไฟล์งานบน Google Drive',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: urlController,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                labelText: 'URL',
-                hintText: 'https://',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final url = urlController.text.trim();
-              if (url.isEmpty) return;
-              Navigator.pop(
-                dialogContext,
-                TaskListAttachment(
-                  name: nameController.text.trim().isEmpty
-                      ? url
-                      : nameController.text.trim(),
-                  url: url,
-                  type: 'link',
-                ),
-              );
-            },
-            child: const Text('แนบลิงก์'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) => const _AddLinkDialog(),
     );
-    nameController.dispose();
-    urlController.dispose();
     if (attachment != null && mounted) {
       setState(() => _attachments.add(attachment));
     }
@@ -478,11 +427,7 @@ class _DeliverableEditorSheetState extends State<DeliverableEditorSheet> {
                                 )
                               : null,
                         ),
-                        label: Text(
-                          member.fullName.trim().isEmpty
-                              ? member.firstName
-                              : member.fullName,
-                        ),
+                        label: Text(member.displayName),
                         selected: _assigneeIds.contains(member.id),
                         onSelected: (selected) {
                           setState(() {
@@ -707,6 +652,84 @@ class _AttachmentEditorRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AddLinkDialog extends StatefulWidget {
+  const _AddLinkDialog();
+
+  @override
+  State<_AddLinkDialog> createState() => _AddLinkDialogState();
+}
+
+class _AddLinkDialogState extends State<_AddLinkDialog> {
+  late final TextEditingController nameController;
+  late final TextEditingController urlController;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController = TextEditingController();
+    urlController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    urlController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('แนบลิงก์'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nameController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'ชื่อลิงก์',
+              hintText: 'เช่น ไฟล์งานบน Google Drive',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: urlController,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'URL',
+              hintText: 'https://',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('ยกเลิก'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final url = urlController.text.trim();
+            if (url.isEmpty) return;
+            Navigator.pop(
+              context,
+              TaskListAttachment(
+                name: nameController.text.trim().isEmpty
+                    ? url
+                    : nameController.text.trim(),
+                url: url,
+                type: 'link',
+              ),
+            );
+          },
+          child: const Text('แนบลิงก์'),
+        ),
+      ],
     );
   }
 }
