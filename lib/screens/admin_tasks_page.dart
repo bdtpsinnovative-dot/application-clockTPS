@@ -84,7 +84,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         brandMap: _brandMap,
         catMap: _catMap,
         statusConfig: taskStatusConfig,
-        onEdit: () => _showEditTaskTitleDialog(task),
+        onEdit: () => _showEditTaskModal(task),
         onChangeStatus: (status) async {
           try {
             await widget.service.updateTaskStatus(task.id, status);
@@ -134,85 +134,48 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     );
   }
 
-  Future<void> _showEditTaskTitleDialog(TaskRecord task) async {
-    final controller = TextEditingController(text: task.title);
-    final formKey = GlobalKey<FormState>();
-
-    try {
-      final saved = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('แก้ไขชื่องาน'),
-          content: Form(
-            key: formKey,
-            child: TextFormField(
-              controller: controller,
-              autofocus: true,
-              textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'ชื่องาน',
-                hintText: 'กรอกชื่องาน',
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'กรุณากรอกชื่องาน';
-                }
-                return null;
-              },
-              onFieldSubmitted: (_) {
-                if (formKey.currentState?.validate() == true) {
-                  Navigator.of(dialogContext).pop(true);
-                }
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('ยกเลิก'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() == true) {
-                  Navigator.of(dialogContext).pop(true);
-                }
-              },
-              child: const Text('บันทึก'),
-            ),
-          ],
-        ),
-      );
-
-      if (saved != true || !mounted) return;
-      final existingAssigneeIds = task.assigneeIds.isNotEmpty
-          ? task.assigneeIds
-          : task.assignedTo.isNotEmpty
-          ? [task.assignedTo]
-          : const <String>[];
-      await widget.service.updateTask(
-        id: task.id,
-        title: controller.text.trim(),
-        description: task.description,
-        assigneeIds: existingAssigneeIds,
-        dueDate: task.dueDate,
-        brandId: task.brandId,
-        categoryId: task.categoryId,
-      );
+  Future<void> _showEditTaskModal(TaskRecord task) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _EditTaskModal(
+        task: task,
+        users: _users,
+        onSave:
+            ({
+              required title,
+              required description,
+              required assigneeIds,
+              required dueDate,
+            }) async {
+              await widget.service.updateTask(
+                id: task.id,
+                title: title,
+                description: description,
+                assigneeIds: assigneeIds,
+                dueDate: dueDate,
+                brandId: task.brandId,
+                categoryId: task.categoryId,
+              );
+            },
+      ),
+    );
+    if (saved == true && mounted) {
+      Navigator.of(context).pop();
       await _loadData();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('แก้ไขชื่องานสำเร็จ'),
-          backgroundColor: Color(0xFF16A34A),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('แก้ไขชื่องานไม่สำเร็จ: $e')));
-    } finally {
-      controller.dispose();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('แก้ไขงานสำเร็จ'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      }
     }
   }
 
@@ -229,36 +192,21 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         users: _users,
         brands: _brands,
         categories: _categories,
-        onSubmit:
-            (
-              title,
-              desc,
-              assignees,
-              due,
-              brand,
-              category,
-              priority,
-              status,
-              initialListName,
-            ) async {
-              await widget.service.createTask(
-                title: title,
-                description: desc,
-                assignedTo: assignees.isNotEmpty ? assignees.first : '',
-                brandId: brand,
-                categoryId: category,
-                dueDate: due,
-                assigneeIds: assignees,
-                listNames: [
-                  initialListName.isNotEmpty
-                      ? initialListName.trim()
-                      : title.trim(),
-                ],
-                priority: priority,
-                status: status,
-              );
-              _loadData();
-            },
+        onSubmit: (title, desc, assignees, due, brand, category, priority, status, initialListName) async {
+          await widget.service.createTask(
+            title: title,
+            description: desc,
+            assignedTo: assignees.isNotEmpty ? assignees.first : '',
+            brandId: brand,
+            categoryId: category,
+            dueDate: due,
+            assigneeIds: assignees,
+            listNames: [initialListName.isNotEmpty ? initialListName.trim() : title.trim()],
+            priority: priority,
+            status: status,
+          );
+          _loadData();
+        },
       ),
     );
   }
@@ -640,340 +588,20 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         ),
                       ],
                     )
-                  : _buildTaskBoard(filteredTasks),
+                  : ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      itemCount: filteredTasks.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final t = filteredTasks[index];
+                        return _buildDraggableTaskCard(t);
+                      },
+                    ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  static const _boardStatuses = [
-    'pending',
-    'in_progress',
-    'in_review',
-    'completed',
-  ];
-
-  Widget _buildTaskBoard(List<TaskRecord> tasks) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: constraints.maxHeight > 104
-                  ? constraints.maxHeight - 104
-                  : 0,
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final status in _boardStatuses) ...[
-                    SizedBox(
-                      width: 296,
-                      child: _buildBoardColumn(
-                        status,
-                        tasks.where((task) => task.status == status).toList(),
-                      ),
-                    ),
-                    if (status != _boardStatuses.last)
-                      const SizedBox(width: 12),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildBoardColumn(String status, List<TaskRecord> tasks) {
-    final meta = taskStatusConfig[status] ?? taskStatusConfig['pending']!;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: meta.bg.withValues(alpha: 0.52),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: meta.border.withValues(alpha: 0.82)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: meta.color,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  meta.label,
-                  style: const TextStyle(
-                    color: workText,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.82),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${tasks.length}',
-                  style: TextStyle(
-                    color: meta.color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (tasks.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 28),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.52),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.8)),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.inbox_rounded,
-                    color: meta.color.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'ยังไม่มีงาน',
-                    style: TextStyle(
-                      color: meta.color.withValues(alpha: 0.72),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            for (final task in tasks) ...[
-              _buildBoardTaskCard(task),
-              if (task != tasks.last) const SizedBox(height: 10),
-            ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBoardTaskCard(TaskRecord task) {
-    final brand = task.brandId != null ? _brandMap[task.brandId] : null;
-    final category = task.categoryId != null ? _catMap[task.categoryId] : null;
-    final isOverdue = isAssignmentOverdue(task.dueDate, task.status);
-    final assignees = _users.where((user) {
-      if (task.assigneeIds.isNotEmpty) {
-        return task.assigneeIds.contains(user.id);
-      }
-      return user.id == task.assignedTo;
-    }).toList();
-    final assigneeLabel = assignees.length == 1
-        ? assignees.first.firstName
-        : assignees.length > 1
-        ? '${assignees.length} คน'
-        : task.assignedToName.isNotEmpty
-        ? task.assignedToName
-        : 'ยังไม่ระบุ';
-
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => ProjectDetailPage(
-                project: task,
-                service: widget.service,
-                brandName: brand?.name,
-                categoryName: category?.name,
-                onChanged: _loadData,
-              ),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFF1F5F9)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0D0F172A),
-                blurRadius: 10,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      task.title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: workText,
-                        fontSize: 13.5,
-                        height: 1.3,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => _showEditTaskTitleDialog(task),
-                    tooltip: 'แก้ไขชื่องาน',
-                    icon: const Icon(Icons.edit_rounded, size: 17),
-                    color: workBlue,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 32,
-                      minHeight: 32,
-                    ),
-                  ),
-                ],
-              ),
-              if (task.description.isNotEmpty) ...[
-                const SizedBox(height: 7),
-                Text(
-                  task.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: workMuted,
-                    fontSize: 11.5,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 11),
-              Wrap(
-                spacing: 5,
-                runSpacing: 5,
-                children: [
-                  PriorityBadge(priority: task.priority, isCompact: true),
-                  if (brand != null)
-                    _buildTag(
-                      brand.name,
-                      const Color(0xFFF8FAFC),
-                      const Color(0xFF475569),
-                      const Color(0xFFE2E8F0),
-                    ),
-                  if (category != null)
-                    _buildTag(
-                      category.name,
-                      const Color(0xFFF8FAFC),
-                      const Color(0xFF475569),
-                      const Color(0xFFE2E8F0),
-                    ),
-                ],
-              ),
-              if (task.cardTotal > 0) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline_rounded,
-                      size: 14,
-                      color: workMuted,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      '${task.cardDone}/${task.cardTotal}',
-                      style: const TextStyle(
-                        color: workMuted,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(99),
-                        child: LinearProgressIndicator(
-                          minHeight: 4,
-                          value: task.cardDone / task.cardTotal,
-                          backgroundColor: const Color(0xFFE2E8F0),
-                          color: task.cardDone == task.cardTotal
-                              ? const Color(0xFF16A34A)
-                              : workBlue,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.person_outline_rounded,
-                    size: 14,
-                    color: workMuted,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      assigneeLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: workText,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    isOverdue
-                        ? Icons.warning_amber_rounded
-                        : Icons.calendar_month_rounded,
-                    size: 14,
-                    color: isOverdue ? const Color(0xFFDC2626) : workMuted,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    DateFormat('dd MMM yy').format(task.dueDate),
-                    style: TextStyle(
-                      color: isOverdue ? const Color(0xFFDC2626) : workMuted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1020,16 +648,11 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     String? creatorAvatar;
     String creatorName = boardCreatorName;
     if (creator != null) {
-      creatorName = creator.nickname.isNotEmpty
-          ? creator.nickname
-          : creator.firstName;
+      creatorName = creator.nickname.isNotEmpty ? creator.nickname : creator.firstName;
       final av = creator.avatarUrl;
       if (av != null && av.trim().isNotEmpty) {
         creatorAvatar = av.startsWith('r2://')
-            ? av.replaceFirst(
-                'r2://',
-                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-              )
+            ? av.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
             : av;
       }
     }
@@ -1065,28 +688,19 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 GestureDetector(
                   onTap: () async {
                     try {
-                      await widget.service.toggleStarTask(
-                        task.id,
-                        !task.isStarred,
-                      );
+                      await widget.service.toggleStarTask(task.id, !task.isStarred);
                       _loadData();
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('สลับสถานะการติดดาวล้มเหลว: $e'),
-                        ),
+                        SnackBar(content: Text('สลับสถานะการติดดาวล้มเหลว: $e')),
                       );
                     }
                   },
                   child: Padding(
                     padding: const EdgeInsets.only(right: 5),
                     child: Icon(
-                      task.isStarred
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      color: task.isStarred
-                          ? Colors.amber
-                          : workMuted.withOpacity(0.5),
+                      task.isStarred ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: task.isStarred ? Colors.amber : workMuted.withOpacity(0.5),
                       size: 20,
                     ),
                   ),
@@ -1309,8 +923,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                           : task.cardDone / task.cardTotal,
                       minHeight: 3.5,
                       backgroundColor: ProjectDetailStyle.line,
-                      color:
-                          task.cardTotal > 0 && task.cardDone == task.cardTotal
+                      color: task.cardTotal > 0 && task.cardDone == task.cardTotal
                           ? ProjectDetailStyle.success
                           : ProjectDetailStyle.accent,
                     ),
