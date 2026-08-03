@@ -327,109 +327,62 @@ extension _TaskBoardRendering on _TaskBoardPageState {
   Widget _buildTaskBoardRow(TaskListRecord list, {required bool isLast}) {
     final isCompleted = list.status == 'completed';
     final isUpdating = _updatingListIds.contains(list.id);
-    final dueDate = list.dueDate;
-    final dueColor = _deadlineColor(dueDate, isCompleted: isCompleted);
 
     return Column(
       children: [
         Material(
-          color: isCompleted ? const Color(0xFFF0FDF4) : Colors.transparent,
+          color: isCompleted ? const Color(0xFFF0FDF4) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
           child: InkWell(
-            onTap: isUpdating ? null : () => _toggleListCompleted(list),
+            onTap: isUpdating ? null : () => _showTaskDetailModal(list),
+            borderRadius: BorderRadius.circular(14),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+              padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 1),
-                    child: Checkbox(
-                      value: isCompleted,
-                      onChanged: isUpdating
-                          ? null
-                          : (_) => _toggleListCompleted(list),
-                      activeColor: const Color(0xFF16A34A),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5),
+                  Checkbox(
+                    value: isCompleted,
+                    onChanged: isUpdating
+                        ? null
+                        : (_) => _toggleListCompleted(list),
+                    activeColor: const Color(0xFF16A34A),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      list.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isCompleted ? workMuted : workText,
+                        fontSize: 13.5,
+                        height: 1.25,
+                        fontWeight: FontWeight.w700,
+                        decoration: isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                list.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: isCompleted ? workMuted : workText,
-                                  fontSize: 14,
-                                  height: 1.3,
-                                  fontWeight: FontWeight.w700,
-                                  decoration: isCompleted
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                ),
-                              ),
-                            ),
-                            if (isUpdating)
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: workBlue,
-                                ),
-                              ),
-                          ],
-                        ),
-                        if (list.description.trim().isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            list.description.trim(),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: workMuted,
-                              fontSize: 11.5,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 7),
-                        Row(
-                          children: [
-                            PriorityBadge(
-                              priority: list.priority,
-                              isCompact: true,
-                            ),
-                            if (dueDate != null) ...[
-                              const SizedBox(width: 7),
-                              Icon(
-                                Icons.calendar_today_outlined,
-                                size: 12,
-                                color: dueColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatDate(dueDate),
-                                style: TextStyle(
-                                  color: dueColor,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
+                  if (isUpdating)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: workBlue,
+                      ),
+                    )
+                  else
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: workMuted,
+                      size: 18,
                     ),
-                  ),
                 ],
               ),
             ),
@@ -438,6 +391,130 @@ extension _TaskBoardRendering on _TaskBoardPageState {
         if (!isLast)
           const Divider(height: 1, indent: 68, color: Color(0xFFF1F5F9)),
       ],
+    );
+  }
+
+  Future<void> _showTaskDetailModal(TaskListRecord list) async {
+    final isCompleted = list.status == 'completed';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              list.name,
+              style: const TextStyle(
+                color: workText,
+                fontSize: 20,
+                height: 1.25,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  isCompleted
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: isCompleted ? const Color(0xFF16A34A) : workMuted,
+                  size: 18,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  isCompleted ? 'เสร็จแล้ว' : 'ยังไม่เสร็จ',
+                  style: TextStyle(
+                    color: isCompleted ? const Color(0xFF15803D) : workMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            if (list.description.trim().isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const Text(
+                'รายละเอียด',
+                style: TextStyle(
+                  color: workMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                list.description.trim(),
+                style: const TextStyle(
+                  color: workText,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ],
+            if (list.dueDate != null) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    color: workMuted,
+                    size: 15,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    _formatDate(list.dueDate),
+                    style: const TextStyle(
+                      color: workText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _toggleListCompleted(list);
+                },
+                icon: Icon(
+                  isCompleted
+                      ? Icons.undo_rounded
+                      : Icons.check_circle_outline_rounded,
+                ),
+                label: Text(
+                  isCompleted
+                      ? 'ทำเครื่องหมายว่ายังไม่เสร็จ'
+                      : 'ทำเครื่องหมายว่าเสร็จแล้ว',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
