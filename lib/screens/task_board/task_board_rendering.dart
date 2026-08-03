@@ -218,6 +218,229 @@ extension _TaskBoardRendering on _TaskBoardPageState {
     }
   }
 
+  Widget _buildSingleTaskBoard(List<TaskListRecord> lists) {
+    return RefreshIndicator(
+      onRefresh: _loadBoard,
+      color: workBlue,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFF1F5F9)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0D0F172A),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: const Icon(
+                          Icons.view_agenda_rounded,
+                          color: workBlue,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'บอร์ดงาน',
+                          style: TextStyle(
+                            color: workText,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${lists.length} งาน',
+                          style: const TextStyle(
+                            color: workMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                if (lists.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 42),
+                    child: Column(
+                      children: [
+                        Icon(Icons.inbox_outlined, color: workMuted, size: 32),
+                        SizedBox(height: 8),
+                        Text(
+                          'ยังไม่มีงานในบอร์ดนี้',
+                          style: TextStyle(
+                            color: workMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  for (var index = 0; index < lists.length; index++)
+                    _buildTaskBoardRow(
+                      lists[index],
+                      isLast: index == lists.length - 1,
+                    ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskBoardRow(TaskListRecord list, {required bool isLast}) {
+    final isCompleted = list.status == 'completed';
+    final isUpdating = _updatingListIds.contains(list.id);
+    final dueDate = list.dueDate;
+    final dueColor = _deadlineColor(dueDate, isCompleted: isCompleted);
+
+    return Column(
+      children: [
+        Material(
+          color: isCompleted ? const Color(0xFFF0FDF4) : Colors.transparent,
+          child: InkWell(
+            onTap: isUpdating ? null : () => _toggleListCompleted(list),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Checkbox(
+                      value: isCompleted,
+                      onChanged: isUpdating
+                          ? null
+                          : (_) => _toggleListCompleted(list),
+                      activeColor: const Color(0xFF16A34A),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                list.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isCompleted ? workMuted : workText,
+                                  fontSize: 14,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w700,
+                                  decoration: isCompleted
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                            ),
+                            if (isUpdating)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: workBlue,
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (list.description.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            list.description.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: workMuted,
+                              fontSize: 11.5,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 7),
+                        Row(
+                          children: [
+                            PriorityBadge(
+                              priority: list.priority,
+                              isCompact: true,
+                            ),
+                            if (dueDate != null) ...[
+                              const SizedBox(width: 7),
+                              Icon(
+                                Icons.calendar_today_outlined,
+                                size: 12,
+                                color: dueColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatDate(dueDate),
+                                style: TextStyle(
+                                  color: dueColor,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (!isLast)
+          const Divider(height: 1, indent: 68, color: Color(0xFFF1F5F9)),
+      ],
+    );
+  }
+
   Widget _buildListHeaderContent(TaskListRecord list) {
     final totalCards = list.cards.length;
     final doneCards = list.cards.where((c) => c.status == 'completed').length;
@@ -665,10 +888,12 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     child: CircleAvatar(
                       radius: 10,
                       backgroundColor: const Color(0xFFDBEAFE),
-                      backgroundImage:
-                          hasAvatar ? NetworkImage(avatarUrl) : null,
-                      onBackgroundImageError:
-                          hasAvatar ? (error, stack) {} : null,
+                      backgroundImage: hasAvatar
+                          ? NetworkImage(avatarUrl)
+                          : null,
+                      onBackgroundImageError: hasAvatar
+                          ? (error, stack) {}
+                          : null,
                       child: !hasAvatar
                           ? Text(
                               user.firstName.isNotEmpty

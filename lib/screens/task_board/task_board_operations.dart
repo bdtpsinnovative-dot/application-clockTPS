@@ -32,6 +32,24 @@ extension _TaskBoardOperations on _TaskBoardPageState {
 
   // เรียงลำดับการ์ดใหม่ภายในคอลัมน์เดียวกัน
   // onReorderItem ปรับ newIndex ให้อัตโนมัติแล้ว (ไม่ต้องลบ 1 เอง)
+  Future<void> _toggleListCompleted(TaskListRecord list) async {
+    if (_updatingListIds.contains(list.id)) return;
+
+    final nextStatus = list.status == 'completed' ? 'pending' : 'completed';
+    setState(() => _updatingListIds.add(list.id));
+    try {
+      await widget.service.updateTaskList(list.id, status: nextStatus);
+      await _loadBoard();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('อัปเดตสถานะงานไม่สำเร็จ: $e')));
+    } finally {
+      if (mounted) setState(() => _updatingListIds.remove(list.id));
+    }
+  }
+
   Future<void> _reorderCards(
     TaskListRecord list,
     int oldIndex,
