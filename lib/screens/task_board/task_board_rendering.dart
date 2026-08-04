@@ -226,108 +226,133 @@ extension _TaskBoardRendering on _TaskBoardPageState {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
         children: [
-          // Custom Board Header styled like the screenshot
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 4, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // Drag indicator icon
-                    const Icon(
-                      Icons.drag_indicator_rounded,
-                      color: Color(0xFF94A3B8), // slate-400
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    // Board/Project Title
-                    Expanded(
-                      child: Text(
-                        widget.task.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: workText,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Edit pencil icon
-                    const Icon(
-                      Icons.edit_outlined,
-                      color: Color(0xFF64748B), // slate-500
-                      size: 18,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                // Progress Bar and Percentage Row
-                Row(
-                  children: [
-                    // Progress Bar
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: lists.isNotEmpty
-                              ? (lists.where((l) => l.status == 'completed').length / lists.length)
-                              : 0.0,
-                          backgroundColor: const Color(0xFFE2E8F0), // light slate background
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Color(0xFF10B981), // Emerald green progress fill
-                          ),
-                          minHeight: 4,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Percentage Text
-                    Text(
-                      lists.isNotEmpty
-                          ? '${((lists.where((l) => l.status == 'completed').length / lists.length) * 100).toInt()}%'
-                          : '0%',
-                      style: const TextStyle(
-                        color: Color(0xFF10B981), // Emerald green text
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)), // slate-200 border
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x06000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
-          ),
-          if (lists.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 42),
-              child: Column(
-                children: [
-                  Icon(Icons.inbox_outlined, color: workMuted, size: 32),
-                  SizedBox(height: 8),
-                  Text(
-                    'ยังไม่มีงานในบอร์ดนี้',
-                    style: TextStyle(
-                      color: workMuted,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Custom Board Header styled like the screenshot
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        // Drag indicator icon
+                        const Icon(
+                          Icons.drag_indicator_rounded,
+                          color: Color(0xFF94A3B8), // slate-400
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        // Board/Project Title
+                        Expanded(
+                          child: Text(
+                            widget.task.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: workText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Edit pencil icon
+                        const Icon(
+                          Icons.edit_outlined,
+                          color: Color(0xFF64748B), // slate-500
+                          size: 18,
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 10),
+                    // Progress Bar and Percentage Row
+                    Row(
+                      children: [
+                        // Progress Bar
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: lists.isNotEmpty
+                                  ? (lists.where((l) => l.status == 'completed').length / lists.length)
+                                  : 0.0,
+                              backgroundColor: const Color(0xFFE2E8F0), // light slate background
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF10B981), // Emerald green progress fill
+                              ),
+                              minHeight: 4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Percentage Text
+                        Text(
+                          lists.isNotEmpty
+                              ? '${((lists.where((l) => l.status == 'completed').length / lists.length) * 100).toInt()}%'
+                              : '0%',
+                          style: const TextStyle(
+                            color: Color(0xFF10B981), // Emerald green text
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (lists.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.inbox_outlined, color: workMuted, size: 28),
+                      SizedBox(height: 8),
+                      Text(
+                        'ยังไม่มีงานในบอร์ดนี้',
+                        style: TextStyle(
+                          color: workMuted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            )
-          else
-            for (var index = 0; index < lists.length; index++)
-              _buildTaskBoardRow(
-                lists[index],
-                isLast: index == lists.length - 1,
-              ),
-        ],
+                ),
+              )
+            else
+              ...lists.asMap().entries.map((entry) {
+                final index = entry.key;
+                final list = entry.value;
+                return _buildTaskBoardRow(
+                  list,
+                  isLast: index == lists.length - 1,
+                );
+              }),
+          ],
+        ),
       ),
-    );
-  }
+    ],
+  ),
+);
+}
 
   Widget _buildTaskBoardRow(TaskListRecord list, {required bool isLast}) {
     final isCompleted = list.status == 'completed';
@@ -353,7 +378,7 @@ extension _TaskBoardRendering on _TaskBoardPageState {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
       child: Material(
         color: cardBg,
         borderRadius: BorderRadius.circular(12),
