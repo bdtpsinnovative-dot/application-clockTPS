@@ -185,7 +185,10 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                   children: [
                     // Title Bar
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
                       child: Row(
                         children: [
                           const Icon(
@@ -195,7 +198,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                           ),
                           const SizedBox(width: 8),
                           const Text(
-                            'เพิ่มงานย่อยใหม่',
+                            'เพิ่มคอลัมน์ใหม่',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -205,7 +208,10 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                           const Spacer(),
                           IconButton(
                             onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close_rounded, color: workMuted),
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: workMuted,
+                            ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                           ),
@@ -213,7 +219,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                       ),
                     ),
                     const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    
+
                     // Form Content
                     Flexible(
                       child: SingleChildScrollView(
@@ -221,11 +227,11 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // ชื่องานย่อย *
+                            // ชื่อคอลัมน์ *
                             const Row(
                               children: [
                                 Text(
-                                  'ชื่องานย่อย',
+                                  'ชื่อคอลัมน์',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: workText,
@@ -248,28 +254,44 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                               autofocus: true,
                               decoration: InputDecoration(
                                 hintText: 'เช่น ออกแบบหน้าเว็บ...',
-                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 13,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFCBD5E1),
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE2E8F0),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: workBlue, width: 1.5),
+                                  borderSide: const BorderSide(
+                                    color: workBlue,
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
-                              style: const TextStyle(fontSize: 13, color: workText),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: workText,
+                              ),
                             ),
                             const SizedBox(height: 20),
 
-                            // รายละเอียดงานย่อย
+                            // รายละเอียดคอลัมน์
                             const Text(
-                              'รายละเอียดงานย่อย',
+                              'รายละเอียดคอลัมน์',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: workText,
@@ -282,23 +304,39 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                               minLines: 3,
                               maxLines: 5,
                               decoration: InputDecoration(
-                                hintText: 'รายละเอียดเพิ่มเติมของงานย่อย...',
-                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                hintText: 'รายละเอียดเพิ่มเติมของคอลัมน์...',
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 13,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFCBD5E1),
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE2E8F0),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: workBlue, width: 1.5),
+                                  borderSide: const BorderSide(
+                                    color: workBlue,
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
-                              style: const TextStyle(fontSize: 13, color: workText),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: workText,
+                              ),
                             ),
                             const SizedBox(height: 20),
 
@@ -309,7 +347,8 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                 // วันที่กำหนดส่ง
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'วันที่กำหนดส่ง',
@@ -324,7 +363,9 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                         onTap: () async {
                                           final picked = await showDatePicker(
                                             context: context,
-                                            initialDate: selectedDueDate ?? DateTime.now(),
+                                            initialDate:
+                                                selectedDueDate ??
+                                                DateTime.now(),
                                             firstDate: DateTime(2020),
                                             lastDate: DateTime(2030),
                                           );
@@ -337,26 +378,38 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                         borderRadius: BorderRadius.circular(10),
                                         child: Container(
                                           height: 40,
-                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
                                           decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            border: Border.all(
+                                              color: const Color(0xFFE2E8F0),
+                                            ),
                                           ),
                                           child: Row(
                                             children: [
                                               Expanded(
                                                 child: Text(
                                                   selectedDueDate != null
-                                                      ? _formatDate(selectedDueDate)
+                                                      ? _formatDate(
+                                                          selectedDueDate,
+                                                        )
                                                       : 'วว/ดด/ปปปป',
                                                   style: TextStyle(
                                                     fontSize: 10.5,
-                                                    color: selectedDueDate != null
+                                                    color:
+                                                        selectedDueDate != null
                                                         ? workText
-                                                        : const Color(0xFF94A3B8),
+                                                        : const Color(
+                                                            0xFF94A3B8,
+                                                          ),
                                                   ),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                               const Icon(
@@ -376,7 +429,8 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                 // ความสำคัญ
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'ความสำคัญ',
@@ -389,30 +443,51 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                       const SizedBox(height: 8),
                                       Container(
                                         height: 40,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xFFE2E8F0),
+                                          ),
                                         ),
                                         child: DropdownButtonHideUnderline(
                                           child: DropdownButton<String>(
                                             value: selectedPriority,
                                             isExpanded: true,
-                                            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
-                                            style: const TextStyle(fontSize: 11, color: workText),
+                                            icon: const Icon(
+                                              Icons.keyboard_arrow_down_rounded,
+                                              size: 16,
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: workText,
+                                            ),
                                             items: const [
                                               DropdownMenuItem(
                                                 value: 'low',
                                                 child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.arrow_downward_rounded, size: 12, color: Colors.blue),
+                                                    Icon(
+                                                      Icons
+                                                          .arrow_downward_rounded,
+                                                      size: 12,
+                                                      color: Colors.blue,
+                                                    ),
                                                     SizedBox(width: 3),
                                                     Expanded(
                                                       child: Text(
                                                         'ต่ำ',
-                                                        style: TextStyle(fontSize: 11),
-                                                        overflow: TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
                                                       ),
                                                     ),
                                                   ],
@@ -421,15 +496,23 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                               DropdownMenuItem(
                                                 value: 'medium',
                                                 child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.remove_rounded, size: 12, color: Colors.amber),
+                                                    Icon(
+                                                      Icons.remove_rounded,
+                                                      size: 12,
+                                                      color: Colors.amber,
+                                                    ),
                                                     SizedBox(width: 3),
                                                     Expanded(
                                                       child: Text(
                                                         'ปานกลาง',
-                                                        style: TextStyle(fontSize: 11),
-                                                        overflow: TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
                                                       ),
                                                     ),
                                                   ],
@@ -438,15 +521,23 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                               DropdownMenuItem(
                                                 value: 'high',
                                                 child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.flash_on_rounded, size: 12, color: Colors.orange),
+                                                    Icon(
+                                                      Icons.flash_on_rounded,
+                                                      size: 12,
+                                                      color: Colors.orange,
+                                                    ),
                                                     SizedBox(width: 3),
                                                     Expanded(
                                                       child: Text(
                                                         'ด่วน',
-                                                        style: TextStyle(fontSize: 11),
-                                                        overflow: TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
                                                       ),
                                                     ),
                                                   ],
@@ -455,15 +546,24 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                               DropdownMenuItem(
                                                 value: 'urgent',
                                                 child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.report_problem_rounded, size: 12, color: Colors.red),
+                                                    Icon(
+                                                      Icons
+                                                          .report_problem_rounded,
+                                                      size: 12,
+                                                      color: Colors.red,
+                                                    ),
                                                     SizedBox(width: 3),
                                                     Expanded(
                                                       child: Text(
                                                         'ด่วนสุด',
-                                                        style: TextStyle(fontSize: 11),
-                                                        overflow: TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
                                                       ),
                                                     ),
                                                   ],
@@ -488,7 +588,8 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                 // สถานะ
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'สถานะ',
@@ -501,40 +602,61 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                       const SizedBox(height: 8),
                                       Container(
                                         height: 40,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xFFE2E8F0),
+                                          ),
                                         ),
                                         child: DropdownButtonHideUnderline(
                                           child: DropdownButton<String>(
                                             value: selectedStatus,
                                             isExpanded: true,
-                                            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
-                                            style: const TextStyle(fontSize: 11, color: workText),
+                                            icon: const Icon(
+                                              Icons.keyboard_arrow_down_rounded,
+                                              size: 16,
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: workText,
+                                            ),
                                             items: const [
                                               DropdownMenuItem(
                                                 value: 'todo',
                                                 child: Text(
                                                   'รอรับ',
-                                                  style: TextStyle(fontSize: 11),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                               DropdownMenuItem(
                                                 value: 'in_progress',
                                                 child: Text(
                                                   'กำลังทำ',
-                                                  style: TextStyle(fontSize: 11),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                               DropdownMenuItem(
                                                 value: 'completed',
                                                 child: Text(
                                                   'เสร็จสิ้น',
-                                                  style: TextStyle(fontSize: 11),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ],
@@ -572,11 +694,18 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                               children: [
                                 ...selectedAssignees.map((user) {
                                   return Container(
-                                    padding: const EdgeInsets.only(left: 4, right: 8, top: 4, bottom: 4),
+                                    padding: const EdgeInsets.only(
+                                      left: 4,
+                                      right: 8,
+                                      top: 4,
+                                      bottom: 4,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFEFF6FF),
                                       borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                                      border: Border.all(
+                                        color: const Color(0xFFBFDBFE),
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -599,7 +728,9 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                         GestureDetector(
                                           onTap: () {
                                             setModalState(() {
-                                              selectedAssignees.removeWhere((u) => u.id == user.id);
+                                              selectedAssignees.removeWhere(
+                                                (u) => u.id == user.id,
+                                              );
                                             });
                                           },
                                           child: const Icon(
@@ -621,42 +752,77 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                       isScrollControlled: true,
                                       backgroundColor: Colors.white,
                                       shape: const RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                        borderRadius: BorderRadius.vertical(
+                                          top: Radius.circular(24),
+                                        ),
                                       ),
                                       builder: (context) {
                                         return StatefulBuilder(
                                           builder: (context, setDialogState) {
-                                            final filteredMembers = _members.where((m) {
-                                              final q = searchKey.toLowerCase().trim();
-                                              if (q.isEmpty) return true;
-                                              return m.displayName.toLowerCase().contains(q) ||
-                                                  m.fullName.toLowerCase().contains(q) ||
-                                                  m.position.toLowerCase().contains(q);
-                                            }).toList();
+                                            final filteredMembers = _members
+                                                .where((m) {
+                                                  final q = searchKey
+                                                      .toLowerCase()
+                                                      .trim();
+                                                  if (q.isEmpty) return true;
+                                                  return m.displayName
+                                                          .toLowerCase()
+                                                          .contains(q) ||
+                                                      m.fullName
+                                                          .toLowerCase()
+                                                          .contains(q) ||
+                                                      m.position
+                                                          .toLowerCase()
+                                                          .contains(q);
+                                                })
+                                                .toList();
 
                                             return Container(
                                               padding: EdgeInsets.only(
-                                                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                                                bottom:
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).viewInsets.bottom +
+                                                    16,
                                               ),
                                               constraints: BoxConstraints(
-                                                maxHeight: MediaQuery.of(context).size.height * 0.7,
+                                                maxHeight:
+                                                    MediaQuery.of(
+                                                      context,
+                                                    ).size.height *
+                                                    0.7,
                                               ),
                                               child: SingleChildScrollView(
                                                 child: Padding(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 20,
+                                                        vertical: 16,
+                                                      ),
                                                   child: Column(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
                                                       // Drag handle
                                                       Center(
                                                         child: Container(
                                                           width: 40,
                                                           height: 4,
-                                                          margin: const EdgeInsets.only(bottom: 16),
+                                                          margin:
+                                                              const EdgeInsets.only(
+                                                                bottom: 16,
+                                                              ),
                                                           decoration: BoxDecoration(
-                                                            color: const Color(0xFFCBD5E1),
-                                                            borderRadius: BorderRadius.circular(2),
+                                                            color: const Color(
+                                                              0xFFCBD5E1,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  2,
+                                                                ),
                                                           ),
                                                         ),
                                                       ),
@@ -665,105 +831,208 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                                         children: [
                                                           const Expanded(
                                                             child: Column(
-                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              crossAxisAlignment:
+                                                                  CrossAxisAlignment
+                                                                      .start,
                                                               children: [
                                                                 Text(
                                                                   'เลือกผู้รับผิดชอบ',
                                                                   style: TextStyle(
-                                                                    fontSize: 17,
-                                                                    fontWeight: FontWeight.bold,
-                                                                    color: workText,
+                                                                    fontSize:
+                                                                        17,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                    color:
+                                                                        workText,
                                                                   ),
                                                                 ),
-                                                                SizedBox(height: 2),
+                                                                SizedBox(
+                                                                  height: 2,
+                                                                ),
                                                                 Text(
-                                                                  'เลือกสมาชิกที่จะให้ดูแลการ์ดงานนี้',
+                                                                  'เลือกสมาชิกที่จะดูแลงานนี้',
                                                                   style: TextStyle(
-                                                                    fontSize: 12,
-                                                                    color: workMuted,
+                                                                    fontSize:
+                                                                        12,
+                                                                    color:
+                                                                        workMuted,
                                                                   ),
                                                                 ),
                                                               ],
                                                             ),
                                                           ),
                                                           IconButton(
-                                                            onPressed: () => Navigator.pop(context),
-                                                            icon: const Icon(Icons.close_rounded, color: workMuted),
-                                                            padding: EdgeInsets.zero,
-                                                            constraints: const BoxConstraints(),
+                                                            onPressed: () =>
+                                                                Navigator.pop(
+                                                                  context,
+                                                                ),
+                                                            icon: const Icon(
+                                                              Icons
+                                                                  .close_rounded,
+                                                              color: workMuted,
+                                                            ),
+                                                            padding:
+                                                                EdgeInsets.zero,
+                                                            constraints:
+                                                                const BoxConstraints(),
                                                           ),
                                                         ],
                                                       ),
-                                                      const SizedBox(height: 14),
+                                                      const SizedBox(
+                                                        height: 14,
+                                                      ),
 
                                                       // Search Bar
                                                       Container(
                                                         decoration: BoxDecoration(
-                                                          color: const Color(0xFFF1F5F9),
-                                                          borderRadius: BorderRadius.circular(12),
+                                                          color: const Color(
+                                                            0xFFF1F5F9,
+                                                          ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                12,
+                                                              ),
                                                         ),
                                                         child: TextField(
                                                           onChanged: (v) {
-                                                            setDialogState(() => searchKey = v);
+                                                            setDialogState(
+                                                              () =>
+                                                                  searchKey = v,
+                                                            );
                                                           },
-                                                          style: const TextStyle(fontSize: 13, color: workText),
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 13,
+                                                                color: workText,
+                                                              ),
                                                           decoration: const InputDecoration(
-                                                            hintText: 'ค้นหาชื่อเล่น, ชื่อจริง หรือตำแหน่ง...',
-                                                            hintStyle: TextStyle(fontSize: 12.5, color: workMuted),
-                                                            prefixIcon: Icon(Icons.search_rounded, size: 20, color: workMuted),
-                                                            border: InputBorder.none,
-                                                            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                            hintText:
+                                                                'ค้นหาชื่อเล่น, ชื่อจริง หรือตำแหน่ง...',
+                                                            hintStyle:
+                                                                TextStyle(
+                                                                  fontSize:
+                                                                      12.5,
+                                                                  color:
+                                                                      workMuted,
+                                                                ),
+                                                            prefixIcon: Icon(
+                                                              Icons
+                                                                  .search_rounded,
+                                                              size: 20,
+                                                              color: workMuted,
+                                                            ),
+                                                            border: InputBorder
+                                                                .none,
+                                                            contentPadding:
+                                                                EdgeInsets.symmetric(
+                                                                  horizontal:
+                                                                      14,
+                                                                  vertical: 12,
+                                                                ),
                                                           ),
                                                         ),
                                                       ),
-                                                      const SizedBox(height: 12),
+                                                      const SizedBox(
+                                                        height: 12,
+                                                      ),
 
                                                       // Member List
                                                       ListView.separated(
                                                         shrinkWrap: true,
-                                                        physics: const NeverScrollableScrollPhysics(),
-                                                        itemCount: filteredMembers.length,
-                                                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                                        physics:
+                                                            const NeverScrollableScrollPhysics(),
+                                                        itemCount:
+                                                            filteredMembers
+                                                                .length,
+                                                        separatorBuilder:
+                                                            (_, __) =>
+                                                                const Divider(
+                                                                  height: 1,
+                                                                  color: Color(
+                                                                    0xFFF1F5F9,
+                                                                  ),
+                                                                ),
                                                         itemBuilder: (context, idx) {
-                                                          final member = filteredMembers[idx];
-                                                          final isSelected = selectedAssignees.any((u) => u.id == member.id);
+                                                          final member =
+                                                              filteredMembers[idx];
+                                                          final isSelected =
+                                                              selectedAssignees
+                                                                  .any(
+                                                                    (u) =>
+                                                                        u.id ==
+                                                                        member
+                                                                            .id,
+                                                                  );
                                                           return InkWell(
                                                             onTap: () {
                                                               setModalState(() {
                                                                 if (isSelected) {
-                                                                  selectedAssignees.removeWhere((u) => u.id == member.id);
+                                                                  selectedAssignees
+                                                                      .removeWhere(
+                                                                        (u) =>
+                                                                            u.id ==
+                                                                            member.id,
+                                                                      );
                                                                 } else {
-                                                                  selectedAssignees.add(member);
+                                                                  selectedAssignees
+                                                                      .add(
+                                                                        member,
+                                                                      );
                                                                 }
                                                               });
-                                                              setDialogState(() {});
+                                                              setDialogState(
+                                                                () {},
+                                                              );
                                                             },
-                                                            borderRadius: BorderRadius.circular(12),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  12,
+                                                                ),
                                                             child: Padding(
-                                                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    vertical: 8,
+                                                                    horizontal:
+                                                                        4,
+                                                                  ),
                                                               child: Row(
                                                                 children: [
                                                                   UserAvatar(
-                                                                    avatarUrl: member.avatarUrl,
-                                                                    name: member.displayName,
+                                                                    avatarUrl:
+                                                                        member
+                                                                            .avatarUrl,
+                                                                    name: member
+                                                                        .displayName,
                                                                     radius: 19,
                                                                   ),
-                                                                  const SizedBox(width: 12),
+                                                                  const SizedBox(
+                                                                    width: 12,
+                                                                  ),
                                                                   Expanded(
                                                                     child: Column(
-                                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                                      crossAxisAlignment:
+                                                                          CrossAxisAlignment
+                                                                              .start,
                                                                       children: [
                                                                         Text(
-                                                                          member.displayName,
+                                                                          member
+                                                                              .displayName,
                                                                           style: const TextStyle(
-                                                                            fontSize: 13.5,
-                                                                            fontWeight: FontWeight.bold,
-                                                                            color: workText,
+                                                                            fontSize:
+                                                                                13.5,
+                                                                            fontWeight:
+                                                                                FontWeight.bold,
+                                                                            color:
+                                                                                workText,
                                                                           ),
                                                                         ),
-                                                                        if (member.position.isNotEmpty || member.fullName.isNotEmpty)
+                                                                        if (member.position.isNotEmpty ||
+                                                                            member.fullName.isNotEmpty)
                                                                           Text(
-                                                                            member.position.isNotEmpty ? member.position : member.fullName,
+                                                                            member.position.isNotEmpty
+                                                                                ? member.position
+                                                                                : member.fullName,
                                                                             style: const TextStyle(
                                                                               fontSize: 11,
                                                                               color: workMuted,
@@ -776,15 +1045,32 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                                                     width: 22,
                                                                     height: 22,
                                                                     decoration: BoxDecoration(
-                                                                      shape: BoxShape.circle,
-                                                                      color: isSelected ? workBlue : Colors.transparent,
+                                                                      shape: BoxShape
+                                                                          .circle,
+                                                                      color:
+                                                                          isSelected
+                                                                          ? workBlue
+                                                                          : Colors.transparent,
                                                                       border: Border.all(
-                                                                        color: isSelected ? workBlue : const Color(0xFFCBD5E1),
-                                                                        width: 1.5,
+                                                                        color:
+                                                                            isSelected
+                                                                            ? workBlue
+                                                                            : const Color(
+                                                                                0xFFCBD5E1,
+                                                                              ),
+                                                                        width:
+                                                                            1.5,
                                                                       ),
                                                                     ),
-                                                                    child: isSelected
-                                                                        ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                                                                    child:
+                                                                        isSelected
+                                                                        ? const Icon(
+                                                                            Icons.check_rounded,
+                                                                            size:
+                                                                                14,
+                                                                            color:
+                                                                                Colors.white,
+                                                                          )
                                                                         : null,
                                                                   ),
                                                                 ],
@@ -827,12 +1113,15 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                         ),
                       ),
                     ),
-                    
+
                     const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    
+
                     // Footer Bar
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -853,15 +1142,15 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                               if (name.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('กรุณากรอกชื่องานย่อย'),
+                                    content: Text('กรุณากรอกชื่อคอลัมน์'),
                                     backgroundColor: Colors.orange,
                                   ),
                                 );
                                 return;
                               }
-                              
+
                               Navigator.pop(context); // Close sheet
-                              
+
                               setState(() => _loading = true);
                               try {
                                 await widget.service.createTaskList(
@@ -871,7 +1160,9 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                   priority: selectedPriority,
                                   status: selectedStatus,
                                   dueDate: selectedDueDate,
-                                  assigneeIds: selectedAssignees.map((u) => u.id).toList(),
+                                  assigneeIds: selectedAssignees
+                                      .map((u) => u.id)
+                                      .toList(),
                                 );
                                 widget.onRefreshNeeded();
                                 _loadBoard();
@@ -895,7 +1186,10 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: workBlue,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -1130,7 +1424,10 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                           width: 2,
                                         ),
                                       ),
-                                      child: _buildUserAvatar(member, radius: 20),
+                                      child: _buildUserAvatar(
+                                        member,
+                                        radius: 20,
+                                      ),
                                     ),
                                     if (isSelected)
                                       Positioned(

@@ -24,10 +24,12 @@ class TaskAssignmentViewModel extends ChangeNotifier {
   String? selectedOwnership;
   String? selectedStatus;
   bool selectedStarredOnly = false;
+  String selectedQuickView = 'all';
 
   bool get hasSheetFilters =>
       selectedBrandId != null ||
       selectedCategoryId != null ||
+      selectedOwnership != null ||
       selectedStatus != null ||
       selectedStarredOnly;
 
@@ -38,9 +40,8 @@ class TaskAssignmentViewModel extends ChangeNotifier {
       service.currentUserId,
     );
 
-    return tasks
-        .where((task) {
-          final isEmployee = service.currentUser?.role == 'employee';
+    final isEmployee = service.currentUser?.role == 'employee';
+    final filtered = tasks.where((task) {
           if (!isEmployee &&
               !taskMatchesAdminVisibilityFilter(task, currentUserId)) {
             return false;
@@ -66,13 +67,35 @@ class TaskAssignmentViewModel extends ChangeNotifier {
           if (selectedStarredOnly && !task.isStarred) {
             return false;
           }
+          if (selectedQuickView == 'completed' && task.status != 'completed') {
+            return false;
+          }
+          if (selectedQuickView == 'all' && task.status == 'completed') {
+            return false;
+          }
+          if (selectedQuickView == 'starred' && !task.isStarred) {
+            return false;
+          }
           return taskMatchesOwnershipFilter(
             task,
             currentUserId,
             selectedOwnership,
           );
         })
-        .toList(growable: false);
+        .toList();
+
+    filtered.sort((a, b) {
+      final aHasDueDate = a.dueDate.year > 1;
+      final bHasDueDate = b.dueDate.year > 1;
+      if (aHasDueDate != bHasDueDate) return aHasDueDate ? -1 : 1;
+      if (aHasDueDate && bHasDueDate) {
+        final dueComparison = a.dueDate.compareTo(b.dueDate);
+        if (dueComparison != 0) return dueComparison;
+      }
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return List<TaskRecord>.unmodifiable(filtered);
+>>>>>>> d8c4973 (checkpoint: compact task management and task list editor)
   }
 
   Future<void> loadData() async {
@@ -130,14 +153,22 @@ class TaskAssignmentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setQuickView(String value) {
+    if (value != 'all' && value != 'completed' && value != 'starred') return;
+    selectedQuickView = value;
+    notifyListeners();
+  }
+
   void applySheetFilters(
     String? brandId,
     String? categoryId, {
+    String? ownership,
     String? status,
     bool starredOnly = false,
   }) {
     selectedBrandId = brandId;
     selectedCategoryId = categoryId;
+    selectedOwnership = ownership;
     selectedStatus = status;
     selectedStarredOnly = starredOnly;
     notifyListeners();

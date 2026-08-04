@@ -1,22 +1,27 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hr_management/models/app_user.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/screens/admin_tasks_page.dart';
+import 'package:hr_management/screens/task_assignment/task_assignment_view_model.dart';
+import 'package:hr_management/services/auth_flow_service.dart';
 
 TaskRecord _task({
   required String id,
   required String assignedBy,
   List<String> assigneeIds = const [],
+  DateTime? dueDate,
+  DateTime? createdAt,
 }) {
   return TaskRecord(
     id: id,
     assignedTo: assigneeIds.isEmpty ? '' : assigneeIds.first,
     title: id,
     description: '',
-    dueDate: DateTime(2026, 7, 24),
+    dueDate: dueDate ?? DateTime(2026, 7, 24),
     status: 'pending',
     assignedBy: assignedBy,
-    createdAt: DateTime(2026, 7, 24),
+    createdAt: createdAt ?? DateTime(2026, 7, 24),
     assigneeIds: assigneeIds,
   );
 }
@@ -108,5 +113,59 @@ void main() {
       isAssignmentOverdue(dueDate, 'completed', now: DateTime(2026, 7, 25)),
       isFalse,
     );
+  });
+
+  test('task list sorts nearest due date first and missing dates last', () {
+    final viewModel = TaskAssignmentViewModel(
+      service: AuthFlowService(dio: Dio()),
+    );
+    addTearDown(viewModel.dispose);
+    viewModel.tasks = [
+      _task(id: 'no-due-date', assignedBy: 'owner', dueDate: DateTime(1)),
+      _task(id: 'later', assignedBy: 'owner', dueDate: DateTime(2026, 8, 10)),
+      _task(
+        id: 'nearer-old',
+        assignedBy: 'owner',
+        dueDate: DateTime(2026, 8, 5),
+        createdAt: DateTime(2026, 8, 1),
+      ),
+      _task(
+        id: 'nearer-new',
+        assignedBy: 'owner',
+        dueDate: DateTime(2026, 8, 5),
+        createdAt: DateTime(2026, 8, 2),
+      ),
+    ];
+
+    expect(viewModel.filteredTasks.map((task) => task.id), [
+      'nearer-new',
+      'nearer-old',
+      'later',
+      'no-due-date',
+    ]);
+  });
+
+  test('all view excludes completed tasks', () {
+    final viewModel = TaskAssignmentViewModel(
+      service: AuthFlowService(dio: Dio()),
+    );
+    addTearDown(viewModel.dispose);
+    viewModel.tasks = [
+      _task(id: 'active', assignedBy: 'owner'),
+      TaskRecord(
+        id: 'completed',
+        assignedTo: '',
+        title: 'completed',
+        description: '',
+        dueDate: DateTime(2026, 8, 5),
+        status: 'completed',
+        assignedBy: 'owner',
+        createdAt: DateTime(2026, 8, 1),
+      ),
+    ];
+
+    expect(viewModel.filteredTasks.map((task) => task.id), ['active']);
+    viewModel.setQuickView('completed');
+    expect(viewModel.filteredTasks.map((task) => task.id), ['completed']);
   });
 }

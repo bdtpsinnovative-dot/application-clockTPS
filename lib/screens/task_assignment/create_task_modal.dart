@@ -1,529 +1,272 @@
 part of '../admin_tasks_page.dart';
 
-// ─── Create Task Modal Sheet widget ──────────────────────────────
+class _InitialTaskBoard {
+  _InitialTaskBoard();
+
+  String name = '';
+  String description = '';
+  DateTime? dueDate;
+  String priority = 'medium';
+}
+
+typedef _CreateTaskSubmit =
+    Future<void> Function(
+      String title,
+      String description,
+      List<String> assigneeIds,
+      DateTime dueDate,
+      String? brandId,
+      String? categoryId,
+      String priority,
+      String status,
+      List<_InitialTaskBoard> boards,
+    );
+
 class _CreateTaskModal extends StatefulWidget {
   const _CreateTaskModal({
     required this.users,
     required this.brands,
     required this.categories,
     required this.onSubmit,
+    this.currentUser,
   });
 
   final List<AppUser> users;
   final List<BrandRecord> brands;
   final List<TaskCategoryRecord> categories;
-  final Function(
-    String title,
-    String desc,
-    List<String> assignees,
-    DateTime due,
-    String? brand,
-    String? category,
-    String? priority,
-    String? status,
-    String initialListName,
-  ) onSubmit;
+  final AppUser? currentUser;
+  final _CreateTaskSubmit onSubmit;
 
   @override
   State<_CreateTaskModal> createState() => _CreateTaskModalState();
 }
 
 class _CreateTaskModalState extends State<_CreateTaskModal> {
-  String? _formBrand;
-  String? _formCategory;
-  final List<String> _formAssignees = [];
-  String _formTitle = '';
-  String _formDesc = '';
-  DateTime _formDue = DateTime.now().add(const Duration(days: 1));
-  String? _formPriority = 'medium';
-  String? _formStatus = 'pending';
-  String _formInitialBoardName = '';
-  bool _showAdvanced = false;
-  bool _formLoading = false;
+  String? _brandId;
+  String? _categoryId;
+  final List<String> _assigneeIds = [];
+  final Set<String> _autoBrandAssigneeIds = {};
+  final List<_InitialTaskBoard> _boards = [];
+  String _title = '';
+  String _description = '';
+  DateTime _dueDate = DateTime.now();
+  String _priority = 'low';
+  String _status = 'pending';
+  bool _showAssigneePicker = false;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final currentUserId = widget.currentUser?.id.trim() ?? '';
+    if (currentUserId.isNotEmpty) _assigneeIds.add(currentUserId);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      decoration: const BoxDecoration(
+    return FractionallySizedBox(
+      heightFactor: 0.94,
+      child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SingleChildScrollView(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        clipBehavior: Clip.antiAlias,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            Row(
-              children: [
-                const Icon(Icons.add_task_rounded, color: workBlue, size: 22),
-                const SizedBox(width: 8),
-                const Text(
-                  'มอบหมายงานใหม่',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                    color: workText,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: workMuted,
-                    size: 20,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    padding: const EdgeInsets.all(8),
-                    minimumSize: Size.zero,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 24, color: Color(0xFFF1F5F9)),
-
-            // ── 1. Title (ชื่องาน) ──
-            _fieldLabel('ชื่องาน *', Icons.title_rounded),
-            const SizedBox(height: 4),
-            TextField(
-              decoration: _inputDeco('กรอกชื่องาน / หัวข้อ'),
-              onChanged: (v) => _formTitle = v,
-              style: const TextStyle(fontSize: 13.5),
-            ),
-            const SizedBox(height: 12),
-
-            // ── 2. Description (รายละเอียดงาน) ──
-            _fieldLabel('รายละเอียดงาน', Icons.notes_rounded),
-            const SizedBox(height: 4),
-            TextField(
-              maxLines: 2,
-              decoration: _inputDeco('อธิบายรายละเอียดงาน...'),
-              onChanged: (v) => _formDesc = v,
-              style: const TextStyle(fontSize: 13.5),
-            ),
-            const SizedBox(height: 12),
-
-            // ── 3. Assignees (ผู้รับผิดชอบ) ──
-            _fieldLabel(
-              'ผู้รับผิดชอบ * (เลือกได้มากกว่า 1 คน)',
-              Icons.people_outline_rounded,
-            ),
-            const SizedBox(height: 5),
-            SizedBox(
-              height: 60,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: widget.users.length,
-                itemBuilder: (context, i) {
-                  final u = widget.users[i];
-                  final isSelected = _formAssignees.contains(u.id);
-                  final resolvedAvatar =
-                      u.avatarUrl != null && u.avatarUrl!.trim().isNotEmpty
-                      ? (u.avatarUrl!.startsWith('r2://')
-                            ? u.avatarUrl!.replaceFirst(
-                                'r2://',
-                                'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-                              )
-                            : u.avatarUrl)
-                      : null;
-
-                  final displayName = u.nickname.trim().isNotEmpty ? u.nickname : u.firstName;
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _formAssignees.remove(u.id);
-                        } else {
-                          _formAssignees.add(u.id);
-                        }
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 14),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSelected ? workBlue : Colors.transparent,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: UserAvatar(
-                                  avatarUrl: u.avatarUrl,
-                                  name: displayName,
-                                  radius: 16,
-                                ),
-                              ),
-                              if (isSelected)
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(1),
-                                    decoration: const BoxDecoration(
-                                      color: workBlue,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.check,
-                                      size: 8,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? workBlue : workText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // ── Toggle Advanced options (วงกลมที่มี บวก) ──
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 8),
-                child: InkWell(
-                  onTap: () => setState(() => _showAdvanced = !_showAdvanced),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: workBlue.withValues(alpha: 0.08),
-                      border: Border.all(color: workBlue.withValues(alpha: 0.25)),
-                    ),
-                    child: Icon(
-                      _showAdvanced ? Icons.remove : Icons.add,
-                      color: workBlue,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Advanced Optional Fields (วันส่ง, แบรนด์, หมวดหมู่, ความสำคัญ, สถานะ, ชื่อบอร์ด) ──
-            if (_showAdvanced) ...[
-              // Date picker
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _fieldLabel('กำหนดส่ง *', Icons.calendar_month_rounded),
-                  const SizedBox(height: 4),
-                  InkWell(
-                    onTap: () async {
-                      final p = await showWorkDueDatePicker(
-                        context,
-                        initialDate: _formDue,
-                      );
-                      if (p != null) setState(() => _formDue = p);
-                    },
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      height: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: isWorkDatePast(_formDue)
-                            ? const Color(0xFFFEF2F2)
-                            : const Color(0xFFF8FAFC),
-                        border: Border.all(
-                          color: isWorkDatePast(_formDue)
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFFE2E8F0),
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              DateFormat('dd MMMM yyyy', 'th').format(_formDue),
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                color: isWorkDatePast(_formDue)
-                                    ? const Color(0xFFDC2626)
-                                    : workText,
-                                fontWeight: isWorkDatePast(_formDue)
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            Icons.calendar_month_rounded,
-                            color: isWorkDatePast(_formDue)
-                                ? const Color(0xFFDC2626)
-                                : workBlue,
-                            size: 18,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (isWorkDatePast(_formDue)) ...[
+            _buildHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _fieldLabel('ชื่องาน *'),
                     const SizedBox(height: 6),
-                    const Text(
-                      'วันที่กำหนดส่งผ่านมาแล้ว แต่ยังสามารถสร้างงานได้',
-                      style: TextStyle(
-                        color: Color(0xFFB91C1C),
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
+                    TextField(
+                      key: const Key('create-task-title'),
+                      decoration: _inputDecoration(
+                        'เช่น ทำรายงานสรุปยอดขายประจำสัปดาห์...',
                       ),
+                      onChanged: (value) => _title = value,
                     ),
+                    const SizedBox(height: 14),
+                    _fieldLabel(
+                      'รายละเอียดเพิ่มเติม',
+                      icon: Icons.notes_rounded,
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      key: const Key('create-task-description'),
+                      minLines: 2,
+                      maxLines: 3,
+                      decoration: _inputDecoration(
+                        'รายละเอียดเพิ่มเติมของงาน...',
+                      ),
+                      onChanged: (value) => _description = value,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildAssignees(),
+                    const SizedBox(height: 16),
+                    _buildTaskMetadata(),
+                    const SizedBox(height: 16),
+                    _buildPriorityAndStatus(),
+                    const SizedBox(height: 16),
+                    _buildBoards(),
                   ],
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Brand + Category Row
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDropdown<String?>(
-                      label: 'แบรนด์',
-                      icon: Icons.label_outline_rounded,
-                      value: _formBrand,
-                      items: <DropdownMenuItem<String?>>[
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('— ไม่ระบุ —'),
-                        ),
-                        ...widget.brands.map(
-                          (b) => DropdownMenuItem<String?>(
-                            value: b.id,
-                            child: Text(
-                              b.name,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _formBrand = v),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildDropdown<String?>(
-                      label: 'หมวดหมู่',
-                      icon: Icons.folder_outlined,
-                      value: _formCategory,
-                      items: <DropdownMenuItem<String?>>[
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('— ไม่ระบุ —'),
-                        ),
-                        ...widget.categories.map(
-                          (c) => DropdownMenuItem<String?>(
-                            value: c.id,
-                            child: Text(
-                              c.name,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _formCategory = v),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Priority + Status Row
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDropdown<String?>(
-                      label: 'ความสำคัญ',
-                      icon: Icons.priority_high_rounded,
-                      value: _formPriority,
-                      items: const <DropdownMenuItem<String?>>[
-                        DropdownMenuItem(
-                          value: 'low',
-                          child: Text('ต่ำ', style: TextStyle(fontSize: 13)),
-                        ),
-                        DropdownMenuItem(
-                          value: 'medium',
-                          child: Text('ปานกลาง', style: TextStyle(fontSize: 13)),
-                        ),
-                        DropdownMenuItem(
-                          value: 'high',
-                          child: Text('สูง', style: TextStyle(fontSize: 13)),
-                        ),
-                        DropdownMenuItem(
-                          value: 'urgent',
-                          child: Text('ด่วนมาก', style: TextStyle(fontSize: 13)),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _formPriority = v),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildDropdown<String?>(
-                      label: 'สถานะงานเริ่มต้น',
-                      icon: Icons.hourglass_empty_rounded,
-                      value: _formStatus,
-                      items: const <DropdownMenuItem<String?>>[
-                        DropdownMenuItem(
-                          value: 'pending',
-                          child: Text('รอทำ', style: TextStyle(fontSize: 13)),
-                        ),
-                        DropdownMenuItem(
-                          value: 'in_progress',
-                          child: Text('กำลังทำ', style: TextStyle(fontSize: 13)),
-                        ),
-                        DropdownMenuItem(
-                          value: 'in_review',
-                          child: Text('รอตรวจ', style: TextStyle(fontSize: 13)),
-                        ),
-                        DropdownMenuItem(
-                          value: 'completed',
-                          child: Text('เสร็จสิ้น', style: TextStyle(fontSize: 13)),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _formStatus = v),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Initial Board List Name
-              _fieldLabel('บอร์ดงานเริ่มต้น', Icons.splitscreen_rounded),
-              const SizedBox(height: 4),
-              TextField(
-                decoration: _inputDeco('ระบุชื่อบอร์ดงานเริ่มต้น (เช่น งานหลัก)'),
-                onChanged: (v) => _formInitialBoardName = v,
-                style: const TextStyle(fontSize: 13.5),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            const SizedBox(height: 8),
-
-            // ── Submit Button ──
-            Container(
-              width: double.infinity,
-              height: 52,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [workBlue, workSky],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x3F2563EB),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
               ),
-              child: ElevatedButton(
-                onPressed: _formLoading
-                    ? null
-                    : () async {
-                        if (_formTitle.trim().isEmpty ||
-                            _formAssignees.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'กรุณากรอกชื่องานและเลือกผู้รับผิดชอบอย่างน้อย 1 คน',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-                        setState(() => _formLoading = true);
-                        try {
-                          await widget.onSubmit(
-                            _formTitle,
-                            _formDesc,
-                            _formAssignees,
-                            _formDue,
-                            _formBrand,
-                            _formCategory,
-                            _formPriority,
-                            _formStatus,
-                            _formInitialBoardName,
-                          );
-                          if (mounted) Navigator.pop(context);
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-                          );
-                        } finally {
-                          if (mounted) setState(() => _formLoading = false);
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            ),
+            _buildFooter(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      height: 54,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAFC),
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'มอบหมายงานใหม่',
+              style: TextStyle(
+                color: workText,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          IconButton(
+            key: const Key('close-create-task'),
+            onPressed: _submitting ? null : () => Navigator.pop(context),
+            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssignees() {
+    final selectedUsers = widget.users
+        .where((user) => _assigneeIds.contains(user.id))
+        .toList();
+    final candidates = widget.users
+        .where((user) => !_assigneeIds.contains(user.id))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('ผู้รับผิดชอบ', icon: Icons.person_outline_rounded),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final user in selectedUsers) _selectedAssignee(user),
+            InkWell(
+              key: const Key('toggle-assignee-picker'),
+              onTap: () =>
+                  setState(() => _showAssigneePicker = !_showAssigneePicker),
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFF8FAFC),
+                  border: Border.all(
+                    color: _showAssigneePicker
+                        ? workBlue
+                        : const Color(0xFFB9C8DC),
+                    width: 1.5,
                   ),
                 ),
-                child: _formLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'มอบหมายงาน',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                child: Icon(
+                  _showAssigneePicker ? Icons.remove : Icons.add,
+                  color: workBlue,
+                  size: 23,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_showAssigneePicker) ...[
+          const SizedBox(height: 10),
+          Container(
+            key: const Key('assignee-picker'),
+            width: double.infinity,
+            constraints: const BoxConstraints(maxHeight: 190),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              border: Border.all(color: const Color(0xFFD8E1EE)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: candidates.isEmpty
+                ? const Center(
+                    child: Text(
+                      'เลือกผู้รับผิดชอบครบทุกคนแล้ว',
+                      style: TextStyle(color: workMuted, fontSize: 12),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final user in candidates) _assigneeCandidate(user),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+        ..._buildBrandResponsibilityGroups(),
+      ],
+    );
+  }
+
+  Widget _selectedAssignee(AppUser user) {
+    final locked =
+        user.id == widget.currentUser?.id ||
+        _autoBrandAssigneeIds.contains(user.id);
+    return Tooltip(
+      message: _userDisplayName(user),
+      child: InkWell(
+        onTap: locked
+            ? null
+            : () => setState(() => _assigneeIds.remove(user.id)),
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            UserAvatar(
+              avatarUrl: user.avatarUrl,
+              name: _userDisplayName(user),
+              radius: 18,
+            ),
+            Positioned(
+              right: -2,
+              bottom: -2,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: locked ? const Color(0xFF8B5CF6) : workBlue,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Icon(
+                  locked ? Icons.lock_rounded : Icons.check_rounded,
+                  color: Colors.white,
+                  size: 9,
+                ),
               ),
             ),
           ],
@@ -532,7 +275,426 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
     );
   }
 
-  Widget _buildDropdown<T>({
+  Widget _assigneeCandidate(AppUser user) {
+    return InkWell(
+      key: Key('assignee-${user.id}'),
+      onTap: () => setState(() => _assigneeIds.add(user.id)),
+      borderRadius: BorderRadius.circular(11),
+      child: Container(
+        width: 92,
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFD8E1EE)),
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Row(
+          children: [
+            UserAvatar(
+              avatarUrl: user.avatarUrl,
+              name: _userDisplayName(user),
+              radius: 14,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                _userDisplayName(user),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: workText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaskMetadata() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _dateField()),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _dropdown<String?>(
+            label: 'แบรนด์',
+            icon: Icons.sell_outlined,
+            value: _brandId,
+            items: [
+              const DropdownMenuItem(value: null, child: Text('เลือก')),
+              for (final brand in widget.brands)
+                DropdownMenuItem(
+                  value: brand.id,
+                  child: Text(
+                    brand.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: _changeBrand,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _dropdown<String?>(
+            label: 'หมวดหมู่',
+            icon: Icons.folder_outlined,
+            value: _categoryId,
+            items: [
+              const DropdownMenuItem(value: null, child: Text('เลือก')),
+              for (final category in widget.categories)
+                DropdownMenuItem(
+                  value: category.id,
+                  child: Text(
+                    category.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (value) => setState(() => _categoryId = value),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dateField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('วันครบกำหนด *', icon: Icons.calendar_month_outlined),
+        const SizedBox(height: 6),
+        InkWell(
+          key: const Key('task-due-date'),
+          onTap: () async {
+            final picked = await showWorkDueDatePicker(
+              context,
+              initialDate: _dueDate,
+            );
+            if (picked != null && mounted) setState(() => _dueDate = picked);
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: _fieldBoxDecoration(),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FittedBox(
+                    alignment: Alignment.centerLeft,
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      DateFormat('dd/MM/yyyy').format(_dueDate),
+                      style: const TextStyle(color: workText, fontSize: 12),
+                    ),
+                  ),
+                ),
+                const Icon(Icons.calendar_today_rounded, size: 14),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriorityAndStatus() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _dropdown<String>(
+            label: 'ความสำคัญ (Priority)',
+            icon: Icons.local_fire_department_outlined,
+            value: _priority,
+            items: const [
+              DropdownMenuItem(value: 'low', child: Text('🌱 งานไม่รีบ (Low)')),
+              DropdownMenuItem(
+                value: 'medium',
+                child: Text('⚡ ปานกลาง (Medium)'),
+              ),
+              DropdownMenuItem(value: 'high', child: Text('🔥 สำคัญ (High)')),
+              DropdownMenuItem(
+                value: 'urgent',
+                child: Text('🚨 ด่วนมาก (Urgent)'),
+              ),
+            ],
+            onChanged: (value) => setState(() => _priority = value ?? 'low'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _dropdown<String>(
+            label: 'สถานะ (Status)',
+            icon: Icons.check_circle_outline_rounded,
+            value: _status,
+            items: const [
+              DropdownMenuItem(value: 'pending', child: Text('รอทำ (Pending)')),
+              DropdownMenuItem(value: 'in_progress', child: Text('กำลังทำ')),
+              DropdownMenuItem(value: 'in_review', child: Text('รอตรวจ')),
+              DropdownMenuItem(value: 'completed', child: Text('เสร็จสิ้น')),
+            ],
+            onChanged: (value) => setState(() => _status = value ?? 'pending'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBoards() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _fieldLabel(
+                'บอร์ดงานเริ่มต้น',
+                icon: Icons.grid_view_rounded,
+              ),
+            ),
+            TextButton.icon(
+              key: const Key('add-initial-board'),
+              onPressed: () => setState(() => _boards.add(_InitialTaskBoard())),
+              style: TextButton.styleFrom(
+                foregroundColor: workBlue,
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+              icon: const Icon(Icons.add_rounded, size: 17),
+              label: const Text(
+                'เพิ่มบอร์ดงาน',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        const Divider(height: 12, color: Color(0xFFE2E8F0)),
+        for (var index = 0; index < _boards.length; index++) ...[
+          _boardEditor(index, _boards[index]),
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+
+  Widget _boardEditor(int index, _InitialTaskBoard board) {
+    return Container(
+      key: Key('initial-board-$index'),
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        border: Border.all(color: const Color(0xFFD8E1EE)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: _inputDecoration('ชื่อบอร์ดงานที่ ${index + 1}'),
+                  onChanged: (value) => board.name = value,
+                ),
+              ),
+              if (_boards.length > 1) ...[
+                const SizedBox(width: 6),
+                IconButton(
+                  key: Key('remove-initial-board-$index'),
+                  tooltip: 'ลบบอร์ดงาน',
+                  onPressed: () => setState(() => _boards.removeAt(index)),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            minLines: 2,
+            maxLines: 3,
+            decoration: _inputDecoration('รายละเอียดเพิ่มเติมของบอร์ดงาน...'),
+            onChanged: (value) => board.description = value,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final picked = await showWorkDueDatePicker(
+                      context,
+                      initialDate: board.dueDate ?? _dueDate,
+                    );
+                    if (picked != null && mounted) {
+                      setState(() => board.dueDate = picked);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: _fieldBoxDecoration(),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            board.dueDate == null
+                                ? 'วว/ดด/ปปปป'
+                                : DateFormat(
+                                    'dd/MM/yyyy',
+                                  ).format(board.dueDate!),
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: board.dueDate == null
+                                  ? workMuted
+                                  : workText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.calendar_today_rounded, size: 14),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<String>(
+                  initialValue: board.priority,
+                  isExpanded: true,
+                  decoration: _compactDropdownDecoration(),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'low',
+                      child: Text('🌱 งานไม่รีบ (Low)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'medium',
+                      child: Text('⚡ ปานกลาง (Medium)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'high',
+                      child: Text('🔥 สำคัญ (High)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'urgent',
+                      child: Text('🚨 ด่วนมาก (Urgent)'),
+                    ),
+                  ],
+                  onChanged: (value) => board.priority = value ?? 'medium',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        ),
+        child: Row(
+          children: [
+            const Spacer(),
+            TextButton(
+              onPressed: _submitting ? null : () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                foregroundColor: workText,
+                minimumSize: const Size(0, 44),
+              ),
+              child: const Text(
+                'ยกเลิก',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              key: const Key('submit-create-task'),
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: workBlue,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'สร้างงาน',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final validBoards = _boards
+        .where((board) => board.name.trim().isNotEmpty)
+        .toList();
+    if (_title.trim().isEmpty) {
+      _showError('กรุณากรอกชื่องาน');
+      return;
+    }
+    if (_assigneeIds.isEmpty) {
+      _showError('กรุณาเลือกผู้รับผิดชอบอย่างน้อย 1 คน');
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await widget.onSubmit(
+        _title.trim(),
+        _description.trim(),
+        List<String>.unmodifiable(_assigneeIds),
+        _dueDate,
+        _brandId,
+        _categoryId,
+        _priority,
+        _status,
+        validBoards,
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) _showError('เกิดข้อผิดพลาด: $error');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Widget _dropdown<T>({
     required String label,
     required IconData icon,
     required T? value,
@@ -542,59 +704,236 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel(label, icon),
-        const SizedBox(height: 4),
+        _fieldLabel(label, icon: icon),
+        const SizedBox(height: 6),
         DropdownButtonFormField<T>(
-          value: value,
-          decoration: _inputDeco('').copyWith(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
+          initialValue: value,
           isExpanded: true,
+          decoration: _compactDropdownDecoration(),
           items: items,
           onChanged: onChanged,
-          style: const TextStyle(fontSize: 13, color: workText),
+          style: const TextStyle(color: workText, fontSize: 12),
         ),
       ],
     );
   }
 
-  Widget _fieldLabel(String label, IconData icon) {
+  Widget _fieldLabel(String label, {IconData? icon}) {
     return Row(
       children: [
-        Icon(icon, size: 13, color: workBlue),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11.5,
-            color: workMuted,
-            fontWeight: FontWeight.bold,
+        if (icon != null) ...[
+          Icon(icon, size: 15, color: const Color(0xFF8BA0BA)),
+          const SizedBox(width: 5),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: workText,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ],
     );
   }
 
-  InputDecoration _inputDeco(String hint) {
+  InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(fontSize: 12.5, color: workMuted),
+      hintStyle: const TextStyle(color: workMuted, fontSize: 12),
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      isDense: true,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: workBlue, width: 1.2),
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: _inputBorder(),
+      enabledBorder: _inputBorder(),
+      focusedBorder: _inputBorder(workBlue, 1.3),
     );
+  }
+
+  InputDecoration _compactDropdownDecoration() {
+    return InputDecoration(
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
+      border: _inputBorder(),
+      enabledBorder: _inputBorder(),
+      focusedBorder: _inputBorder(workBlue, 1.3),
+    );
+  }
+
+  OutlineInputBorder _inputBorder([
+    Color color = const Color(0xFFD8E1EE),
+    double width = 1,
+  ]) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: color, width: width),
+    );
+  }
+
+  BoxDecoration _fieldBoxDecoration() {
+    return BoxDecoration(
+      color: const Color(0xFFF8FAFC),
+      border: Border.all(color: const Color(0xFFD8E1EE)),
+      borderRadius: BorderRadius.circular(10),
+    );
+  }
+
+  String _userDisplayName(AppUser user) {
+    if (user.nickname.trim().isNotEmpty) return user.nickname.trim();
+    if (user.firstName.trim().isNotEmpty) return user.firstName.trim();
+    return user.email;
+  }
+
+  void _changeBrand(String? brandId) {
+    final manualAssignees = _assigneeIds
+        .where((id) => !_autoBrandAssigneeIds.contains(id))
+        .toSet();
+    final brand = widget.brands.where((item) => item.id == brandId).firstOrNull;
+    final autoAssignees = brand == null
+        ? <String>{}
+        : _autoAssigneeIdsForBrand(brand);
+    setState(() {
+      _brandId = brandId;
+      _autoBrandAssigneeIds
+        ..clear()
+        ..addAll(autoAssignees);
+      _assigneeIds
+        ..clear()
+        ..addAll(manualAssignees)
+        ..addAll(autoAssignees);
+    });
+  }
+
+  Set<String> _autoAssigneeIdsForBrand(BrandRecord brand) {
+    final groups = _visibleResponsibilityGroups(brand);
+    final currentUserId = widget.currentUser?.id;
+    String? currentTeamType;
+    for (final entry in groups.reversed) {
+      if (currentUserId != null &&
+          entry.value.any((user) => user.id == currentUserId)) {
+        currentTeamType = entry.key;
+        break;
+      }
+    }
+    currentTeamType ??= _responsibilityTypeForUser(widget.currentUser);
+
+    return groups
+        .where((entry) => entry.key != currentTeamType)
+        .expand((entry) => entry.value)
+        .map((user) => user.id)
+        .toSet();
+  }
+
+  List<MapEntry<String, List<AppUser>>> _visibleResponsibilityGroups(
+    BrandRecord brand,
+  ) {
+    const types = ['bd', 'mkt', 'graphic'];
+    final usersById = {for (final user in widget.users) user.id: user};
+    final groups = <MapEntry<String, List<AppUser>>>[];
+    for (final type in types) {
+      final userIds = brand.hasTypedResponsibilities
+          ? brand.responsibilities
+                .where((item) => item.type == type)
+                .map((item) => item.userId)
+          : type == 'bd'
+          ? brand.responsibleUserIds
+          : const <String>[];
+      final users = userIds
+          .map((id) => usersById[id])
+          .whereType<AppUser>()
+          .where(
+            (user) =>
+                user.status == 'active' &&
+                (brand.hasTypedResponsibilities ||
+                    user.position.trim().toLowerCase() == 'bd'),
+          )
+          .toList(growable: false);
+      groups.add(MapEntry(type, users));
+    }
+
+    final currentUserId = widget.currentUser?.id;
+    final teamType = _responsibilityTypeForUser(widget.currentUser);
+    final teamIndex = teamType == null ? -1 : types.indexOf(teamType);
+    var mappedIndex = -1;
+    if (currentUserId != null) {
+      for (var index = 0; index < groups.length; index++) {
+        if (groups[index].value.any((user) => user.id == currentUserId)) {
+          mappedIndex = index;
+        }
+      }
+    }
+    final currentIndex = teamIndex > mappedIndex ? teamIndex : mappedIndex;
+    return groups.take(currentIndex < 0 ? 1 : currentIndex + 1).toList();
+  }
+
+  String? _responsibilityTypeForUser(AppUser? user) {
+    if (user == null) return null;
+    final teamKey = '${user.position}${user.department}'
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp('[^a-z]'), '');
+    if (teamKey == 'bd' || teamKey.contains('businessdevelop')) return 'bd';
+    if (teamKey == 'mkt' || teamKey.contains('marketing')) return 'mkt';
+    if (teamKey == 'gp' || teamKey.contains('graphic')) return 'graphic';
+    return null;
+  }
+
+  List<Widget> _buildBrandResponsibilityGroups() {
+    final brand = widget.brands
+        .where((item) => item.id == _brandId)
+        .firstOrNull;
+    if (brand == null) return const [];
+    final groups = _visibleResponsibilityGroups(
+      brand,
+    ).where((entry) => entry.value.isNotEmpty).toList();
+    if (groups.isEmpty) return const [];
+    const labels = {'bd': 'BD', 'mkt': 'MKT', 'graphic': 'Graphic'};
+
+    return [
+      const SizedBox(height: 10),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          border: Border.all(color: const Color(0xFFD8E1EE)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'ทีมผู้รับผิดชอบแบรนด์',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 7),
+            for (final group in groups)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: Text(
+                  '${labels[group.key]}: ${group.value.map(_userDisplayName).join(', ')}',
+                  style: const TextStyle(color: workText, fontSize: 11),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

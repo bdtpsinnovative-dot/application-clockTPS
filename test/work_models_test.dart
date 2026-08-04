@@ -53,6 +53,23 @@ void main() {
     expect(deliverable.cards.single.title, 'ข้อมูลเดิม');
   });
 
+  test(
+    'TaskCardRecord maps assignee_ids when assignee objects are omitted',
+    () {
+      final card = TaskCardRecord.fromJson({
+        'id': 'card-1',
+        'list_id': 'list-1',
+        'title': 'การ์ดงาน',
+        'description': '',
+        'status': 'pending',
+        'sort_order': 0,
+        'assignee_ids': ['user-1', 'user-2'],
+      });
+
+      expect(card.assigneeIds, ['user-1', 'user-2']);
+    },
+  );
+
   test('TaskEventRecord maps a deliverable comment and its author', () {
     final comment = TaskEventRecord.fromJson({
       'id': 'event-1',

@@ -230,7 +230,9 @@ extension _TaskBoardRendering on _TaskBoardPageState {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)), // slate-200 border
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+              ), // slate-200 border
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x06000000),
@@ -289,11 +291,20 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               value: lists.isNotEmpty
-                                  ? (lists.where((l) => l.status == 'completed').length / lists.length)
+                                  ? (lists
+                                            .where(
+                                              (l) => l.status == 'completed',
+                                            )
+                                            .length /
+                                        lists.length)
                                   : 0.0,
-                              backgroundColor: const Color(0xFFE2E8F0), // light slate background
+                              backgroundColor: const Color(
+                                0xFFE2E8F0,
+                              ), // light slate background
                               valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFF10B981), // Emerald green progress fill
+                                Color(
+                                  0xFF10B981,
+                                ), // Emerald green progress fill
                               ),
                               minHeight: 4,
                             ),
@@ -313,85 +324,89 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                         ),
                       ],
                     ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (lists.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.inbox_outlined,
+                            color: workMuted,
+                            size: 28,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'ยังไม่มีงานในบอร์ดนี้',
+                            style: TextStyle(
+                              color: workMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (lists.isNotEmpty)
+                  ...lists.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final list = entry.value;
+                    return _buildTaskBoardRow(
+                      list,
+                      isLast: index == lists.length - 1,
+                    );
+                  }),
+                // "+ เพิ่มการ์ด" Button
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: _createNewList,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9), // slate-100 background
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0), // slate-200 border
+                        width: 1,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_rounded,
+                            size: 18,
+                            color: Color(0xFF475569), // slate-600
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'เพิ่มการ์ด',
+                            style: TextStyle(
+                              color: Color(0xFF475569), // slate-600
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            if (lists.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.inbox_outlined, color: workMuted, size: 28),
-                      SizedBox(height: 8),
-                      Text(
-                        'ยังไม่มีงานในบอร์ดนี้',
-                        style: TextStyle(
-                          color: workMuted,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (lists.isNotEmpty)
-              ...lists.asMap().entries.map((entry) {
-                final index = entry.key;
-                final list = entry.value;
-                return _buildTaskBoardRow(
-                  list,
-                  isLast: index == lists.length - 1,
-                );
-              }),
-            // "+ เพิ่มการ์ด" Button
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: _createNewList,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9), // slate-100 background
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFE2E8F0), // slate-200 border
-                    width: 1,
-                  ),
-                ),
-                child: const Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.add_rounded,
-                        size: 18,
-                        color: Color(0xFF475569), // slate-600
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        'เพิ่มการ์ด',
-                        style: TextStyle(
-                          color: Color(0xFF475569), // slate-600
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    ],
-  ),
-);
-}
+    );
+  }
 
   Widget _buildTaskBoardRow(TaskListRecord list, {required bool isLast}) {
     final isCompleted = list.status == 'completed';
@@ -422,16 +437,13 @@ extension _TaskBoardRendering on _TaskBoardPageState {
         color: cardBg,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          onTap: isUpdating ? null : () => _showTaskDetailModal(list),
+          onTap: isUpdating ? null : () => _showTaskListDetailSheet(list),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: cardBorder,
-                width: 1,
-              ),
+              border: Border.all(color: cardBorder, width: 1),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x05000000),
@@ -450,9 +462,7 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                       : 'ทำเครื่องหมายว่าเสร็จแล้ว',
                   button: true,
                   child: GestureDetector(
-                    onTap: isUpdating
-                        ? null
-                        : () => _toggleListCompleted(list),
+                    onTap: isUpdating ? null : () => _toggleListCompleted(list),
                     child: Container(
                       width: 20,
                       height: 20,
@@ -497,7 +507,9 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13.5,
                                 color: isCompleted
-                                    ? const Color(0xFF6B7280) // Muted slate-green
+                                    ? const Color(
+                                        0xFF6B7280,
+                                      ) // Muted slate-green
                                     : workText,
                                 decoration: isCompleted
                                     ? TextDecoration.lineThrough
@@ -1172,9 +1184,11 @@ extension _TaskBoardRendering on _TaskBoardPageState {
   }
 
   Widget _buildCardContent(TaskCardRecord card) {
-    final doneCount = card.subItems.where((s) => s.isDone).length;
-    final totalCount = card.subItems.length;
-    final pct = totalCount == 0 ? 0 : (doneCount / totalCount * 100).toInt();
+    // Cards are the actual work items. The legacy nested sub-item checklist
+    // is intentionally not rendered on the board anymore.
+    const doneCount = 0;
+    const totalCount = 0;
+    const pct = 0;
 
     final isCompleted = card.status == 'completed';
     final isInProgress = card.status == 'in_progress';
@@ -1206,10 +1220,7 @@ extension _TaskBoardRendering on _TaskBoardPageState {
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cardBorder,
-            width: 1,
-          ),
+          border: Border.all(color: cardBorder, width: 1),
           boxShadow: const [
             BoxShadow(
               color: Color(0x05000000),
@@ -1318,7 +1329,7 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     ),
                   ],
                   // Sub-items checklist (if not empty)
-                  if (card.subItems.isNotEmpty) ...[
+                  if (false && card.subItems.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.all(8),
@@ -1386,7 +1397,7 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     ),
                   ],
                   // Progress bar (if sub-items exist)
-                  if (totalCount > 0) ...[
+                  if (false && totalCount > 0) ...[
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -1411,7 +1422,9 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                             child: LinearProgressIndicator(
                               value: doneCount / totalCount,
                               backgroundColor: const Color(0xFFE2E8F0),
-                              color: pct == 100 ? const Color(0xFF10B981) : workBlue,
+                              color: pct == 100
+                                  ? const Color(0xFF10B981)
+                                  : workBlue,
                               minHeight: 4,
                             ),
                           ),
@@ -1421,7 +1434,9 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                           '$pct%',
                           style: TextStyle(
                             fontSize: 10,
-                            color: pct == 100 ? const Color(0xFF10B981) : workBlue,
+                            color: pct == 100
+                                ? const Color(0xFF10B981)
+                                : workBlue,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

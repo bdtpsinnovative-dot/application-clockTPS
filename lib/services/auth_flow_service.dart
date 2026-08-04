@@ -893,8 +893,23 @@ class AuthFlowService {
     await _authorizedDelete('/admin/tasks/$id');
   }
 
+  Future<List<TaskRecord>> getTrashTasks() async {
+    final response = await _authorizedGet('/api/tasks/trash');
+    final data = response['data'] as List? ?? [];
+    return data
+        .map((json) => TaskRecord.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> restoreTask(String id) async {
+    await _authorizedPost('/api/tasks/$id/restore', data: {});
+  }
+
   Future<void> toggleStarTask(String id, bool isStarred) async {
-    await _authorizedPost('/api/tasks/$id/star', data: {'is_starred': isStarred});
+    await _authorizedPost(
+      '/api/tasks/$id/star',
+      data: {'is_starred': isStarred},
+    );
   }
 
   Future<void> updateFcmToken(String token) async {

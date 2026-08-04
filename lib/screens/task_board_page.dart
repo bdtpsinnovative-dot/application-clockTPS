@@ -15,7 +15,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 part 'task_board/card_detail_sheet.dart';
-part 'task_board/sub_item_detail_sheet.dart';
+part 'task_board/task_list_detail_sheet.dart';
 part 'task_board/board_support_widgets.dart';
 part 'task_board/task_board_operations.dart';
 part 'task_board/task_board_filters.dart';
@@ -292,7 +292,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   Widget _buildUserAvatar(UserSummary user, {double radius = 10}) {
     final avatarUrl = _resolveAvatarUrl(user.avatarUrl);
     final hasAvatar = avatarUrl.isNotEmpty;
-    final isSvg = hasAvatar && (avatarUrl.toLowerCase().contains('.svg') || avatarUrl.toLowerCase().contains('/svg'));
+    final isSvg =
+        hasAvatar &&
+        (avatarUrl.toLowerCase().contains('.svg') ||
+            avatarUrl.toLowerCase().contains('/svg'));
 
     Widget avatarWidget;
     if (hasAvatar) {
@@ -300,13 +303,15 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         avatarWidget = SvgPicture.network(
           avatarUrl,
           fit: BoxFit.cover,
-          placeholderBuilder: (BuildContext context) => _buildFallbackText(user, radius),
+          placeholderBuilder: (BuildContext context) =>
+              _buildFallbackText(user, radius),
         );
       } else {
         avatarWidget = Image.network(
           avatarUrl,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildFallbackText(user, radius),
+          errorBuilder: (context, error, stackTrace) =>
+              _buildFallbackText(user, radius),
         );
       }
     } else {
@@ -320,9 +325,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         shape: BoxShape.circle,
         color: Color(0xFFDBEAFE),
       ),
-      child: ClipOval(
-        child: avatarWidget,
-      ),
+      child: ClipOval(child: avatarWidget),
     );
   }
 
@@ -456,7 +459,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                           ),
                                         ),
                                       ),
-                                    ],
+                                  ],
                                 ),
                               ),
                               IconButton(

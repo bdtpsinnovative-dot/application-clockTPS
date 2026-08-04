@@ -136,6 +136,26 @@ components:
 
 Architectural Trust meets Industrial Cleanliness. The Clock in TPS design system delivers a highly structured, reliable, and accessible interface suited for workplace operations and factory environments. The UI focuses on clean surfaces, clear alignment, and high readability under varying lighting conditions.
 
+## Compact Modern Direction (Mandatory)
+
+The product must feel **compact, modern, fast, and uncluttered**. This direction is the default for every new screen and every UI revision, especially task-management and admin workflows. For operational screens, these rules supersede older oversized card, radius, and spacing defaults elsewhere in this document.
+
+- Show the highest-value information first. Remove duplicate labels, redundant actions, and decorative empty space.
+- Keep related controls visually close. Use `2-6px` between AppBar actions, `4-8px` inside compact groups, and `8-12px` between related sections.
+- AppBar titles should sit close to the leading icon (`titleSpacing: 0-8`). Keep action buttons compact and aligned on one row.
+- AppBar icon controls should visually occupy about `36-40px`. Preserve an accessible tap target where possible without making the icon look oversized.
+- Use a compact primary action with an icon and a short label, such as `+ งาน`. Avoid large icon-only actions when the meaning may be unclear.
+- Use `44-48px` for normal form controls and primary footer buttons. A control inside an AppBar may be `34-40px` high.
+- Operational cards should normally use `10-14px` padding and `12-16px` corner radius. Reserve `20-24px` radius and spacious padding for hero sections or major dashboards only.
+- Prefer one clear primary action per area. Secondary actions should use quiet colors, outlines, or icon treatments.
+- Use concise Thai labels. Do not repeat information that is already obvious from the surrounding title, icon, or section.
+- Avoid redundant refresh icons when pull-to-refresh or automatic refresh already exists.
+- Modals and bottom sheets must use the available mobile height efficiently: fixed compact header/footer, scrollable content, and no large unused gaps.
+- Status, unread state, and urgency should be shown with small badges or dots instead of enlarging the whole component.
+- Before completing UI work, verify at a narrow mobile width and check for overflow, infinite constraints, awkward wrapping, and excessive spacing.
+
+The target impression is: **ข้อมูลครบ แต่หน้าจอไม่แน่นรก; ปุ่มหาเจอง่าย แต่ไม่ใหญ่เทอะทะ; ทุกส่วนดูทันสมัยและอยู่ใกล้สิ่งที่เกี่ยวข้อง**.
+
 ## Colors
 
 The system uses corporate blue and sky tones as anchors for main themes, supported by clean light backgrounds and explicit semantic colors to display status:

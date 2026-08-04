@@ -176,6 +176,7 @@ class TaskRecord {
     this.assigneeIds = const [],
     this.isStarred = false,
     this.priority = 'medium',
+    this.deletedAt,
   });
 
   factory TaskRecord.fromJson(Map<String, dynamic> json) {
@@ -210,6 +211,9 @@ class TaskRecord {
       assigneeIds: assigneeList,
       isStarred: json['is_starred'] as bool? ?? false,
       priority: json['priority'] as String? ?? 'medium',
+      deletedAt: json['deleted_at'] == null
+          ? null
+          : DateTime.tryParse(json['deleted_at'].toString())?.toLocal(),
     );
   }
 
@@ -231,6 +235,7 @@ class TaskRecord {
   final List<String> assigneeIds;
   final bool isStarred;
   final String priority;
+  final DateTime? deletedAt;
 }
 
 class TaskSubItem {
@@ -510,7 +515,10 @@ class TaskCardRecord {
               .toList()
         : <UserSummary>[];
 
-    final rawAssigneeIds = rawAssignees.map((e) => e.id).toList();
+    final rawAssigneeIdsJson = json['assignee_ids'];
+    final rawAssigneeIds = rawAssigneeIdsJson is List
+        ? rawAssigneeIdsJson.map((e) => e.toString()).toList()
+        : rawAssignees.map((e) => e.id).toList();
 
     return TaskCardRecord(
       id: json['id'] as String? ?? '',
@@ -794,17 +802,55 @@ class CardAttachment {
 }
 
 class BrandRecord {
-  const BrandRecord({required this.id, required this.name});
+  const BrandRecord({
+    required this.id,
+    required this.name,
+    this.responsibleUserIds = const [],
+    this.responsibilities = const [],
+    this.hasTypedResponsibilities = false,
+  });
 
   factory BrandRecord.fromJson(Map<String, dynamic> json) {
+    final typedResponsibilities = (json['responsibilities'] as List? ?? [])
+        .whereType<Map>()
+        .map(
+          (item) => BrandResponsibilityRecord.fromJson(
+            Map<String, dynamic>.from(item),
+          ),
+        )
+        .where((item) => item.userId.isNotEmpty)
+        .toList(growable: false);
     return BrandRecord(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
+      responsibleUserIds: (json['responsible_user_ids'] as List? ?? [])
+          .map((item) => item.toString())
+          .where((id) => id.isNotEmpty)
+          .toList(growable: false),
+      responsibilities: typedResponsibilities,
+      hasTypedResponsibilities: json['responsibilities'] is List,
     );
   }
 
   final String id;
   final String name;
+  final List<String> responsibleUserIds;
+  final List<BrandResponsibilityRecord> responsibilities;
+  final bool hasTypedResponsibilities;
+}
+
+class BrandResponsibilityRecord {
+  const BrandResponsibilityRecord({required this.userId, required this.type});
+
+  factory BrandResponsibilityRecord.fromJson(Map<String, dynamic> json) {
+    return BrandResponsibilityRecord(
+      userId: json['user_id'] as String? ?? '',
+      type: json['responsibility_type'] as String? ?? 'bd',
+    );
+  }
+
+  final String userId;
+  final String type;
 }
 
 class TaskCategoryRecord {
