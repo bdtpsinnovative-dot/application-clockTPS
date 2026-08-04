@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/priority_selector.dart';
@@ -286,6 +287,58 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     'in_progress': const Color(0xFFFFF7ED),
     'completed': const Color(0xFFF0FDF4),
   };
+
+  Widget _buildUserAvatar(UserSummary user, {double radius = 10}) {
+    final avatarUrl = user.resolvedAvatarUrl;
+    final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
+    final isSvg = hasAvatar && avatarUrl.toLowerCase().contains('.svg');
+
+    Widget avatarWidget;
+    if (hasAvatar) {
+      if (isSvg) {
+        avatarWidget = SvgPicture.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+          placeholderBuilder: (BuildContext context) => _buildFallbackText(user, radius),
+        );
+      } else {
+        avatarWidget = Image.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildFallbackText(user, radius),
+        );
+      }
+    } else {
+      avatarWidget = _buildFallbackText(user, radius);
+    }
+
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFFDBEAFE),
+      ),
+      child: ClipOval(
+        child: avatarWidget,
+      ),
+    );
+  }
+
+  Widget _buildFallbackText(UserSummary user, double radius) {
+    return Container(
+      alignment: Alignment.center,
+      color: const Color(0xFFDBEAFE),
+      child: Text(
+        user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
+        style: TextStyle(
+          fontSize: radius * 0.9,
+          color: const Color(0xFF1E40AF),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {

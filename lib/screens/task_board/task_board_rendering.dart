@@ -1133,35 +1133,12 @@ extension _TaskBoardRendering on _TaskBoardPageState {
               child: Builder(
                 builder: (context) {
                   final user = visible[i];
-                  final avatarUrl = user.resolvedAvatarUrl;
-                  final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
                   return Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 1.5),
                     ),
-                    child: CircleAvatar(
-                      radius: 10,
-                      backgroundColor: const Color(0xFFDBEAFE),
-                      backgroundImage: hasAvatar
-                          ? NetworkImage(avatarUrl)
-                          : null,
-                      onBackgroundImageError: hasAvatar
-                          ? (error, stack) {}
-                          : null,
-                      child: !hasAvatar
-                          ? Text(
-                              user.firstName.isNotEmpty
-                                  ? user.firstName[0]
-                                  : '?',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Color(0xFF1E40AF),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : null,
-                    ),
+                    child: _buildUserAvatar(user, radius: 10),
                   );
                 },
               ),

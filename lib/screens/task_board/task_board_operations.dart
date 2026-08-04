@@ -316,7 +316,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: workText,
-                                          fontSize: 13,
+                                          fontSize: 12,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
@@ -336,7 +336,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                         },
                                         borderRadius: BorderRadius.circular(10),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                                           decoration: BoxDecoration(
                                             borderRadius: BorderRadius.circular(10),
                                             border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -349,16 +349,18 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                                       ? _formatDate(selectedDueDate)
                                                       : 'วว/ดด/ปปปป',
                                                   style: TextStyle(
-                                                    fontSize: 12,
+                                                    fontSize: 10.5,
                                                     color: selectedDueDate != null
                                                         ? workText
                                                         : const Color(0xFF94A3B8),
                                                   ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),
                                               const Icon(
                                                 Icons.calendar_today_rounded,
-                                                size: 14,
+                                                size: 12,
                                                 color: Color(0xFF64748B),
                                               ),
                                             ],
@@ -368,7 +370,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 8),
 
                                 // ความสำคัญ
                                 Expanded(
@@ -380,12 +382,12 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: workText,
-                                          fontSize: 13,
+                                          fontSize: 12,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),
                                         decoration: BoxDecoration(
                                           borderRadius: BorderRadius.circular(10),
                                           border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -394,46 +396,75 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                           child: DropdownButton<String>(
                                             value: selectedPriority,
                                             isExpanded: true,
-                                            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                                            style: const TextStyle(fontSize: 12, color: workText),
+                                            isDense: true,
+                                            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
+                                            style: const TextStyle(fontSize: 11, color: workText),
                                             items: const [
                                               DropdownMenuItem(
                                                 value: 'low',
                                                 child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.arrow_downward_rounded, size: 14, color: Colors.blue),
-                                                    SizedBox(width: 4),
-                                                    Text('ต่ำ'),
+                                                    Icon(Icons.arrow_downward_rounded, size: 12, color: Colors.blue),
+                                                    SizedBox(width: 3),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'ต่ำ',
+                                                        style: TextStyle(fontSize: 11),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
                                                   ],
                                                 ),
                                               ),
                                               DropdownMenuItem(
                                                 value: 'medium',
                                                 child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.remove_rounded, size: 14, color: Colors.amber),
-                                                    SizedBox(width: 4),
-                                                    Text('ปานกลาง'),
+                                                    Icon(Icons.remove_rounded, size: 12, color: Colors.amber),
+                                                    SizedBox(width: 3),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'ปานกลาง',
+                                                        style: TextStyle(fontSize: 11),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
                                                   ],
                                                 ),
                                               ),
                                               DropdownMenuItem(
                                                 value: 'high',
                                                 child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.flash_on_rounded, size: 14, color: Colors.orange),
-                                                    SizedBox(width: 4),
-                                                    Text('ด่วน'),
+                                                    Icon(Icons.flash_on_rounded, size: 12, color: Colors.orange),
+                                                    SizedBox(width: 3),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'ด่วน',
+                                                        style: TextStyle(fontSize: 11),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
                                                   ],
                                                 ),
                                               ),
                                               DropdownMenuItem(
                                                 value: 'urgent',
                                                 child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.report_problem_rounded, size: 14, color: Colors.red),
-                                                    SizedBox(width: 4),
-                                                    Text('ด่วนที่สุด'),
+                                                    Icon(Icons.report_problem_rounded, size: 12, color: Colors.red),
+                                                    SizedBox(width: 3),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'ด่วนสุด',
+                                                        style: TextStyle(fontSize: 11),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
                                                   ],
                                                 ),
                                               ),
@@ -451,7 +482,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 8),
 
                                 // สถานะ
                                 Expanded(
@@ -463,12 +494,12 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: workText,
-                                          fontSize: 13,
+                                          fontSize: 12,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),
                                         decoration: BoxDecoration(
                                           borderRadius: BorderRadius.circular(10),
                                           border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -477,20 +508,33 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                           child: DropdownButton<String>(
                                             value: selectedStatus,
                                             isExpanded: true,
-                                            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                                            style: const TextStyle(fontSize: 12, color: workText),
+                                            isDense: true,
+                                            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
+                                            style: const TextStyle(fontSize: 11, color: workText),
                                             items: const [
                                               DropdownMenuItem(
                                                 value: 'todo',
-                                                child: Text('รอรับ'),
+                                                child: Text(
+                                                  'รอรับ',
+                                                  style: TextStyle(fontSize: 11),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                               ),
                                               DropdownMenuItem(
                                                 value: 'in_progress',
-                                                child: Text('กำลังทำ'),
+                                                child: Text(
+                                                  'กำลังทำ',
+                                                  style: TextStyle(fontSize: 11),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                               ),
                                               DropdownMenuItem(
                                                 value: 'completed',
-                                                child: Text('เสร็จสิ้น'),
+                                                child: Text(
+                                                  'เสร็จสิ้น',
+                                                  style: TextStyle(fontSize: 11),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                               ),
                                             ],
                                             onChanged: (val) {
@@ -929,27 +973,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                           width: 2,
                                         ),
                                       ),
-                                      child: CircleAvatar(
-                                        radius: 20,
-                                        backgroundImage:
-                                            member.avatarUrl != null &&
-                                                member.avatarUrl!.isNotEmpty
-                                            ? NetworkImage(member.avatarUrl!)
-                                            : null,
-                                        child:
-                                            member.avatarUrl == null ||
-                                                member.avatarUrl!.isEmpty
-                                            ? Text(
-                                                member.firstName.isNotEmpty
-                                                    ? member.firstName[0]
-                                                    : '?',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              )
-                                            : null,
-                                      ),
+                                      child: _buildUserAvatar(member, radius: 20),
                                     ),
                                     if (isSelected)
                                       Positioned(
