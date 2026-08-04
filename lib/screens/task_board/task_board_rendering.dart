@@ -336,8 +336,8 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     ],
                   ),
                 ),
-              )
-            else
+              ),
+            if (lists.isNotEmpty)
               ...lists.asMap().entries.map((entry) {
                 final index = entry.key;
                 final list = entry.value;
@@ -346,6 +346,45 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                   isLast: index == lists.length - 1,
                 );
               }),
+            // "+ เพิ่มการ์ด" Button
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: _createNewList,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9), // slate-100 background
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFE2E8F0), // slate-200 border
+                    width: 1,
+                  ),
+                ),
+                child: const Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_rounded,
+                        size: 18,
+                        color: Color(0xFF475569), // slate-600
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'เพิ่มการ์ด',
+                        style: TextStyle(
+                          color: Color(0xFF475569), // slate-600
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
