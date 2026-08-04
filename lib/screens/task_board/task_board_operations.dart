@@ -4,7 +4,13 @@ extension _TaskBoardOperations on _TaskBoardPageState {
   Future<void> _loadBoard() async {
     setState(() => _loading = true);
     try {
-      final boardLists = await widget.service.getTrelloBoard(widget.task.id);
+      final results = await Future.wait([
+        widget.service.getTrelloBoard(widget.task.id),
+        widget.service.getTaskMembers(widget.task.id),
+      ]);
+      final boardLists = results[0] as List<TaskListRecord>;
+      final members = results[1] as List<UserSummary>;
+
       if (mounted) {
         // ลำดับจากผู้ใช้เป็น source of truth เพื่อให้การลากเรียงคงอยู่หลังรีโหลด
         for (var list in boardLists) {
@@ -13,6 +19,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
 
         setState(() {
           _lists = boardLists;
+          _members = members;
           _loading = false;
         });
       }
