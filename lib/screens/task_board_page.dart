@@ -291,7 +291,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   Widget _buildUserAvatar(UserSummary user, {double radius = 10}) {
     final avatarUrl = _resolveAvatarUrl(user.avatarUrl);
     final hasAvatar = avatarUrl.isNotEmpty;
-    final isSvg = hasAvatar && avatarUrl.toLowerCase().contains('.svg');
+    final isSvg = hasAvatar && (avatarUrl.toLowerCase().contains('.svg') || avatarUrl.toLowerCase().contains('/svg'));
 
     Widget avatarWidget;
     if (hasAvatar) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 
@@ -71,6 +72,87 @@ class _CardAssigneePickerState extends State<CardAssigneePicker> {
         );
       }
     }
+  }
+
+  Widget _buildUserAvatarWidget(UserSummary user, {double radius = 18}) {
+    final avatarUrl = _resolveAvatarUrl(user.avatarUrl);
+    final hasAvatar = avatarUrl.isNotEmpty;
+    final isSvg = hasAvatar && (avatarUrl.toLowerCase().contains('.svg') || avatarUrl.toLowerCase().contains('/svg'));
+
+    Widget avatarWidget;
+    if (hasAvatar) {
+      if (isSvg) {
+        avatarWidget = SvgPicture.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+          placeholderBuilder: (BuildContext context) => _buildFallbackTextWidget(user, radius),
+        );
+      } else {
+        avatarWidget = Image.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+          headers: const {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+          errorBuilder: (context, error, stackTrace) => _buildFallbackTextWidget(user, radius),
+        );
+      }
+    } else {
+      avatarWidget = _buildFallbackTextWidget(user, radius);
+    }
+
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFFDBEAFE),
+      ),
+      child: ClipOval(
+        child: avatarWidget,
+      ),
+    );
+  }
+
+  Widget _buildFallbackTextWidget(UserSummary user, double radius) {
+    return Container(
+      alignment: Alignment.center,
+      color: const Color(0xFFDBEAFE),
+      child: Text(
+        user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
+        style: TextStyle(
+          fontSize: radius * 0.9,
+          color: const Color(0xFF1E40AF),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  String _resolveAvatarUrl(String? url) {
+    if (url == null) return '';
+    var trimmed = url.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('r2://')) {
+      return trimmed.replaceFirst(
+        'r2://',
+        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+      );
+    }
+    if (trimmed.startsWith('okpr2://')) {
+      return trimmed.replaceFirst(
+        'okpr2://',
+        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+      );
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    final apiBase = widget.service.baseUrl;
+    if (trimmed.startsWith('/')) {
+      return '$apiBase$trimmed';
+    }
+    return '$apiBase/$trimmed';
   }
 
   void _showPermissionErrorDialog(String errorMsg) {
@@ -222,25 +304,8 @@ class _CardAssigneePickerState extends State<CardAssigneePicker> {
 
                           return ListTile(
                             enabled: !_isSaving,
-                            leading: Builder(
-                              builder: (context) {
-                                final avatarUrl = member.resolvedAvatarUrl;
-                                final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
-                                return CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: Colors.blue[100],
-                                  backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
-                                  onBackgroundImageError: hasAvatar ? (error, stack) {} : null,
-                                  child: !hasAvatar
-                                      ? Text(
-                                          member.firstName.isNotEmpty ? member.firstName[0] : '?',
-                                          style: const TextStyle(fontSize: 14, color: Colors.blue, fontWeight: FontWeight.bold),
-                                        )
-                                      : null,
-                                );
-                              },
-                            ),
-                            title: Text(member.fullName),
+                            leading: _buildUserAvatarWidget(member, radius: 18),
+                            title: Text(member.displayName),
                             subtitle: Text(member.position, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                             trailing: isSelected
                                 ? const Icon(Icons.check_circle, color: Colors.blue)
@@ -329,22 +394,9 @@ class _CardAssigneePickerState extends State<CardAssigneePicker> {
               _selectedAssignees.length > 3 ? 3 : _selectedAssignees.length,
               (index) {
                 final assignee = _selectedAssignees[index];
-                final avatarUrl = assignee.resolvedAvatarUrl;
-                final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
                 return Align(
                   widthFactor: 0.7,
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.blue[100],
-                    backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
-                    onBackgroundImageError: hasAvatar ? (error, stack) {} : null,
-                    child: !hasAvatar
-                        ? Text(
-                            assignee.firstName.isNotEmpty ? assignee.firstName[0] : '?',
-                            style: const TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold),
-                          )
-                        : null,
-                  ),
+                  child: _buildUserAvatarWidget(assignee, radius: 16),
                 );
               },
             ),
