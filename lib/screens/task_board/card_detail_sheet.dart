@@ -856,7 +856,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                             Expanded(
                               child: Text(
                                 _dueDate != null
-                                    ? DateFormat('dd / MM / yyyy').format(_dueDate!)
+                                    ? _formatDate(_dueDate!)
                                     : 'วว/ดด/ปปปป',
                                 style: TextStyle(
                                   fontSize: 12,
@@ -1123,7 +1123,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _pickAndUploadFile(),
+                    onPressed: () => _uploadEvidenceFileCombined(),
                     icon: const Icon(Icons.attach_file_rounded, size: 16, color: Color(0xFF6366F1)),
                     label: const Text('แนบไฟล์ (ลิงก์)', style: TextStyle(color: Color(0xFF6366F1), fontSize: 12.5, fontWeight: FontWeight.bold)),
                     style: OutlinedButton.styleFrom(
@@ -1136,7 +1136,7 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _addLinkAttachment(),
+                    onPressed: () => _attachEvidenceLink(),
                     icon: const Icon(Icons.link_rounded, size: 16, color: Color(0xFF10B981)),
                     label: const Text('แนบลิงก์', style: TextStyle(color: Color(0xFF10B981), fontSize: 12.5, fontWeight: FontWeight.bold)),
                     style: OutlinedButton.styleFrom(
