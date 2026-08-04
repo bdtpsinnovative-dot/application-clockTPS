@@ -33,13 +33,11 @@ void main() {
         home: TaskBoardPage(
           task: task,
           service: service,
+          initialListId: 'list-1',
           onRefreshNeeded: () {},
         ),
       ),
     );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('รายการทดสอบ'));
     await tester.pumpAndSettle();
 
     expect(find.text('แก้ไขข้อมูลงาน'), findsOneWidget);

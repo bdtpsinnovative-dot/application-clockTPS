@@ -245,11 +245,13 @@ class TaskBoardPage extends StatefulWidget {
     required this.task,
     required this.service,
     required this.onRefreshNeeded,
+    this.initialListId,
   });
 
   final TaskRecord task;
   final AuthFlowService service;
   final VoidCallback onRefreshNeeded;
+  final String? initialListId;
 
   @override
   State<TaskBoardPage> createState() => _TaskBoardPageState();
@@ -266,6 +268,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   bool _isCompactMode = false;
   final ValueNotifier<double> _cardDragXNotifier = ValueNotifier<double>(0.0);
   final Set<String> _updatingListIds = <String>{};
+  bool _openedInitialList = false;
 
   String _cardSearchQuery = '';
   List<String> _selectedListIds = [];

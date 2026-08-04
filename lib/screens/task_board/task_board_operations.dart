@@ -22,6 +22,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
           _members = members;
           _loading = false;
         });
+        _openInitialTaskList();
       }
     } catch (e) {
       if (mounted) {
@@ -35,6 +36,18 @@ extension _TaskBoardOperations on _TaskBoardPageState {
         );
       }
     }
+  }
+
+  void _openInitialTaskList() {
+    if (_openedInitialList) return;
+    final initialListId = widget.initialListId?.trim() ?? '';
+    if (initialListId.isEmpty) return;
+    final target = _lists.where((list) => list.id == initialListId).firstOrNull;
+    if (target == null) return;
+    _openedInitialList = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showTaskListDetailSheet(target);
+    });
   }
 
   // เรียงลำดับการ์ดใหม่ภายในคอลัมน์เดียวกัน

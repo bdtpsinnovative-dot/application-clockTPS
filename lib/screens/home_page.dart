@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../models/app_user.dart';
 import '../services/auth_flow_service.dart';
+import '../services/fcm_service.dart';
 import '../widgets/work_ui.dart';
 import 'calendar_page.dart';
 import 'dashboard_page.dart';
@@ -12,6 +14,7 @@ import 'user_profile_page.dart';
 import 'main_dashboard_page.dart';
 import 'admin_dashboard_page.dart';
 import 'notifications_page.dart';
+import 'task_board_page.dart';
 import '../widgets/user_avatar.dart';
 
 class HomePage extends StatefulWidget {
@@ -37,6 +40,8 @@ class _HomePageState extends State<HomePage> {
   int _pendingCount = 0;
   late AppUser _currentUser;
   String? _targetRequestId;
+  StreamSubscription<FcmNotificationTarget>? _notificationTapSubscription;
+  bool _openingNotificationTarget = false;
 
   @override
   void initState() {
@@ -45,6 +50,62 @@ class _HomePageState extends State<HomePage> {
     _animatingSelectedIndex = _selectedIndex;
     if (_currentUser.role == 'admin') {
       _loadPendingCount();
+    }
+    _notificationTapSubscription = FcmService.instance.notificationTaps.listen(
+      _openNotificationTarget,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final pendingTarget = FcmService.instance.takePendingTarget();
+      if (pendingTarget != null) _openNotificationTarget(pendingTarget);
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationTapSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _openNotificationTarget(FcmNotificationTarget target) async {
+    if (!mounted || _openingNotificationTarget) return;
+    final taskId = target.taskId;
+    if (taskId == null || taskId.isEmpty) {
+      _selectPage(4);
+      return;
+    }
+
+    _openingNotificationTarget = true;
+    try {
+      final tasks = await widget.service.getMyTasks();
+      if (!mounted) return;
+      final task = tasks.where((item) => item.id == taskId).firstOrNull;
+      if (task == null) {
+        _selectPage(4);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่พบงานจากการแจ้งเตือนนี้')),
+        );
+        return;
+      }
+
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => TaskBoardPage(
+            task: task,
+            service: widget.service,
+            initialListId: target.listId,
+            onRefreshNeeded: () {},
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        _selectPage(4);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('เปิดงานจากการแจ้งเตือนไม่สำเร็จ')),
+        );
+      }
+    } finally {
+      _openingNotificationTarget = false;
     }
   }
 
@@ -82,7 +143,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     Navigator.maybePop(context);
-    
+
     // Immediately switch both capsule and page at the same time
     setState(() {
       _animatingSelectedIndex = index;
@@ -129,12 +190,16 @@ class _HomePageState extends State<HomePage> {
                   // 1. Sliding capsule background
                   Positioned.fill(
                     child: AnimatedAlign(
-                      alignment: Alignment(-1.0 + (_animatingSelectedIndex * (2.0 / 5.0)), 0.0),
+                      alignment: Alignment(
+                        -1.0 + (_animatingSelectedIndex * (2.0 / 5.0)),
+                        0.0,
+                      ),
                       duration: const Duration(milliseconds: 250),
                       curve: Curves.easeOutCubic,
                       child: FractionallySizedBox(
                         widthFactor: 1.0 / 6.0,
-                        heightFactor: 0.75, // Capsule height relative to nav bar height
+                        heightFactor:
+                            0.75, // Capsule height relative to nav bar height
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 4),
                           decoration: BoxDecoration(
@@ -149,11 +214,36 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildGlassNavItem(0, Icons.home_outlined, Icons.home_rounded, 'หน้าหลัก'),
-                      _buildGlassNavItem(1, Icons.fingerprint_rounded, Icons.fingerprint_rounded, 'ลงเวลา'),
-                      _buildGlassNavItem(2, Icons.assignment_outlined, Icons.assignment_rounded, 'คำขอ'),
-                      _buildGlassNavItem(3, Icons.calendar_month_outlined, Icons.calendar_month_rounded, 'ปฏิทิน'),
-                      _buildGlassNavItem(4, Icons.notifications_none_rounded, Icons.notifications_rounded, 'แจ้งเตือน'),
+                      _buildGlassNavItem(
+                        0,
+                        Icons.home_outlined,
+                        Icons.home_rounded,
+                        'หน้าหลัก',
+                      ),
+                      _buildGlassNavItem(
+                        1,
+                        Icons.fingerprint_rounded,
+                        Icons.fingerprint_rounded,
+                        'ลงเวลา',
+                      ),
+                      _buildGlassNavItem(
+                        2,
+                        Icons.assignment_outlined,
+                        Icons.assignment_rounded,
+                        'คำขอ',
+                      ),
+                      _buildGlassNavItem(
+                        3,
+                        Icons.calendar_month_outlined,
+                        Icons.calendar_month_rounded,
+                        'ปฏิทิน',
+                      ),
+                      _buildGlassNavItem(
+                        4,
+                        Icons.notifications_none_rounded,
+                        Icons.notifications_rounded,
+                        'แจ้งเตือน',
+                      ),
                       _buildGlassProfileNavItem(5, 'โปรไฟล์'),
                     ],
                   ),
@@ -166,9 +256,14 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildGlassNavItem(int index, IconData unselectedIcon, IconData selectedIcon, String label) {
+  Widget _buildGlassNavItem(
+    int index,
+    IconData unselectedIcon,
+    IconData selectedIcon,
+    String label,
+  ) {
     final isSelected = _animatingSelectedIndex == index;
-    
+
     final Widget iconWidget;
     if (index == 0) {
       iconWidget = FacebookHomeIcon(
@@ -192,7 +287,14 @@ class _HomePageState extends State<HomePage> {
 
     final Widget badgeIcon = (index == 2 && _pendingCount > 0)
         ? Badge(
-            label: Text('$_pendingCount', style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold)),
+            label: Text(
+              '$_pendingCount',
+              style: const TextStyle(
+                fontSize: 8,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             backgroundColor: const Color(0xFFEF4444),
             child: iconWidget,
           )
@@ -232,7 +334,7 @@ class _HomePageState extends State<HomePage> {
     final isSelected = _animatingSelectedIndex == index;
     final avatarUrl = _currentUser.avatarUrl;
     final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
-    
+
     return Expanded(
       child: GestureDetector(
         onTap: () => _selectPage(index),
@@ -260,14 +362,18 @@ class _HomePageState extends State<HomePage> {
                   child: hasAvatar
                       ? Image.network(
                           avatarUrl.startsWith('r2://')
-                            ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                            : avatarUrl,
+                              ? avatarUrl.replaceFirst(
+                                  'r2://',
+                                  'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+                                )
+                              : avatarUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
-                            Icons.person_rounded,
-                            size: 11,
-                            color: workMuted,
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                                Icons.person_rounded,
+                                size: 11,
+                                color: workMuted,
+                              ),
                         )
                       : const Icon(
                           Icons.person_rounded,
@@ -291,8 +397,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -365,7 +469,8 @@ class _HomePageState extends State<HomePage> {
               key: const PageStorageKey('calendar'),
               service: widget.service,
               onMenu: _openMenu,
-              onOpenRequests: () => _selectPage(2), // เปิดแท็บ 2 (คำขอ) แทนแท็บ 1 เดิม
+              onOpenRequests: () =>
+                  _selectPage(2), // เปิดแท็บ 2 (คำขอ) แทนแท็บ 1 เดิม
               isActive: _selectedIndex == 3,
             ),
             // Index 4: แจ้งเตือน
@@ -374,7 +479,8 @@ class _HomePageState extends State<HomePage> {
               onMenu: _openMenu,
               isActive: _selectedIndex == 4,
               service: widget.service,
-              onNavigateToRequests: (targetId) => _selectPage(2, targetRequestId: targetId),
+              onNavigateToRequests: (targetId) =>
+                  _selectPage(2, targetRequestId: targetId),
             ),
             // Index 5: โปรไฟล์
             UserProfilePage(
@@ -401,18 +507,42 @@ class _HomePageState extends State<HomePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.bug_report_rounded, size: 48, color: Colors.red),
+                  const Icon(
+                    Icons.bug_report_rounded,
+                    size: 48,
+                    color: Colors.red,
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                     'เกิดข้อผิดพลาดในการสร้างหน้าจอ HomePage',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  Text('ข้อผิดพลาด: $e', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text(
+                    'ข้อผิดพลาด: $e',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  const Text('ตำแหน่งที่ล่ม:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text(
+                    'ตำแหน่งที่ล่ม:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   const SizedBox(height: 4),
-                  Text('$stack', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.grey)),
+                  Text(
+                    '$stack',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                      color: Colors.grey,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -572,7 +702,12 @@ class _DrawerItem extends StatelessWidget {
 }
 
 class FacebookHomeIcon extends StatelessWidget {
-  const FacebookHomeIcon({super.key, required this.color, required this.isFilled, this.size = 22});
+  const FacebookHomeIcon({
+    super.key,
+    required this.color,
+    required this.isFilled,
+    this.size = 22,
+  });
 
   final Color color;
   final bool isFilled;
@@ -625,7 +760,11 @@ class _HomePainter extends CustomPainter {
 
     if (isFilled) {
       paint.style = PaintingStyle.fill;
-      final combinedPath = Path.combine(PathOperation.difference, housePath, doorPath);
+      final combinedPath = Path.combine(
+        PathOperation.difference,
+        housePath,
+        doorPath,
+      );
       canvas.drawPath(combinedPath, paint);
     } else {
       paint.style = PaintingStyle.stroke;
@@ -642,7 +781,12 @@ class _HomePainter extends CustomPainter {
 }
 
 class ClockInIcon extends StatelessWidget {
-  const ClockInIcon({super.key, required this.color, required this.isFilled, this.size = 22});
+  const ClockInIcon({
+    super.key,
+    required this.color,
+    required this.isFilled,
+    this.size = 22,
+  });
 
   final Color color;
   final bool isFilled;
@@ -684,16 +828,32 @@ class _ClockInPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round;
 
       // วาดเฉพาะเข็มนาฬิกาด้านใน (ไม่เอาวงกลมซ้อน)
-      canvas.drawLine(Offset(w * 0.5, h * 0.5), Offset(w * 0.5, h * 0.22), linePaint);
-      canvas.drawLine(Offset(w * 0.5, h * 0.5), Offset(w * 0.70, h * 0.5), linePaint);
+      canvas.drawLine(
+        Offset(w * 0.5, h * 0.5),
+        Offset(w * 0.5, h * 0.22),
+        linePaint,
+      );
+      canvas.drawLine(
+        Offset(w * 0.5, h * 0.5),
+        Offset(w * 0.70, h * 0.5),
+        linePaint,
+      );
     } else {
       paint.style = PaintingStyle.stroke;
       paint.strokeWidth = 2.0;
       canvas.drawCircle(Offset(w * 0.5, h * 0.5), w * 0.45, paint);
 
       // วาดเฉพาะเข็มนาฬิกาด้านใน (ไม่เอาวงกลมซ้อน)
-      canvas.drawLine(Offset(w * 0.5, h * 0.5), Offset(w * 0.5, h * 0.22), paint);
-      canvas.drawLine(Offset(w * 0.5, h * 0.5), Offset(w * 0.70, h * 0.5), paint);
+      canvas.drawLine(
+        Offset(w * 0.5, h * 0.5),
+        Offset(w * 0.5, h * 0.22),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(w * 0.5, h * 0.5),
+        Offset(w * 0.70, h * 0.5),
+        paint,
+      );
     }
   }
 
