@@ -35,6 +35,7 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   bool _verifying = false;
   String _selectedInspectionStatus = 'approved';
   List<SubItemVerification> _verifications = [];
+  String _subItemPriority = 'medium';
   String _currentStatus = 'pending';
   final List<Map<String, String>> _uploadingFiles = [];
 
@@ -849,7 +850,7 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                             Expanded(
                               child: Text(
                                 _dueDate != null
-                                    ? DateFormat('dd / MM / yyyy').format(_dueDate!)
+                                    ? _formatThaiDate(_dueDate!)
                                     : 'วว/ดด/ปปปป',
                                 style: TextStyle(
                                   fontSize: 12,
@@ -887,7 +888,7 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: widget.item.priority ?? 'medium',
+                          value: _subItemPriority,
                           isExpanded: true,
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
                           style: const TextStyle(fontSize: 12, color: workText),
@@ -900,7 +901,7 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                           onChanged: (val) {
                             if (val != null) {
                               setState(() {
-                                widget.item.priority = val;
+                                _subItemPriority = val;
                               });
                             }
                           },
@@ -961,17 +962,8 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              ...widget.item.assignees.map(
-                (user) => UserAvatar(
-                  avatarUrl: user.avatarUrl,
-                  name: user.displayName,
-                  radius: 16,
-                ),
-              ),
               InkWell(
-                onTap: () {
-                  // Open assignee selector
-                },
+                onTap: () {},
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   width: 32,
