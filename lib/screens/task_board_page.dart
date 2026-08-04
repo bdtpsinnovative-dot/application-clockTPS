@@ -289,8 +289,8 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   };
 
   Widget _buildUserAvatar(UserSummary user, {double radius = 10}) {
-    final avatarUrl = user.resolvedAvatarUrl;
-    final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
+    final avatarUrl = _resolveAvatarUrl(user.avatarUrl);
+    final hasAvatar = avatarUrl.isNotEmpty;
     final isSvg = hasAvatar && avatarUrl.toLowerCase().contains('.svg');
 
     Widget avatarWidget;
@@ -305,6 +305,9 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         avatarWidget = Image.network(
           avatarUrl,
           fit: BoxFit.cover,
+          headers: const {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
           errorBuilder: (context, error, stackTrace) => _buildFallbackText(user, radius),
         );
       }
@@ -323,6 +326,32 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
         child: avatarWidget,
       ),
     );
+  }
+
+  String _resolveAvatarUrl(String? url) {
+    if (url == null) return '';
+    var trimmed = url.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('r2://')) {
+      return trimmed.replaceFirst(
+        'r2://',
+        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+      );
+    }
+    if (trimmed.startsWith('okpr2://')) {
+      return trimmed.replaceFirst(
+        'okpr2://',
+        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+      );
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    final apiBase = widget.service.baseUrl;
+    if (trimmed.startsWith('/')) {
+      return '$apiBase$trimmed';
+    }
+    return '$apiBase/$trimmed';
   }
 
   Widget _buildFallbackText(UserSummary user, double radius) {
