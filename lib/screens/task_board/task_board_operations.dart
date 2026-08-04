@@ -571,94 +571,232 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 ...selectedAssignees.map((user) {
-                                  return InkWell(
-                                    onTap: () {
-                                      setModalState(() {
-                                        selectedAssignees.removeWhere((u) => u.id == user.id);
-                                      });
-                                    },
-                                    child: _buildUserAvatar(user, radius: 16),
+                                  return Container(
+                                    padding: const EdgeInsets.only(left: 4, right: 8, top: 4, bottom: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        UserAvatar(
+                                          avatarUrl: user.avatarUrl,
+                                          name: user.displayName,
+                                          radius: 12,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          user.displayName,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF1E40AF),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        GestureDetector(
+                                          onTap: () {
+                                            setModalState(() {
+                                              selectedAssignees.removeWhere((u) => u.id == user.id);
+                                            });
+                                          },
+                                          child: const Icon(
+                                            Icons.close_rounded,
+                                            size: 14,
+                                            color: Color(0xFF3B82F6),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                 }),
-                                // Plus dashed button
+                                // Plus button
                                 InkWell(
                                   onTap: () async {
-                                    // Show user list picker dialog
-                                    await showDialog<void>(
+                                    String searchKey = '';
+                                    await showModalBottomSheet<void>(
                                       context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.white,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                      ),
                                       builder: (context) {
                                         return StatefulBuilder(
                                           builder: (context, setDialogState) {
-                                            return AlertDialog(
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(16),
+                                            final filteredMembers = _members.where((m) {
+                                              final q = searchKey.toLowerCase().trim();
+                                              if (q.isEmpty) return true;
+                                              return m.displayName.toLowerCase().contains(q) ||
+                                                  m.fullName.toLowerCase().contains(q) ||
+                                                  m.position.toLowerCase().contains(q);
+                                            }).toList();
+
+                                            return Container(
+                                              padding: EdgeInsets.only(
+                                                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
                                               ),
-                                              title: const Text(
-                                                'เลือกผู้รับผิดชอบ',
-                                                style: TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                              constraints: BoxConstraints(
+                                                maxHeight: MediaQuery.of(context).size.height * 0.7,
                                               ),
-                                              content: Container(
-                                                width: double.maxFinite,
-                                                constraints: BoxConstraints(
-                                                  maxHeight: MediaQuery.of(context).size.height * 0.4,
-                                                ),
-                                                child: ListView.builder(
-                                                  shrinkWrap: true,
-                                                  itemCount: _members.length,
-                                                  itemBuilder: (context, idx) {
-                                                    final member = _members[idx];
-                                                    final isSelected = selectedAssignees.any((u) => u.id == member.id);
-                                                    return ListTile(
-                                                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                      leading: _buildUserAvatar(member, radius: 15),
-                                                      title: Text(
-                                                        member.displayName,
-                                                        style: const TextStyle(fontSize: 13, color: workText),
+                                              child: SingleChildScrollView(
+                                                child: Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                                  child: Column(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      // Drag handle
+                                                      Center(
+                                                        child: Container(
+                                                          width: 40,
+                                                          height: 4,
+                                                          margin: const EdgeInsets.only(bottom: 16),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFFCBD5E1),
+                                                            borderRadius: BorderRadius.circular(2),
+                                                          ),
+                                                        ),
                                                       ),
-                                                      trailing: Checkbox(
-                                                        value: isSelected,
-                                                        activeColor: workBlue,
-                                                        onChanged: (checked) {
-                                                          setModalState(() {
-                                                            if (checked == true) {
-                                                              if (!selectedAssignees.any((u) => u.id == member.id)) {
-                                                                selectedAssignees.add(member);
-                                                              }
-                                                            } else {
-                                                              selectedAssignees.removeWhere((u) => u.id == member.id);
-                                                            }
-                                                          });
-                                                          setDialogState(() {}); // Rebuild dialog list
+                                                      // Title
+                                                      Row(
+                                                        children: [
+                                                          const Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              children: [
+                                                                Text(
+                                                                  'เลือกผู้รับผิดชอบ',
+                                                                  style: TextStyle(
+                                                                    fontSize: 17,
+                                                                    fontWeight: FontWeight.bold,
+                                                                    color: workText,
+                                                                  ),
+                                                                ),
+                                                                SizedBox(height: 2),
+                                                                Text(
+                                                                  'เลือกสมาชิกที่จะให้ดูแลการ์ดงานนี้',
+                                                                  style: TextStyle(
+                                                                    fontSize: 12,
+                                                                    color: workMuted,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          IconButton(
+                                                            onPressed: () => Navigator.pop(context),
+                                                            icon: const Icon(Icons.close_rounded, color: workMuted),
+                                                            padding: EdgeInsets.zero,
+                                                            constraints: const BoxConstraints(),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 14),
+
+                                                      // Search Bar
+                                                      Container(
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFF1F5F9),
+                                                          borderRadius: BorderRadius.circular(12),
+                                                        ),
+                                                        child: TextField(
+                                                          onChanged: (v) {
+                                                            setDialogState(() => searchKey = v);
+                                                          },
+                                                          style: const TextStyle(fontSize: 13, color: workText),
+                                                          decoration: const InputDecoration(
+                                                            hintText: 'ค้นหาชื่อเล่น, ชื่อจริง หรือตำแหน่ง...',
+                                                            hintStyle: TextStyle(fontSize: 12.5, color: workMuted),
+                                                            prefixIcon: Icon(Icons.search_rounded, size: 20, color: workMuted),
+                                                            border: InputBorder.none,
+                                                            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 12),
+
+                                                      // Member List
+                                                      ListView.separated(
+                                                        shrinkWrap: true,
+                                                        physics: const NeverScrollableScrollPhysics(),
+                                                        itemCount: filteredMembers.length,
+                                                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                                        itemBuilder: (context, idx) {
+                                                          final member = filteredMembers[idx];
+                                                          final isSelected = selectedAssignees.any((u) => u.id == member.id);
+                                                          return InkWell(
+                                                            onTap: () {
+                                                              setModalState(() {
+                                                                if (isSelected) {
+                                                                  selectedAssignees.removeWhere((u) => u.id == member.id);
+                                                                } else {
+                                                                  selectedAssignees.add(member);
+                                                                }
+                                                              });
+                                                              setDialogState(() {});
+                                                            },
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            child: Padding(
+                                                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                                              child: Row(
+                                                                children: [
+                                                                  UserAvatar(
+                                                                    avatarUrl: member.avatarUrl,
+                                                                    name: member.displayName,
+                                                                    radius: 19,
+                                                                  ),
+                                                                  const SizedBox(width: 12),
+                                                                  Expanded(
+                                                                    child: Column(
+                                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                                      children: [
+                                                                        Text(
+                                                                          member.displayName,
+                                                                          style: const TextStyle(
+                                                                            fontSize: 13.5,
+                                                                            fontWeight: FontWeight.bold,
+                                                                            color: workText,
+                                                                          ),
+                                                                        ),
+                                                                        if (member.position.isNotEmpty || member.fullName.isNotEmpty)
+                                                                          Text(
+                                                                            member.position.isNotEmpty ? member.position : member.fullName,
+                                                                            style: const TextStyle(
+                                                                              fontSize: 11,
+                                                                              color: workMuted,
+                                                                            ),
+                                                                          ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                  Container(
+                                                                    width: 22,
+                                                                    height: 22,
+                                                                    decoration: BoxDecoration(
+                                                                      shape: BoxShape.circle,
+                                                                      color: isSelected ? workBlue : Colors.transparent,
+                                                                      border: Border.all(
+                                                                        color: isSelected ? workBlue : const Color(0xFFCBD5E1),
+                                                                        width: 1.5,
+                                                                      ),
+                                                                    ),
+                                                                    child: isSelected
+                                                                        ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                                                                        : null,
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          );
                                                         },
                                                       ),
-                                                      onTap: () {
-                                                        setModalState(() {
-                                                          if (isSelected) {
-                                                            selectedAssignees.removeWhere((u) => u.id == member.id);
-                                                          } else {
-                                                            if (!selectedAssignees.any((u) => u.id == member.id)) {
-                                                              selectedAssignees.add(member);
-                                                            }
-                                                          }
-                                                        });
-                                                        setDialogState(() {}); // Rebuild dialog list
-                                                      },
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(context),
-                                                  child: const Text(
-                                                    'ตกลง',
-                                                    style: TextStyle(color: workBlue, fontWeight: FontWeight.bold),
+                                                    ],
                                                   ),
                                                 ),
-                                              ],
+                                              ),
                                             );
                                           },
                                         );
