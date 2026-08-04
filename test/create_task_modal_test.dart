@@ -5,6 +5,7 @@ import 'package:hr_management/models/app_user.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/screens/admin_tasks_page.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() {
   test('brand responsibilities are retained for automatic assignees', () {
@@ -160,6 +161,46 @@ void main() {
     expect(service.markedNotificationIds, contains('notification-list'));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('edit task reuses create form and saves every task field', (
+    tester,
+  ) async {
+    await initializeDateFormatting('th');
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final service = _CreateTaskService(withNotifications: true);
+
+    await tester.pumpWidget(
+      MaterialApp(home: AdminTasksPage(service: service)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('task-more-task-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('แก้ไขงานมอบหมาย'), findsOneWidget);
+    expect(find.text('บอร์ดงานเริ่มต้น'), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('edit-task-title')))
+          .controller
+          ?.text,
+      'โครงการทดสอบ',
+    );
+    expect(find.text('แบรนด์ทดสอบ'), findsWidgets);
+    expect(find.text('หมวดหมู่ทดสอบ'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const Key('submit-edit-task')));
+    await tester.pumpAndSettle();
+
+    expect(service.updatedTaskId, 'task-1');
+    expect(service.updatedBrandId, 'brand-1');
+    expect(service.updatedCategoryId, 'category-1');
+    expect(service.updatedPriority, 'medium');
+    expect(service.updatedStatus, 'pending');
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _CreateTaskService extends AuthFlowService {
@@ -171,6 +212,29 @@ class _CreateTaskService extends AuthFlowService {
   final List<String> createdLists = [];
   final List<String> markedNotificationIds = [];
   final List<String> restoredTaskIds = [];
+  String? updatedTaskId;
+  String? updatedBrandId;
+  String? updatedCategoryId;
+  String? updatedPriority;
+  String? updatedStatus;
+
+  @override
+  AppUser? get currentUser => withNotifications
+      ? const AppUser(
+          id: 'user-1',
+          authId: 'auth-1',
+          email: 'admin@example.com',
+          firstName: 'Admin',
+          lastName: 'Test',
+          nickname: 'Admin',
+          department: '',
+          position: '',
+          role: 'admin',
+          status: 'active',
+          avatarUrl: null,
+          hasFaceEmbedding: false,
+        )
+      : null;
 
   @override
   Future<List<TaskRecord>> getAdminTasks() async {
@@ -189,6 +253,9 @@ class _CreateTaskService extends AuthFlowService {
       ),
     ];
   }
+
+  @override
+  Future<List<TaskRecord>> getMyTasks() => getAdminTasks();
 
   @override
   Future<List<Map<String, dynamic>>> getMyNotifications() async {
@@ -293,6 +360,37 @@ class _CreateTaskService extends AuthFlowService {
       description: description,
       dueDate: dueDate,
       status: status ?? 'pending',
+      createdAt: DateTime(2026, 8, 4),
+    );
+  }
+
+  @override
+  Future<TaskRecord> updateTask({
+    required String id,
+    required String title,
+    required String description,
+    required List<String> assigneeIds,
+    required DateTime dueDate,
+    String? brandId,
+    String? categoryId,
+    String? priority,
+    String? status,
+  }) async {
+    updatedTaskId = id;
+    updatedBrandId = brandId;
+    updatedCategoryId = categoryId;
+    updatedPriority = priority;
+    updatedStatus = status;
+    return TaskRecord(
+      id: id,
+      assignedTo: assigneeIds.first,
+      title: title,
+      description: description,
+      dueDate: dueDate,
+      status: status ?? 'pending',
+      priority: priority ?? 'medium',
+      brandId: brandId,
+      categoryId: categoryId,
       createdAt: DateTime(2026, 8, 4),
     );
   }

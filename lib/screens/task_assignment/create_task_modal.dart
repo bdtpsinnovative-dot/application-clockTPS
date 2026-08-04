@@ -29,12 +29,14 @@ class _CreateTaskModal extends StatefulWidget {
     required this.categories,
     required this.onSubmit,
     this.currentUser,
+    this.initialTask,
   });
 
   final List<AppUser> users;
   final List<BrandRecord> brands;
   final List<TaskCategoryRecord> categories;
   final AppUser? currentUser;
+  final TaskRecord? initialTask;
   final _CreateTaskSubmit onSubmit;
 
   @override
@@ -42,6 +44,8 @@ class _CreateTaskModal extends StatefulWidget {
 }
 
 class _CreateTaskModalState extends State<_CreateTaskModal> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
   String? _brandId;
   String? _categoryId;
   final List<String> _assigneeIds = [];
@@ -55,11 +59,39 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
   bool _showAssigneePicker = false;
   bool _submitting = false;
 
+  bool get _isEditing => widget.initialTask != null;
+
   @override
   void initState() {
     super.initState();
-    final currentUserId = widget.currentUser?.id.trim() ?? '';
-    if (currentUserId.isNotEmpty) _assigneeIds.add(currentUserId);
+    final task = widget.initialTask;
+    _title = task?.title ?? '';
+    _description = task?.description ?? '';
+    _titleController = TextEditingController(text: _title);
+    _descriptionController = TextEditingController(text: _description);
+    _brandId = task?.brandId;
+    _categoryId = task?.categoryId;
+    _dueDate = task?.dueDate ?? DateTime.now();
+    _priority = task?.priority ?? 'low';
+    _status = task?.status ?? 'pending';
+
+    if (task != null) {
+      _assigneeIds.addAll(
+        task.assigneeIds.isNotEmpty
+            ? task.assigneeIds
+            : [if (task.assignedTo.isNotEmpty) task.assignedTo],
+      );
+    } else {
+      final currentUserId = widget.currentUser?.id.trim() ?? '';
+      if (currentUserId.isNotEmpty) _assigneeIds.add(currentUserId);
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   @override
@@ -82,7 +114,10 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     _fieldLabel('ชื่องาน *'),
                     const SizedBox(height: 6),
                     TextField(
-                      key: const Key('create-task-title'),
+                      key: Key(
+                        _isEditing ? 'edit-task-title' : 'create-task-title',
+                      ),
+                      controller: _titleController,
                       decoration: _inputDecoration(
                         'เช่น ทำรายงานสรุปยอดขายประจำสัปดาห์...',
                       ),
@@ -95,7 +130,12 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     ),
                     const SizedBox(height: 6),
                     TextField(
-                      key: const Key('create-task-description'),
+                      key: Key(
+                        _isEditing
+                            ? 'edit-task-description'
+                            : 'create-task-description',
+                      ),
+                      controller: _descriptionController,
                       minLines: 2,
                       maxLines: 3,
                       decoration: _inputDecoration(
@@ -109,8 +149,10 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     _buildTaskMetadata(),
                     const SizedBox(height: 16),
                     _buildPriorityAndStatus(),
-                    const SizedBox(height: 16),
-                    _buildBoards(),
+                    if (!_isEditing) ...[
+                      const SizedBox(height: 16),
+                      _buildBoards(),
+                    ],
                   ],
                 ),
               ),
@@ -132,10 +174,10 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Text(
-              'มอบหมายงานใหม่',
-              style: TextStyle(
+              _isEditing ? 'แก้ไขงานมอบหมาย' : 'มอบหมายงานใหม่',
+              style: const TextStyle(
                 color: workText,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -143,7 +185,7 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
             ),
           ),
           IconButton(
-            key: const Key('close-create-task'),
+            key: Key(_isEditing ? 'close-edit-task' : 'close-create-task'),
             onPressed: _submitting ? null : () => Navigator.pop(context),
             icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
           ),
@@ -235,8 +277,9 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
 
   Widget _selectedAssignee(AppUser user) {
     final locked =
-        user.id == widget.currentUser?.id ||
-        _autoBrandAssigneeIds.contains(user.id);
+        !_isEditing &&
+        (user.id == widget.currentUser?.id ||
+            _autoBrandAssigneeIds.contains(user.id));
     return Tooltip(
       message: _userDisplayName(user),
       child: InkWell(
@@ -629,7 +672,7 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
             ),
             const SizedBox(width: 8),
             FilledButton(
-              key: const Key('submit-create-task'),
+              key: Key(_isEditing ? 'submit-edit-task' : 'submit-create-task'),
               onPressed: _submitting ? null : _submit,
               style: FilledButton.styleFrom(
                 backgroundColor: workBlue,
@@ -649,9 +692,9 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text(
-                      'สร้างงาน',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                  : Text(
+                      _isEditing ? 'บันทึกข้อมูล' : 'สร้างงาน',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
             ),
           ],
@@ -686,7 +729,7 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
         _status,
         validBoards,
       );
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context, _isEditing ? true : null);
     } catch (error) {
       if (mounted) _showError('เกิดข้อผิดพลาด: $error');
     } finally {
@@ -791,6 +834,10 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
   }
 
   void _changeBrand(String? brandId) {
+    if (_isEditing) {
+      setState(() => _brandId = brandId);
+      return;
+    }
     final manualAssignees = _assigneeIds
         .where((id) => !_autoBrandAssigneeIds.contains(id))
         .toSet();

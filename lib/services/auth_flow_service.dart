@@ -649,6 +649,8 @@ class AuthFlowService {
     required DateTime dueDate,
     String? brandId,
     String? categoryId,
+    String? priority,
+    String? status,
   }) async {
     final response = await _authorizedPatch(
       '/api/tasks/$id',
@@ -659,6 +661,8 @@ class AuthFlowService {
         'due_date': _dateValue(dueDate),
         'brand_id': brandId ?? '',
         'category_id': categoryId ?? '',
+        if (priority != null && priority.isNotEmpty) 'priority': priority,
+        if (status != null && status.isNotEmpty) 'status': status,
       },
     );
     return TaskRecord.fromJson(response['data'] as Map<String, dynamic>);

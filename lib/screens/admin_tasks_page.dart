@@ -115,10 +115,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _TaskTrashSheet(
-        service: widget.service,
-        onRestored: _loadData,
-      ),
+      builder: (_) =>
+          _TaskTrashSheet(service: widget.service, onRestored: _loadData),
     );
   }
 
@@ -252,12 +250,19 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       builder: (_) => _EditTaskModal(
         task: task,
         users: _users,
+        brands: _brands,
+        categories: _categories,
+        currentUser: widget.service.currentUser,
         onSave:
             ({
               required title,
               required description,
               required assigneeIds,
               required dueDate,
+              brandId,
+              categoryId,
+              required priority,
+              required status,
             }) async {
               await widget.service.updateTask(
                 id: task.id,
@@ -265,8 +270,10 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 description: description,
                 assigneeIds: assigneeIds,
                 dueDate: dueDate,
-                brandId: task.brandId,
-                categoryId: task.categoryId,
+                brandId: brandId,
+                categoryId: categoryId,
+                priority: priority,
+                status: status,
               );
             },
       ),
@@ -405,9 +412,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                     label,
                     maxLines: 1,
                     style: TextStyle(
-                      color: selected
-                          ? Colors.white
-                          : const Color(0xFF475569),
+                      color: selected ? Colors.white : const Color(0xFF475569),
                       fontSize: 10.5,
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     ),
@@ -488,9 +493,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                       icon: Icon(
                         Icons.notifications_none_rounded,
                         size: 21,
-                        color: _mainTaskNotifications.any(
-                          (item) => !item.isRead,
-                        )
+                        color:
+                            _mainTaskNotifications.any((item) => !item.isRead)
                             ? const Color(0xFFE11D48)
                             : const Color(0xFF64748B),
                       ),
@@ -602,10 +606,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         key: const Key('task-search-field'),
                         controller: _searchController,
                         onChanged: _viewModel.setSearchQuery,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: workText,
-                        ),
+                        style: const TextStyle(fontSize: 12.5, color: workText),
                         decoration: InputDecoration(
                           hintText: 'ค้นหางาน...',
                           hintStyle: const TextStyle(
@@ -859,19 +860,28 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                 GestureDetector(
                   onTap: () async {
                     try {
-                      await widget.service.toggleStarTask(task.id, !task.isStarred);
+                      await widget.service.toggleStarTask(
+                        task.id,
+                        !task.isStarred,
+                      );
                       _loadData();
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('สลับสถานะการติดดาวล้มเหลว: $e')),
+                        SnackBar(
+                          content: Text('สลับสถานะการติดดาวล้มเหลว: $e'),
+                        ),
                       );
                     }
                   },
                   child: Padding(
                     padding: const EdgeInsets.only(right: 5),
                     child: Icon(
-                      task.isStarred ? Icons.star_rounded : Icons.star_outline_rounded,
-                      color: task.isStarred ? Colors.amber : workMuted.withOpacity(0.5),
+                      task.isStarred
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      color: task.isStarred
+                          ? Colors.amber
+                          : workMuted.withOpacity(0.5),
                       size: 20,
                     ),
                   ),
@@ -902,9 +912,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                           clipBehavior: Clip.none,
                           children: [
                             IconButton(
-                              key: Key(
-                                'task-list-notifications-${task.id}',
-                              ),
+                              key: Key('task-list-notifications-${task.id}'),
                               tooltip: 'ดูการแจ้งเตือนของงานนี้',
                               onPressed: () => _showListNotifications(task),
                               padding: EdgeInsets.zero,
@@ -955,7 +963,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                               height: 28,
                             ),
                             visualDensity: VisualDensity.compact,
-                            onPressed: () => _showTaskDetailSheet(task),
+                            onPressed: () => _showEditTaskModal(task),
                           ),
                         ),
                     ],
@@ -1005,7 +1013,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                           : task.cardDone / task.cardTotal,
                       minHeight: 3.5,
                       backgroundColor: ProjectDetailStyle.line,
-                      color: task.cardTotal > 0 && task.cardDone == task.cardTotal
+                      color:
+                          task.cardTotal > 0 && task.cardDone == task.cardTotal
                           ? ProjectDetailStyle.success
                           : ProjectDetailStyle.accent,
                     ),

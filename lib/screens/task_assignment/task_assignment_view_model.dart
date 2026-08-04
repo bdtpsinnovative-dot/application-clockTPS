@@ -42,47 +42,41 @@ class TaskAssignmentViewModel extends ChangeNotifier {
 
     final isEmployee = service.currentUser?.role == 'employee';
     final filtered = tasks.where((task) {
-          if (!isEmployee &&
-              !taskMatchesAdminVisibilityFilter(task, currentUserId)) {
-            return false;
-          }
-          if (query.isNotEmpty &&
-              !task.title.toLowerCase().contains(query) &&
-              !task.description.toLowerCase().contains(query)) {
-            return false;
-          }
-          if (selectedBrandId != null && task.brandId != selectedBrandId) {
-            return false;
-          }
-          if (selectedCategoryId != null &&
-              task.categoryId != selectedCategoryId) {
-            return false;
-          }
-          if (selectedStatus == 'active' && task.status == 'completed') {
-            return false;
-          }
-          if (selectedStatus == 'completed' && task.status != 'completed') {
-            return false;
-          }
-          if (selectedStarredOnly && !task.isStarred) {
-            return false;
-          }
-          if (selectedQuickView == 'completed' && task.status != 'completed') {
-            return false;
-          }
-          if (selectedQuickView == 'all' && task.status == 'completed') {
-            return false;
-          }
-          if (selectedQuickView == 'starred' && !task.isStarred) {
-            return false;
-          }
-          return taskMatchesOwnershipFilter(
-            task,
-            currentUserId,
-            selectedOwnership,
-          );
-        })
-        .toList();
+      if (!isEmployee &&
+          !taskMatchesAdminVisibilityFilter(task, currentUserId)) {
+        return false;
+      }
+      if (query.isNotEmpty &&
+          !task.title.toLowerCase().contains(query) &&
+          !task.description.toLowerCase().contains(query)) {
+        return false;
+      }
+      if (selectedBrandId != null && task.brandId != selectedBrandId) {
+        return false;
+      }
+      if (selectedCategoryId != null && task.categoryId != selectedCategoryId) {
+        return false;
+      }
+      if (selectedStatus == 'active' && task.status == 'completed') {
+        return false;
+      }
+      if (selectedStatus == 'completed' && task.status != 'completed') {
+        return false;
+      }
+      if (selectedStarredOnly && !task.isStarred) {
+        return false;
+      }
+      if (selectedQuickView == 'completed' && task.status != 'completed') {
+        return false;
+      }
+      if (selectedQuickView == 'all' && task.status == 'completed') {
+        return false;
+      }
+      if (selectedQuickView == 'starred' && !task.isStarred) {
+        return false;
+      }
+      return taskMatchesOwnershipFilter(task, currentUserId, selectedOwnership);
+    }).toList();
 
     filtered.sort((a, b) {
       final aHasDueDate = a.dueDate.year > 1;
@@ -95,7 +89,6 @@ class TaskAssignmentViewModel extends ChangeNotifier {
       return b.createdAt.compareTo(a.createdAt);
     });
     return List<TaskRecord>.unmodifiable(filtered);
->>>>>>> d8c4973 (checkpoint: compact task management and task list editor)
   }
 
   Future<void> loadData() async {
@@ -105,9 +98,9 @@ class TaskAssignmentViewModel extends ChangeNotifier {
 
     try {
       final isEmployee = service.currentUser?.role == 'employee';
-      final loadedTasks = await (isEmployee
-          ? service.getMyTasks()
-          : service.getAdminTasks());
+      // `/api/tasks` is scoped by the backend to tasks created by, directly
+      // assigned to, or jointly assigned to the signed-in user.
+      final loadedTasks = await service.getMyTasks();
       final auxiliary = await Future.wait<Object>([
         (isEmployee ? Future.value(<AppUser>[]) : service.getAdminUsers())
             .catchError((_) => <AppUser>[]),

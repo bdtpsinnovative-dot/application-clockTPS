@@ -94,6 +94,28 @@ void main() {
     expect(taskMatchesAdminVisibilityFilter(assignedToMe, null), isFalse);
   });
 
+  test('combined assignment view only includes created or joined tasks', () {
+    final created = _task(
+      id: 'created',
+      assignedBy: 'me',
+      assigneeIds: const ['coworker'],
+    );
+    final joined = _task(
+      id: 'joined',
+      assignedBy: 'owner',
+      assigneeIds: const ['me'],
+    );
+    final unrelated = _task(
+      id: 'unrelated',
+      assignedBy: 'owner',
+      assigneeIds: const ['coworker'],
+    );
+
+    expect(taskBelongsToCurrentUser(created, 'me'), isTrue);
+    expect(taskBelongsToCurrentUser(joined, 'me'), isTrue);
+    expect(taskBelongsToCurrentUser(unrelated, 'me'), isFalse);
+  });
+
   test('assignment becomes overdue only after the due calendar day', () {
     final dueDate = DateTime(2026, 7, 24);
 
