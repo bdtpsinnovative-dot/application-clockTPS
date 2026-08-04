@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/priority_selector.dart';
@@ -309,33 +308,6 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isBoardCreator =
-        widget.service.currentUser?.id == widget.task.assignedBy;
-    final boardCreatorName = widget.task.assignedByName.isNotEmpty
-        ? widget.task.assignedByName
-        : 'เพื่อนร่วมงาน';
-    final creator = _members.firstWhere(
-      (m) => m.id == widget.task.assignedBy,
-      orElse: () {
-        final curUser = widget.service.currentUser;
-        if (widget.task.assignedBy == curUser?.id && curUser != null) {
-          return UserSummary(
-            id: curUser.id,
-            firstName: curUser.firstName,
-            lastName: curUser.lastName,
-            position: curUser.position,
-            nickname: curUser.nickname.isNotEmpty ? curUser.nickname : null,
-            avatarUrl: curUser.avatarUrl,
-          );
-        }
-        return UserSummary(
-          id: widget.task.assignedBy ?? '',
-          firstName: boardCreatorName.split(' ').first,
-          lastName: '',
-          position: '',
-        );
-      },
-    );
     final visibleLists = _lists
         .where(
           (list) =>
@@ -404,9 +376,7 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                           ),
                                         ),
                                       ),
-                                    const SizedBox(height: 6),
-                                    _buildCreatorChip(creator, isBoardCreator),
-                                  ],
+                                    ],
                                 ),
                               ),
                               IconButton(
@@ -440,149 +410,6 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
       ),
     );
   }
-
-  String? _resolveAvatar(String? rawUrl) {
-    if (rawUrl == null || rawUrl.trim().isEmpty) return null;
-    final url = rawUrl.trim();
-    if (url.startsWith('r2://')) {
-      return url.replaceFirst(
-        'r2://',
-        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-      );
-    }
-    return url;
-  }
-
-  Widget _buildFallbackInitial(UserSummary creator) {
-    return Container(
-      alignment: Alignment.center,
-      color: const Color(0xFFEFF6FF),
-      child: Text(
-        creator.displayName.isNotEmpty
-            ? creator.displayName[0].toUpperCase()
-            : '?',
-        style: const TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
-          color: workBlue,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCreatorChip(UserSummary creator, bool isBoardCreator) {
-    final avatarUrl = _resolveAvatar(creator.avatarUrl);
-    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
-    final isSvg = avatarUrl != null && avatarUrl.toLowerCase().contains('.svg');
-
-    Widget avatarWidget;
-    if (hasAvatar) {
-      if (isSvg) {
-        avatarWidget = SvgPicture.network(
-          avatarUrl,
-          fit: BoxFit.cover,
-          placeholderBuilder: (BuildContext context) => const SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(strokeWidth: 1.5),
-          ),
-        );
-      } else {
-        avatarWidget = Image.network(
-          avatarUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildFallbackInitial(creator),
-        );
-      }
-    } else {
-      avatarWidget = _buildFallbackInitial(creator);
-    }
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.25),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Avatar + Crown stack
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1),
-                ),
-                child: ClipOval(
-                  child: avatarWidget,
-                ),
-              ),
-              // Crown on top of avatar
-              Positioned(
-                top: -8,
-                left: 1,
-                right: 1,
-                child: CustomPaint(
-                  size: const Size(12, 8),
-                  painter: CrownPainter(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 6),
-          Text(
-            creator.displayName,
-            style: const TextStyle(
-              fontSize: 11.5,
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class CrownPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFF59E0B) // Amber/orange crown color
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    path.moveTo(0, size.height);
-    path.lineTo(0, size.height * 0.35);
-    path.lineTo(size.width * 0.25, size.height * 0.65);
-    path.lineTo(size.width * 0.5, size.height * 0.15);
-    path.lineTo(size.width * 0.75, size.height * 0.65);
-    path.lineTo(size.width, size.height * 0.35);
-    path.lineTo(size.width, size.height);
-    path.close();
-
-    canvas.drawPath(path, paint);
-
-    // Draw little circles on the crown tips
-    final circlePaint = Paint()
-      ..color = const Color(0xFFF59E0B)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(0, size.height * 0.35), 1.5, circlePaint);
-    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.15), 1.5, circlePaint);
-    canvas.drawCircle(Offset(size.width, size.height * 0.35), 1.5, circlePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ─── Card Detail Bottom Sheet ──────────────────────────────────────
