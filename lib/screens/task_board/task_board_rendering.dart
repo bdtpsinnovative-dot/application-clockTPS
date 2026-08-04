@@ -452,7 +452,7 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                           Expanded(
                             child: Text(
                               list.name,
-                              maxLines: 2,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
