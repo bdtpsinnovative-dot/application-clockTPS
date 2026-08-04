@@ -20,7 +20,9 @@ class UserAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final resolvedUrl = _resolveAvatarUrl(avatarUrl);
     final hasAvatar = resolvedUrl.isNotEmpty;
-    final isSvg = hasAvatar && (resolvedUrl.toLowerCase().contains('.svg') || resolvedUrl.toLowerCase().contains('/svg'));
+    final isSvg = hasAvatar &&
+        (resolvedUrl.toLowerCase().contains('.svg') ||
+            resolvedUrl.toLowerCase().contains('/svg'));
 
     Widget avatarWidget;
     if (hasAvatar) {
@@ -28,41 +30,31 @@ class UserAvatar extends StatelessWidget {
         avatarWidget = SvgPicture.network(
           resolvedUrl,
           fit: BoxFit.cover,
-          placeholderBuilder: (BuildContext context) => _buildFallbackText(radius, name),
+          placeholderBuilder: (BuildContext context) =>
+              _buildFallbackText(radius, name),
         );
       } else {
         avatarWidget = Image.network(
           resolvedUrl,
           fit: BoxFit.cover,
-          headers: const {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-          errorBuilder: (context, error, stackTrace) => _buildFallbackText(radius, name),
+          errorBuilder: (context, error, stackTrace) =>
+              _buildFallbackText(radius, name),
         );
       }
     } else {
       avatarWidget = _buildFallbackText(radius, name);
     }
 
-    Widget child = ClipOval(
-      child: avatarWidget,
-    );
+    Widget child = ClipOval(child: avatarWidget);
 
     if (border != null) {
       child = Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: border,
-        ),
+        decoration: BoxDecoration(shape: BoxShape.circle, border: border),
         child: child,
       );
     }
 
-    return SizedBox(
-      width: radius * 2,
-      height: radius * 2,
-      child: child,
-    );
+    return SizedBox(width: radius * 2, height: radius * 2, child: child);
   }
 
   static Widget _buildFallbackText(double radius, String name) {
