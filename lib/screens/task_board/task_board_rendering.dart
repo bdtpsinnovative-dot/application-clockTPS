@@ -339,10 +339,6 @@ extension _TaskBoardRendering on _TaskBoardPageState {
     final badgeText = _statusTextColors[list.status] ?? workMuted;
     final badgeLabel = _statusLabels[list.status] ?? 'รอทำ';
 
-    final assignees = _members
-        .where((member) => list.assigneeIds.contains(member.id))
-        .toList();
-
     Color cardBg;
     Color cardBorder;
     if (isCompleted) {
@@ -475,58 +471,29 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                           ],
                         ],
                       ),
-                      // Description (if not empty)
-                      if (list.description.trim().isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          list.description.trim(),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: workMuted,
-                            fontSize: 11,
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                      // Date and Assignees row
-                      if (list.startDate != null ||
-                          list.dueDate != null ||
-                          list.assigneeIds.isNotEmpty) ...[
+                      // Date row (only if date is present)
+                      if (list.startDate != null || list.dueDate != null) ...[
                         const SizedBox(height: 6),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            if (list.startDate != null || list.dueDate != null)
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.calendar_today_rounded,
-                                    size: 11,
-                                    color: dateColor == workMuted
-                                        ? const Color(0xFF94A3B8)
-                                        : dateColor,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    dateLabel,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: dateColor == workMuted
-                                          ? const Color(0xFF64748B)
-                                          : dateColor,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            else
-                              const Spacer(),
-                            if (list.assigneeIds.isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              _buildAssigneeAvatars(assignees),
-                            ],
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 11,
+                              color: dateColor == workMuted
+                                  ? const Color(0xFF94A3B8)
+                                  : dateColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              dateLabel,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: dateColor == workMuted
+                                    ? const Color(0xFF64748B)
+                                    : dateColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ],
                         ),
                       ],
