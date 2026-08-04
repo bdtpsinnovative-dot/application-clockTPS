@@ -18,7 +18,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
         }
 
         setState(() {
-          _lists = boardLists;
+          _lists = sortTaskListsForBoard(boardLists);
           _members = members;
           _loading = false;
         });
