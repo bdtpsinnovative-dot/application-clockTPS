@@ -17,6 +17,7 @@ import 'dart:io';
 
 part 'task_board/card_detail_sheet.dart';
 part 'task_board/task_list_detail_sheet.dart';
+part 'task_board/task_list_activity_sheet.dart';
 part 'task_board/board_support_widgets.dart';
 part 'task_board/task_board_operations.dart';
 part 'task_board/task_board_filters.dart';

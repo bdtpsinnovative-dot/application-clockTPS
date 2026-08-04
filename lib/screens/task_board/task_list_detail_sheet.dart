@@ -159,6 +159,20 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
     }
   }
 
+  void _showActivity() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TaskListActivitySheet(
+        taskId: widget.task.id,
+        list: widget.list,
+        service: widget.service,
+      ),
+    );
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -641,13 +655,23 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  IconButton(
-                    onPressed: widget.canEdit ? _delete : null,
-                    icon: const Icon(Icons.delete_outline, color: workMuted),
+                  const SizedBox(width: 4),
+                  _headerAction(
+                    key: const Key('task-list-activity-button'),
+                    tooltip: 'ดูประวัติกิจกรรมของบอร์ดนี้',
+                    icon: Icons.access_time_rounded,
+                    onPressed: _showActivity,
                   ),
-                  IconButton(
+                  _headerAction(
+                    tooltip: 'ลบงานนี้',
+                    icon: Icons.delete_outline_rounded,
+                    onPressed: widget.canEdit ? _delete : null,
+                  ),
+                  _headerAction(
+                    tooltip: 'ปิด',
+                    icon: Icons.close_rounded,
+                    size: 23,
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: workMuted),
                   ),
                 ],
               ),
@@ -710,6 +734,24 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _headerAction({
+    Key? key,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    double size = 20,
+  }) {
+    return IconButton(
+      key: key,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon, color: workMuted, size: size),
     );
   }
 }

@@ -43,12 +43,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('แก้ไขข้อมูลงาน'), findsOneWidget);
+    expect(find.byKey(const Key('task-list-activity-button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('task-list-activity-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ประวัติกิจกรรมของบอร์ด'), findsOneWidget);
+    expect(find.text('ผู้ทดสอบ ระบบ'), findsOneWidget);
+    expect(
+      find.text('เปลี่ยนสถานะจาก กำลังทำ เป็น รอดำเนินการ'),
+      findsOneWidget,
+    );
+    expect(service.requestedEventListId, 'list-1');
     expect(tester.takeException(), isNull);
   });
 }
 
 class _TaskListService extends AuthFlowService {
   _TaskListService() : super(dio: Dio());
+
+  String? requestedEventListId;
 
   @override
   Future<List<TaskListRecord>> getTrelloBoard(String taskId) async {
@@ -65,4 +79,26 @@ class _TaskListService extends AuthFlowService {
 
   @override
   Future<List<UserSummary>> getTaskMembers(String taskId) async => const [];
+
+  @override
+  Future<List<TaskEventRecord>> getTaskEvents(
+    String taskId, {
+    String? listId,
+  }) async {
+    requestedEventListId = listId;
+    return [
+      TaskEventRecord(
+        id: 'event-1',
+        taskId: taskId,
+        listId: listId,
+        userId: 'user-1',
+        eventType: 'system',
+        action: 'board_status_changed',
+        content: 'เปลี่ยนสถานะจาก กำลังทำ เป็น รอดำเนินการ',
+        createdAt: DateTime(2026, 7, 31, 14, 5),
+        userFirstName: 'ผู้ทดสอบ',
+        userLastName: 'ระบบ',
+      ),
+    ];
+  }
 }
