@@ -3,6 +3,7 @@ import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/user_avatar.dart';
 import '../widgets/app_loading_view.dart';
 import '../services/fcm_service.dart';
 import 'admin_websites_page.dart';
@@ -372,21 +373,14 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                         child: Container(
                           width: 48,
                           height: 48,
-                          decoration: borderDecoration.copyWith(
-                            image: hasAvatar
-                                ? DecorationImage(
-                                    image: NetworkImage(avatarUrl),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
+                          decoration: borderDecoration,
+                          child: UserAvatar(
+                            avatarUrl: widget.user.avatarUrl,
+                            name: widget.user.nickname.isNotEmpty
+                                ? widget.user.nickname
+                                : widget.user.firstName,
+                            radius: 24,
                           ),
-                          child: hasAvatar
-                              ? null
-                              : const Icon(
-                                  Icons.person_rounded,
-                                  color: workMuted,
-                                  size: 25,
-                                ),
                         ),
                       ),
                     ],

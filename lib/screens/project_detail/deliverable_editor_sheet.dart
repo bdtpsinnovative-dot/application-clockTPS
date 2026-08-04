@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/work_models.dart';
 import '../../services/auth_flow_service.dart';
+import '../../widgets/user_avatar.dart';
 import 'project_detail_style.dart';
 
 typedef DeliverableCreateCallback =
@@ -400,45 +401,23 @@ class _DeliverableEditorSheetState extends State<DeliverableEditorSheet> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final member in _members)
-                  Builder(
-                    builder: (context) {
-                      final avatarUrl = member.resolvedAvatarUrl;
-                      final hasAvatar =
-                          avatarUrl != null && avatarUrl.isNotEmpty;
-                      return FilterChip(
-                        avatar: CircleAvatar(
-                          radius: 10,
-                          backgroundColor: const Color(0xFFDBEAFE),
-                          backgroundImage:
-                              hasAvatar ? NetworkImage(avatarUrl) : null,
-                          onBackgroundImageError:
-                              hasAvatar ? (error, stack) {} : null,
-                          child: !hasAvatar
-                              ? Text(
-                                  member.firstName.isNotEmpty
-                                      ? member.firstName[0]
-                                      : '?',
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1E40AF),
-                                  ),
-                                )
-                              : null,
-                        ),
-                        label: Text(member.displayName),
-                        selected: _assigneeIds.contains(member.id),
-                        onSelected: (selected) {
-                          setState(() {
-                            if (selected) {
-                              _assigneeIds.add(member.id);
-                            } else {
-                              _assigneeIds.remove(member.id);
-                            }
-                          });
-                        },
-                      );
+                 for (final member in _members)
+                  FilterChip(
+                    avatar: UserAvatar(
+                      avatarUrl: member.avatarUrl,
+                      name: member.displayName,
+                      radius: 10,
+                    ),
+                    label: Text(member.displayName),
+                    selected: _assigneeIds.contains(member.id),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _assigneeIds.add(member.id);
+                        } else {
+                          _assigneeIds.remove(member.id);
+                        }
+                      });
                     },
                   ),
               ],

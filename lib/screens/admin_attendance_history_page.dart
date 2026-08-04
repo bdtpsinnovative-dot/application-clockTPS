@@ -7,6 +7,7 @@ import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/skeleton_loading.dart';
 import '../widgets/app_loading_view.dart';
+import '../widgets/user_avatar.dart';
 
 class AdminAttendanceHistoryPage extends StatefulWidget {
   const AdminAttendanceHistoryPage({
@@ -1040,26 +1041,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFFF1F5F9),
-                            image: hasAvatar
-                                ? DecorationImage(
-                                    image: NetworkImage(avatarUrl),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                          ),
-                          child: hasAvatar
-                              ? null
-                              : const Icon(
-                                  Icons.person_rounded,
-                                  color: workMuted,
-                                  size: 18,
-                                ),
+                        UserAvatar(
+                          avatarUrl: matchedUser?.avatarUrl,
+                          name: matchedUser?.fullName ?? row.email,
+                          radius: 16,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1214,17 +1199,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                 // Header (User avatar + name + Circular progress)
                 Row(
                   children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFFF1F5F9),
-                        image: hasAvatar
-                            ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover)
-                            : null,
-                      ),
-                      child: hasAvatar ? null : const Icon(Icons.person_rounded, color: workMuted, size: 20),
+                    UserAvatar(
+                      avatarUrl: user.avatarUrl,
+                      name: user.fullName,
+                      radius: 19,
                     ),
                     const SizedBox(width: 10),
                     Expanded(

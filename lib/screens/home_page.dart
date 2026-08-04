@@ -12,6 +12,7 @@ import 'user_profile_page.dart';
 import 'main_dashboard_page.dart';
 import 'admin_dashboard_page.dart';
 import 'notifications_page.dart';
+import '../widgets/user_avatar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -456,34 +457,14 @@ class _AppDrawer extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 62,
-                  height: 62,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.45),
-                      width: 2,
-                    ),
-                    image: user.avatarUrl != null && user.avatarUrl!.trim().isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(
-                              user.avatarUrl!.startsWith('r2://')
-                                  ? user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                                  : user.avatarUrl!,
-                            ),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
+                UserAvatar(
+                  avatarUrl: user.avatarUrl,
+                  name: user.fullName,
+                  radius: 31,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.45),
+                    width: 2,
                   ),
-                  child: user.avatarUrl != null && user.avatarUrl!.trim().isNotEmpty
-                      ? null
-                      : const Icon(
-                          Icons.person_rounded,
-                          color: Colors.white,
-                          size: 34,
-                        ),
                 ),
                 const SizedBox(height: 14),
                 Text(

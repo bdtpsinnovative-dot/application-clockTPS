@@ -174,22 +174,10 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                                     width: 1.5,
                                   ),
                                 ),
-                                child: CircleAvatar(
-                                  backgroundImage: resolvedAvatar != null
-                                      ? NetworkImage(resolvedAvatar)
-                                      : null,
+                                child: UserAvatar(
+                                  avatarUrl: u.avatarUrl,
+                                  name: displayName,
                                   radius: 16,
-                                  backgroundColor: const Color(0xFFF1F5F9),
-                                  child: resolvedAvatar == null
-                                      ? Text(
-                                          displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: workText,
-                                          ),
-                                        )
-                                      : null,
                                 ),
                               ),
                               if (isSelected)

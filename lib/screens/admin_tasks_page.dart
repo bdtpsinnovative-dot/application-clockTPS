@@ -11,6 +11,7 @@ import 'package:hr_management/screens/project_detail/project_detail_page.dart';
 import 'package:hr_management/screens/project_detail/project_detail_style.dart';
 import 'task_assignment/task_assignment_domain.dart';
 import 'task_assignment/task_assignment_view_model.dart';
+import 'package:hr_management/widgets/user_avatar.dart';
 
 export 'task_assignment/task_assignment_domain.dart';
 
@@ -794,37 +795,14 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            Container(
-                              width: 14,
-                              height: 14,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: ProjectDetailStyle.soft,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 0.8,
-                                ),
-                                image: creatorAvatar != null
-                                    ? DecorationImage(
-                                        image: NetworkImage(creatorAvatar),
-                                        fit: BoxFit.cover,
-                                      )
-                                    : null,
+                            UserAvatar(
+                              avatarUrl: creator?.avatarUrl,
+                              name: creator.firstName,
+                              radius: 7,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 0.8,
                               ),
-                              child: creatorAvatar == null
-                                  ? Center(
-                                      child: Text(
-                                        creator.firstName.isNotEmpty
-                                            ? creator.firstName[0].toUpperCase()
-                                            : '?',
-                                        style: const TextStyle(
-                                          fontSize: 7.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: ProjectDetailStyle.accent,
-                                        ),
-                                      ),
-                                    )
-                                  : null,
                             ),
                             const Positioned(
                               top: -5,
@@ -969,52 +947,16 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                             assignees.length > 3 ? 3 : assignees.length,
                             (index) {
                               final u = assignees[index];
-                              final avatarUrl = u.avatarUrl;
-                              final hasAvatar =
-                                  avatarUrl != null &&
-                                  avatarUrl.trim().isNotEmpty;
-                              final resolvedAvatar = hasAvatar
-                                  ? (avatarUrl.startsWith('r2://')
-                                        ? avatarUrl.replaceFirst(
-                                            'r2://',
-                                            'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-                                          )
-                                        : avatarUrl)
-                                  : null;
-
                               return Positioned(
                                 left: index * 10.0,
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: ProjectDetailStyle.soft,
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 1.0,
-                                    ),
-                                    image: resolvedAvatar != null
-                                        ? DecorationImage(
-                                            image: NetworkImage(resolvedAvatar),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
+                                child: UserAvatar(
+                                  avatarUrl: u.avatarUrl,
+                                  name: u.firstName,
+                                  radius: 10,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.0,
                                   ),
-                                  child: resolvedAvatar == null
-                                      ? Center(
-                                          child: Text(
-                                            u.firstName.isNotEmpty
-                                                ? u.firstName[0].toUpperCase()
-                                                : '?',
-                                            style: const TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                              color: ProjectDetailStyle.accent,
-                                            ),
-                                          ),
-                                        )
-                                      : null,
                                 ),
                               );
                             },

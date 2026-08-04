@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import '../widgets/avatar_picker.dart';
+import '../widgets/user_avatar.dart';
 
 import '../models/app_user.dart';
 import '../models/work_models.dart';
@@ -403,24 +404,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                               offset: const Offset(0, 3),
                                             ),
                                           ],
-                                          image: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
-                                              ? DecorationImage(
-                                                  image: NetworkImage(
-                                                    widget.user.avatarUrl!.startsWith('r2://')
-                                                        ? widget.user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                                                        : widget.user.avatarUrl!,
-                                                  ),
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : null,
                                         ),
-                                        child: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
-                                            ? null
-                                            : const Icon(
-                                                Icons.person_rounded,
-                                                color: workMuted,
-                                                size: 38,
-                                              ),
+                                        child: UserAvatar(
+                                          avatarUrl: widget.user.avatarUrl,
+                                          name: widget.user.nickname.isNotEmpty
+                                              ? widget.user.nickname
+                                              : widget.user.firstName,
+                                          radius: 32,
+                                        ),
                                       ),
                                       Positioned(
                                         bottom: 0,

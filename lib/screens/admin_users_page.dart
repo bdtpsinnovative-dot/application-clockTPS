@@ -5,6 +5,7 @@ import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/skeleton_loading.dart';
 import '../widgets/app_loading_view.dart';
+import '../widgets/user_avatar.dart';
 
 class AdminUsersPage extends StatefulWidget {
   const AdminUsersPage({
@@ -286,17 +287,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFF1F5F9),
-                  image: hasAvatar
-                      ? DecorationImage(image: NetworkImage(httpAvatarUrl), fit: BoxFit.cover)
-                      : null,
-                ),
-                child: hasAvatar ? null : const Icon(Icons.person_rounded, color: workMuted, size: 20),
+              UserAvatar(
+                avatarUrl: u.avatarUrl,
+                name: u.fullName,
+                radius: 18,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -379,17 +373,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
           ),
           child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFF1F5F9),
-                  image: hasAvatar
-                      ? DecorationImage(image: NetworkImage(httpAvatarUrl), fit: BoxFit.cover)
-                      : null,
-                ),
-                child: hasAvatar ? null : const Icon(Icons.person_rounded, color: workMuted, size: 20),
+              UserAvatar(
+                avatarUrl: u.avatarUrl,
+                name: u.fullName,
+                radius: 18,
               ),
               const SizedBox(width: 12),
               Expanded(

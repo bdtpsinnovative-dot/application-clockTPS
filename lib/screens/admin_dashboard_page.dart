@@ -13,6 +13,7 @@ import 'admin_holidays_page.dart';
 import 'admin_attendance_history_page.dart';
 import 'admin_tasks_page.dart';
 import 'admin_websites_page.dart';
+import '../widgets/user_avatar.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({
@@ -323,23 +324,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             const SizedBox(width: 12),
                             // Custom Bordered Avatar (Role-Based & Solid Color)
                             Container(
-                              width: 44,
-                              height: 44,
-                              decoration: borderDecoration.copyWith(
-                                image: hasAvatar
-                                    ? DecorationImage(
-                                        image: NetworkImage(httpAvatarUrl),
-                                        fit: BoxFit.cover,
-                                      )
-                                    : null,
+                              decoration: borderDecoration,
+                              child: UserAvatar(
+                                avatarUrl: widget.user.avatarUrl,
+                                name: widget.user.fullName,
+                                radius: 22,
                               ),
-                              child: hasAvatar
-                                  ? null
-                                  : const Icon(
-                                      Icons.person_rounded,
-                                      color: workMuted,
-                                      size: 24,
-                                    ),
                             ),
                           ],
                         ),
