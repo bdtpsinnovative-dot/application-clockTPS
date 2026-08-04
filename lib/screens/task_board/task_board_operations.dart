@@ -336,7 +336,8 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                         },
                                         borderRadius: BorderRadius.circular(10),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                                          height: 40,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
                                           decoration: BoxDecoration(
                                             borderRadius: BorderRadius.circular(10),
                                             border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -387,7 +388,8 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                       ),
                                       const SizedBox(height: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                                        height: 40,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8),
                                         decoration: BoxDecoration(
                                           borderRadius: BorderRadius.circular(10),
                                           border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -396,7 +398,6 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                           child: DropdownButton<String>(
                                             value: selectedPriority,
                                             isExpanded: true,
-                                            isDense: true,
                                             icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
                                             style: const TextStyle(fontSize: 11, color: workText),
                                             items: const [
@@ -499,7 +500,8 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                       ),
                                       const SizedBox(height: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                                        height: 40,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8),
                                         decoration: BoxDecoration(
                                           borderRadius: BorderRadius.circular(10),
                                           border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -508,7 +510,6 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                           child: DropdownButton<String>(
                                             value: selectedStatus,
                                             isExpanded: true,
-                                            isDense: true,
                                             icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
                                             style: const TextStyle(fontSize: 11, color: workText),
                                             items: const [
