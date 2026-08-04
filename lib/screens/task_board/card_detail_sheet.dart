@@ -31,6 +31,13 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
   bool _saving = false;
   final _subItemController = TextEditingController();
 
+  late TextEditingController _titleController;
+  late TextEditingController _descController;
+  late TextEditingController _adminCommentController;
+  late String _priority;
+  DateTime? _startDate;
+  DateTime? _dueDate;
+
   final List<String> _statusKeys = ['pending', 'in_progress', 'completed'];
   final List<String> _statusLabels = ['รอทำ', 'กำลังทำ', 'เสร็จสิ้น'];
   final List<Color> _statusColors = [
@@ -48,6 +55,12 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
     _subItems = List.from(widget.card.subItems);
     _attachments = List.from(widget.card.attachments);
     _currentStatus = widget.card.status;
+    _titleController = TextEditingController(text: widget.card.title);
+    _descController = TextEditingController(text: widget.card.description ?? '');
+    _adminCommentController = TextEditingController(text: widget.card.adminComment ?? '');
+    _priority = widget.card.priority ?? 'medium';
+    _startDate = widget.card.startDate;
+    _dueDate = widget.card.dueDate;
 
     // Auto-refresh card details from the server to prevent stale state across different devices
     Future.microtask(() => _refreshCardData());
@@ -83,7 +96,42 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
   void dispose() {
     _detailScrollController.dispose();
     _subItemController.dispose();
+    _titleController.dispose();
+    _descController.dispose();
+    _adminCommentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveCardAllDetails() async {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) return;
+
+    setState(() => _saving = true);
+    try {
+      await widget.service.updateTaskCard(
+        widget.card.id,
+        title: title,
+        description: _descController.text.trim(),
+        adminComment: _adminCommentController.text.trim(),
+        priority: _priority,
+        status: _currentStatus,
+        startDate: _startDate,
+        dueDate: _dueDate,
+      );
+      widget.onChanged();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('บันทึกข้อมูลการ์ดล้มเหลว: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _updateCardStatus(String status) async {
@@ -543,361 +591,568 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final doneCount = _subItems.where((s) => s.isDone).length;
-    final totalCount = _subItems.length;
-    final pct = totalCount == 0 ? 0 : (doneCount / totalCount * 100).toInt();
+    final bool isAdminOrHr =
+        widget.service.currentUser?.role == 'admin' ||
+        widget.service.currentUser?.role == 'hr';
 
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 12),
+    return DefaultTabController(
+      length: 2,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.88,
+          color: Colors.white,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Navigation / Action Bar (ชิดซ้ายเป็นระเบียบเรียบร้อย)
+              // ─── Header Bar ───
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
                 ),
                 child: Row(
                   children: [
-                    // Left side: Back Button
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: workText,
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      tooltip: 'ย้อนกลับ',
+                      child: const Icon(
+                        Icons.assignment_outlined,
+                        color: Color(0xFF6366F1),
+                        size: 20,
+                      ),
                     ),
-                    // List > Card hierarchy
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  widget.listName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    color: workMuted,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 4),
-                                child: Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 13,
-                                  color: Color(0xFFCBD5E1),
-                                ),
-                              ),
-                              const Text(
-                                'การ์ด',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: workBlue,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            '${widget.listName} › การ์ดงาน',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: workMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           const SizedBox(height: 1),
-                          Text(
-                            _cardTitle,
-                            style: const TextStyle(
+                          const Text(
+                            'แก้ไขข้อมูลงานย่อย',
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
                               color: workText,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Right side: Action Menu Buttons (+ and ...)
-                    IconButton(
-                      icon: const Icon(Icons.add_rounded, color: workBlue),
-                      tooltip: 'เพิ่มรายการย่อย',
-                      onPressed: () async {
-                        final textController = TextEditingController();
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            title: const Text(
-                              'เพิ่มรายการย่อยใหม่',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                            content: TextField(
-                              controller: textController,
-                              autofocus: true,
-                              decoration: const InputDecoration(
-                                hintText: 'พิมพ์หัวข้อรายการย่อย...',
-                                filled: true,
-                                fillColor: Color(0xFFF8FAFC),
-                                border: OutlineInputBorder(
-                                  borderSide: BorderSide.none,
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text(
-                                  'ยกเลิก',
-                                  style: TextStyle(color: workMuted),
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  if (textController.text.trim().isNotEmpty) {
-                                    Navigator.pop(context, true);
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: workBlue,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text('เพิ่ม'),
-                              ),
-                            ],
-                          ),
-                        );
-
-                        if (confirm == true &&
-                            textController.text.trim().isNotEmpty) {
-                          setState(() => _saving = true);
-                          try {
-                            final newItem = await widget.service
-                                .createCardSubItem(
-                                  widget.card.id,
-                                  textController.text.trim(),
-                                );
-                            setState(() {
-                              _subItems.add(newItem);
-                            });
-                            widget.onChanged();
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('เพิ่มรายการย่อยล้มเหลว: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          } finally {
-                            setState(() => _saving = false);
-                          }
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                    // Action Menu Button (... icon)
-                    PopupMenuButton<String>(
-                      icon: const Icon(
-                        Icons.more_horiz_rounded,
-                        color: workMuted,
-                      ),
-                      onSelected: (action) async {
-                        if (action == 'edit_card') {
-                          _editCard();
-                        } else if (action == 'delete_card') {
+                    if (widget.canEdit)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF64748B), size: 20),
+                        onPressed: () async {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              title: const Text(
-                                'ลบการ์ด',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              content: Text(
-                                'คุณต้องการลบการ์ด "$_cardTitle" หรือไม่?',
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              title: const Text('ลบการ์ดงาน', style: TextStyle(fontWeight: FontWeight.bold)),
+                              content: Text('คุณต้องการลบการ์ดงาน "$_cardTitle" หรือไม่?'),
                               actions: [
                                 TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, false),
-                                  child: const Text(
-                                    'ยกเลิก',
-                                    style: TextStyle(color: workMuted),
-                                  ),
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
                                 ),
                                 TextButton(
                                   onPressed: () => Navigator.pop(context, true),
-                                  child: const Text(
-                                    'ลบ',
-                                    style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  child: const Text('ลบ', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                                 ),
                               ],
                             ),
                           );
                           if (confirm == true) {
                             try {
-                              await widget.service.deleteTaskCard(
-                                widget.card.id,
-                              );
+                              await widget.service.deleteTaskCard(widget.card.id);
                               widget.onChanged();
                               if (mounted) Navigator.pop(context);
                             } catch (e) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('ลบการ์ดล้มเหลว: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
+                                  SnackBar(content: Text('ลบการ์ดล้มเหลว: $e'), backgroundColor: Colors.red),
                                 );
                               }
                             }
                           }
-                        } else if (action.startsWith('status_')) {
-                          final newStatus = action.substring(
-                            7,
-                          ); // Extract "todo", "doing", "done"
-                          _updateCardStatus(newStatus);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'edit_card',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.edit_outlined,
-                                color: workBlue,
-                                size: 18,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'แก้ไขการ์ด',
-                                style: TextStyle(fontSize: 12.5),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete_card',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.delete_outline_rounded,
-                                color: Colors.redAccent,
-                                size: 18,
-                              ),
-                              SizedBox(width: 8),
-                              Text('ลบการ์ด', style: TextStyle(fontSize: 12.5)),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        PopupMenuItem(
-                          value: 'status_todo',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.circle_rounded,
-                                color: _statusColors[0],
-                                size: 12,
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'ย้ายไป "รอทำ"',
-                                style: TextStyle(fontSize: 12.5),
-                              ),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'status_doing',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.circle_rounded,
-                                color: _statusColors[1],
-                                size: 12,
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'ย้ายไป "กำลังทำ"',
-                                style: TextStyle(fontSize: 12.5),
-                              ),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'status_done',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.circle_rounded,
-                                color: _statusColors[2],
-                                size: 12,
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'ย้ายไป "เสร็จสิ้น"',
-                                style: TextStyle(fontSize: 12.5),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        },
+                        tooltip: 'ลบการ์ด',
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                      onPressed: () => Navigator.pop(context),
+                      tooltip: 'ปิด',
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 4),
 
-              // Scrollable content area
+              // ─── Tab Bar (2 Tabs) ───
+              Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                ),
+                child: const TabBar(
+                  indicatorColor: workBlue,
+                  indicatorWeight: 2.5,
+                  labelColor: workBlue,
+                  unselectedLabelColor: Color(0xFF64748B),
+                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                  tabs: [
+                    Tab(text: 'ข้อมูลทั่วไป (General Info)'),
+                    Tab(text: 'เอกสาร & หมายเหตุ (Docs & Notes)'),
+                  ],
+                ),
+              ),
+
+              // ─── Tab Bar Views ───
               Expanded(
-                child: SingleChildScrollView(
-                  controller: _detailScrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                child: TabBarView(
+                  children: [
+                    _buildGeneralInfoTab(context, isAdminOrHr),
+                    _buildDocsAndNotesTab(context, isAdminOrHr),
+                  ],
+                ),
+              ),
+
+              // ─── Bottom Sticky Footer Bar ───
+              Container(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  10,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom + 10,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: _saving ? null : _saveCardAllDetails,
+                      icon: const Icon(Icons.save_rounded, size: 18),
+                      label: Text(
+                        _saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: workBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// ─── Tab 1: ข้อมูลทั่วไป (General Info) ───
+  Widget _buildGeneralInfoTab(BuildContext context, bool isAdminOrHr) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ชื่อรายการคอร์สงาน
+          const Text(
+            'ชื่อรายการคอร์สงาน',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _titleController,
+            style: const TextStyle(fontSize: 13.5, color: workText),
+            decoration: InputDecoration(
+              hintText: 'พิมพ์ชื่อรายการคอร์สงาน...',
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: workBlue, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Row: วันกำหนดส่ง & ความสำคัญ
+          Row(
+            children: [
+              // วันกำหนดส่ง
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'วันกำหนดส่ง',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: workText),
+                    ),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _dueDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2035),
+                        );
+                        if (picked != null) {
+                          setState(() => _dueDate = picked);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
                           children: [
-                            // 1. รายละเอียดการ์ดงาน (Card Details - Top Section)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.subject_rounded,
-                                  color: workBlue,
-                                  size: 18,
+                            Expanded(
+                              child: Text(
+                                _dueDate != null
+                                    ? DateFormat('dd / MM / yyyy').format(_dueDate!)
+                                    : 'วว/ดด/ปปปป',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _dueDate != null ? workText : workMuted,
                                 ),
-                                const SizedBox(width: 6),
+                              ),
+                            ),
+                            const Icon(Icons.calendar_today_rounded, size: 15, color: Color(0xFF64748B)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // ความสำคัญ
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ความสำคัญ (Priority)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: workText),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _priority,
+                          isExpanded: true,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                          style: const TextStyle(fontSize: 12, color: workText),
+                          items: const [
+                            DropdownMenuItem(value: 'low', child: Text('⚡ ต่ำ (Low)')),
+                            DropdownMenuItem(value: 'medium', child: Text('⚡ ด่วนปานกลาง (Medium)')),
+                            DropdownMenuItem(value: 'high', child: Text('⚡ ด่วนมาก (High)')),
+                            DropdownMenuItem(value: 'urgent', child: Text('⚡ ด่วนที่สุด (Urgent)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _priority = val);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // สถานะงาน (Status)
+          const Text(
+            'สถานะงาน (Status)',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _currentStatus,
+                isExpanded: true,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                style: const TextStyle(fontSize: 12.5, color: workText),
+                items: const [
+                  DropdownMenuItem(value: 'pending', child: Text('รอรับงาน (Pending)')),
+                  DropdownMenuItem(value: 'in_progress', child: Text('กำลังทำ (In Progress)')),
+                  DropdownMenuItem(value: 'completed', child: Text('เสร็จสิ้น (Completed)')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _currentStatus = val);
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // มอบหมายให้ (Assignees)
+          const Text(
+            'มอบหมายให้ (Assignees)',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ...widget.card.assignees.map(
+                (user) => UserAvatar(
+                  avatarUrl: user.avatarUrl,
+                  name: user.displayName,
+                  radius: 16,
+                ),
+              ),
+              InkWell(
+                onTap: () {},
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: const Icon(Icons.add, size: 18, color: workBlue),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // รายละเอียดเพิ่มเติม (Details)
+          const Text(
+            'รายละเอียดเพิ่มเติม (Details)',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _descController,
+            maxLines: 4,
+            style: const TextStyle(fontSize: 13, color: workText),
+            decoration: InputDecoration(
+              hintText: 'กรอกรายละเอียดเพิ่มเติมของการ์ดงานนี้...',
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.all(12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: workBlue, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  /// ─── Tab 2: เอกสาร & หมายเหตุ (Docs & Notes) ───
+  Widget _buildDocsAndNotesTab(BuildContext context, bool isAdminOrHr) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // NOTE / Remark (ความคิดเห็นจากผู้ดูแล)
+          const Text(
+            'NOTE / Remark (ความคิดเห็นจากผู้ดูแล)',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _adminCommentController,
+            maxLines: 4,
+            enabled: isAdminOrHr,
+            style: const TextStyle(fontSize: 13, color: workText),
+            decoration: InputDecoration(
+              hintText: 'เพิ่มคำอธิบายหรือความคิดเห็นผู้ดูแล...',
+              filled: true,
+              fillColor: const Color(0xFFFFFBEB),
+              contentPadding: const EdgeInsets.all(12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFFDE68A)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.amber, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // เอกสารแนบ & ลิงก์ไฟล์งาน (Attachments)
+          const Text(
+            'เอกสารแนบ & ลิงก์ไฟล์งาน (Attachments)',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+          ),
+          const SizedBox(height: 8),
+
+          if (_attachments.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Center(
+                child: Text(
+                  'ยังไม่มีเอกสารแนบในการ์ดงานนี้',
+                  style: TextStyle(fontSize: 12.5, color: workMuted),
+                ),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final att in _attachments)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          att.type == 'link' ? Icons.link_rounded : Icons.attach_file_rounded,
+                          size: 16,
+                          color: workBlue,
+                        ),
+                        const SizedBox(width: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 160),
+                          child: Text(
+                            att.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, color: workText),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          const SizedBox(height: 14),
+
+          // 2 Action Buttons: [ 📎 แนบไฟล์ (ลิงก์) ]  [ 🔗 แนบลิงก์ ]
+          if (widget.canEdit)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickAndUploadFile(),
+                    icon: const Icon(Icons.attach_file_rounded, size: 16, color: Color(0xFF6366F1)),
+                    label: const Text('แนบไฟล์ (ลิงก์)', style: TextStyle(color: Color(0xFF6366F1), fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Color(0xFFA5B4FC)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _addLinkAttachment(),
+                    icon: const Icon(Icons.link_rounded, size: 16, color: Color(0xFF10B981)),
+                    label: const Text('แนบลิงก์', style: TextStyle(color: Color(0xFF10B981), fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Color(0xFF6EE7B7)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
                                 Expanded(
                                   child: Text(
                                     _cardTitle,
