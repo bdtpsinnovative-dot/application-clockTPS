@@ -570,27 +570,13 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 ...selectedAssignees.map((user) {
-                                  final initials = user.displayName.isNotEmpty
-                                      ? user.displayName[0].toUpperCase()
-                                      : '?';
                                   return InkWell(
                                     onTap: () {
                                       setModalState(() {
                                         selectedAssignees.removeWhere((u) => u.id == user.id);
                                       });
                                     },
-                                    child: CircleAvatar(
-                                      radius: 16,
-                                      backgroundColor: const Color(0xFFEFF6FF),
-                                      child: Text(
-                                        initials,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: workBlue,
-                                        ),
-                                      ),
-                                    ),
+                                    child: _buildUserAvatar(user, radius: 16),
                                   );
                                 }),
                                 // Plus dashed button
@@ -600,48 +586,80 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                     await showDialog<void>(
                                       context: context,
                                       builder: (context) {
-                                        return AlertDialog(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(16),
-                                          ),
-                                          title: const Text(
-                                            'เลือกผู้รับผิดชอบ',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          content: Container(
-                                            width: double.maxFinite,
-                                            constraints: BoxConstraints(
-                                              maxHeight: MediaQuery.of(context).size.height * 0.4,
-                                            ),
-                                            child: ListView.builder(
-                                              shrinkWrap: true,
-                                              itemCount: _members.length,
-                                              itemBuilder: (context, idx) {
-                                                final member = _members[idx];
-                                                final isSelected = selectedAssignees.any((u) => u.id == member.id);
-                                                return CheckboxListTile(
-                                                  value: isSelected,
-                                                  title: Text(member.displayName),
-                                                  activeColor: workBlue,
-                                                  onChanged: (checked) {
-                                                    setModalState(() {
-                                                      if (checked == true) {
-                                                        if (!selectedAssignees.any((u) => u.id == member.id)) {
-                                                          selectedAssignees.add(member);
-                                                        }
-                                                      } else {
-                                                        selectedAssignees.removeWhere((u) => u.id == member.id);
-                                                      }
-                                                    });
-                                                    Navigator.pop(context);
+                                        return StatefulBuilder(
+                                          builder: (context, setDialogState) {
+                                            return AlertDialog(
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              title: const Text(
+                                                'เลือกผู้รับผิดชอบ',
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              content: Container(
+                                                width: double.maxFinite,
+                                                constraints: BoxConstraints(
+                                                  maxHeight: MediaQuery.of(context).size.height * 0.4,
+                                                ),
+                                                child: ListView.builder(
+                                                  shrinkWrap: true,
+                                                  itemCount: _members.length,
+                                                  itemBuilder: (context, idx) {
+                                                    final member = _members[idx];
+                                                    final isSelected = selectedAssignees.any((u) => u.id == member.id);
+                                                    return ListTile(
+                                                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                      leading: _buildUserAvatar(member, radius: 15),
+                                                      title: Text(
+                                                        member.displayName,
+                                                        style: const TextStyle(fontSize: 13, color: workText),
+                                                      ),
+                                                      trailing: Checkbox(
+                                                        value: isSelected,
+                                                        activeColor: workBlue,
+                                                        onChanged: (checked) {
+                                                          setModalState(() {
+                                                            if (checked == true) {
+                                                              if (!selectedAssignees.any((u) => u.id == member.id)) {
+                                                                selectedAssignees.add(member);
+                                                              }
+                                                            } else {
+                                                              selectedAssignees.removeWhere((u) => u.id == member.id);
+                                                            }
+                                                          });
+                                                          setDialogState(() {}); // Rebuild dialog list
+                                                        },
+                                                      ),
+                                                      onTap: () {
+                                                        setModalState(() {
+                                                          if (isSelected) {
+                                                            selectedAssignees.removeWhere((u) => u.id == member.id);
+                                                          } else {
+                                                            if (!selectedAssignees.any((u) => u.id == member.id)) {
+                                                              selectedAssignees.add(member);
+                                                            }
+                                                          }
+                                                        });
+                                                        setDialogState(() {}); // Rebuild dialog list
+                                                      },
+                                                    );
                                                   },
-                                                );
-                                              },
-                                            ),
-                                          ),
+                                                ),
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context),
+                                                  child: const Text(
+                                                    'ตกลง',
+                                                    style: TextStyle(color: workBlue, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
                                         );
                                       },
                                     );
