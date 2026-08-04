@@ -226,53 +226,76 @@ extension _TaskBoardRendering on _TaskBoardPageState {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
         children: [
-          // Header Row: 'บอร์ดงาน' and 'N งาน'
+          // Custom Board Header styled like the screenshot
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 14),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: const Icon(
-                    Icons.view_agenda_rounded,
-                    color: workBlue,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'บอร์ดงาน',
-                    style: TextStyle(
-                      color: workText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                Row(
+                  children: [
+                    // Drag indicator icon
+                    const Icon(
+                      Icons.drag_indicator_rounded,
+                      color: Color(0xFF94A3B8), // slate-400
+                      size: 20,
                     ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Text(
-                    '${lists.length} งาน',
-                    style: const TextStyle(
-                      color: workMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(width: 8),
+                    // Board/Project Title
+                    Expanded(
+                      child: Text(
+                        widget.task.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: workText,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    // Edit pencil icon
+                    const Icon(
+                      Icons.edit_outlined,
+                      color: Color(0xFF64748B), // slate-500
+                      size: 18,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Progress Bar and Percentage Row
+                Row(
+                  children: [
+                    // Progress Bar
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: lists.isNotEmpty
+                              ? (lists.where((l) => l.status == 'completed').length / lists.length)
+                              : 0.0,
+                          backgroundColor: const Color(0xFFE2E8F0), // light slate background
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF10B981), // Emerald green progress fill
+                          ),
+                          minHeight: 4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Percentage Text
+                    Text(
+                      lists.isNotEmpty
+                          ? '${((lists.where((l) => l.status == 'completed').length / lists.length) * 100).toInt()}%'
+                          : '0%',
+                      style: const TextStyle(
+                        color: Color(0xFF10B981), // Emerald green text
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
