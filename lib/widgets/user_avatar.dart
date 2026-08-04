@@ -23,6 +23,7 @@ class UserAvatar extends StatelessWidget {
     final isSvg = hasAvatar &&
         (resolvedUrl.toLowerCase().contains('.svg') ||
             resolvedUrl.toLowerCase().contains('/svg'));
+    final headers = _buildHeaders(resolvedUrl);
 
     Widget avatarWidget;
     if (hasAvatar) {
@@ -30,6 +31,7 @@ class UserAvatar extends StatelessWidget {
         avatarWidget = SvgPicture.network(
           resolvedUrl,
           fit: BoxFit.cover,
+          headers: headers,
           placeholderBuilder: (BuildContext context) =>
               _buildFallbackText(radius, name),
         );
@@ -37,6 +39,7 @@ class UserAvatar extends StatelessWidget {
         avatarWidget = Image.network(
           resolvedUrl,
           fit: BoxFit.cover,
+          headers: headers,
           errorBuilder: (context, error, stackTrace) =>
               _buildFallbackText(radius, name),
         );
@@ -55,6 +58,26 @@ class UserAvatar extends StatelessWidget {
     }
 
     return SizedBox(width: radius * 2, height: radius * 2, child: child);
+  }
+
+  /// Domain-specific headers to bypass strict hotlinking rules
+  /// without interfering with CORS for Cloudflare R2 or standard servers.
+  static Map<String, String>? _buildHeaders(String url) {
+    final lower = url.toLowerCase();
+    if (lower.contains('pngtree.com')) {
+      return const {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://pngtree.com/',
+      };
+    }
+    if (lower.contains('gstatic.com')) {
+      return const {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      };
+    }
+    return null;
   }
 
   static Widget _buildFallbackText(double radius, String name) {
@@ -77,25 +100,27 @@ class UserAvatar extends StatelessWidget {
     if (url == null) return '';
     var trimmed = url.trim();
     if (trimmed.isEmpty) return '';
+    String finalUrl;
     if (trimmed.startsWith('r2://')) {
-      return trimmed.replaceFirst(
+      finalUrl = trimmed.replaceFirst(
         'r2://',
         'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
       );
-    }
-    if (trimmed.startsWith('okpr2://')) {
-      return trimmed.replaceFirst(
+    } else if (trimmed.startsWith('okpr2://')) {
+      finalUrl = trimmed.replaceFirst(
         'okpr2://',
         'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
       );
+    } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      finalUrl = trimmed;
+    } else {
+      final apiBase = AppConfig.apiBaseUrl;
+      if (trimmed.startsWith('/')) {
+        finalUrl = '$apiBase$trimmed';
+      } else {
+        finalUrl = '$apiBase/$trimmed';
+      }
     }
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
-    }
-    final apiBase = AppConfig.apiBaseUrl;
-    if (trimmed.startsWith('/')) {
-      return '$apiBase$trimmed';
-    }
-    return '$apiBase/$trimmed';
+    return Uri.encodeFull(finalUrl);
   }
 }
