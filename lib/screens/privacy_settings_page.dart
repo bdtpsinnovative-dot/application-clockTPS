@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import '../widgets/work_ui.dart';
-import 'privacy_settings_page.dart';
+import 'edit_user_info_page.dart';
+import 'change_password_page.dart';
 import '../services/auth_flow_service.dart';
 import '../models/app_user.dart';
 
-class AccountSettingsPage extends StatelessWidget {
+class PrivacySettingsPage extends StatelessWidget {
   final AuthFlowService service;
   final AppUser user;
   final VoidCallback onProfileUpdated;
 
-  const AccountSettingsPage({
+  const PrivacySettingsPage({
     super.key,
     required this.service,
     required this.user,
@@ -22,7 +23,7 @@ class AccountSettingsPage extends StatelessWidget {
       backgroundColor: workBackground,
       appBar: AppBar(
         title: const Text(
-          'ตั้งค่าบัญชี',
+          'ความเป็นส่วนตัว',
           style: TextStyle(
             color: Colors.white,
             fontSize: 18,
@@ -37,32 +38,37 @@ class AccountSettingsPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 8),
-          _SeparatedSettingsTile(
-            icon: Icons.notifications_active_rounded,
-            title: 'การแจ้งเตือน',
-            subtitle: 'ตั้งค่าการรับการแจ้งเตือนต่างๆ',
-            iconColor: const Color(0xFFF59E0B),
-            iconBgColor: const Color(0xFFFEF3C7),
-            onTap: () {
-              // Navigate to Notifications settings
-            },
-          ),
-          const SizedBox(height: 16),
-          _SeparatedSettingsTile(
-            icon: Icons.privacy_tip_rounded,
-            title: 'ความเป็นส่วนตัว',
-            subtitle: 'จัดการข้อมูลและความปลอดภัย',
-            iconColor: const Color(0xFF10B981),
-            iconBgColor: const Color(0xFFD1FAE5),
+          _PrivacyActionTile(
+            icon: Icons.person_outline_rounded,
+            title: 'ข้อมูลผู้ใช้',
+            subtitle: 'แก้ไขชื่อจริง นามสกุล และชื่อเล่น',
+            iconColor: const Color(0xFF3B82F6), // Blue
+            iconBgColor: const Color(0xFFDBEAFE),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => PrivacySettingsPage(
+                  builder: (_) => EditUserInfoPage(
                     service: service,
                     user: user,
                     onProfileUpdated: onProfileUpdated,
                   ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _PrivacyActionTile(
+            icon: Icons.lock_outline_rounded,
+            title: 'เปลี่ยนรหัสผ่าน',
+            subtitle: 'ตั้งรหัสผ่านใหม่เพื่อความปลอดภัย',
+            iconColor: const Color(0xFFEF4444), // Red
+            iconBgColor: const Color(0xFFFEE2E2),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChangePasswordPage(service: service),
                 ),
               );
             },
@@ -73,7 +79,7 @@ class AccountSettingsPage extends StatelessWidget {
   }
 }
 
-class _SeparatedSettingsTile extends StatelessWidget {
+class _PrivacyActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
@@ -81,7 +87,7 @@ class _SeparatedSettingsTile extends StatelessWidget {
   final Color iconBgColor;
   final VoidCallback onTap;
 
-  const _SeparatedSettingsTile({
+  const _PrivacyActionTile({
     required this.icon,
     required this.title,
     required this.subtitle,

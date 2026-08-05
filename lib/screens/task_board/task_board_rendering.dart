@@ -56,11 +56,10 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     Expanded(
                       child: InkWell(
                         onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
+                          final picked = await showWorkDueDatePicker(
+                            context,
                             initialDate: startDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2035),
+                            title: 'เลือกวันที่เริ่ม',
                           );
                           if (picked != null) {
                             setDlgState(() => startDate = picked);
@@ -109,11 +108,9 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     Expanded(
                       child: InkWell(
                         onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
+                          final picked = await showWorkDueDatePicker(
+                            context,
                             initialDate: dueDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2035),
                           );
                           if (picked != null) {
                             setDlgState(() => dueDate = picked);
@@ -271,13 +268,6 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Edit pencil icon
-                        const Icon(
-                          Icons.edit_outlined,
-                          color: Color(0xFF64748B), // slate-500
-                          size: 18,
                         ),
                       ],
                     ),

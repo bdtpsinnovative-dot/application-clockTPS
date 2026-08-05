@@ -251,6 +251,18 @@ class AuthFlowService {
     }
   }
 
+  Future<void> updatePassword(String oldPassword, String newPassword) async {
+    try {
+      await _dio.put<Map<String, dynamic>>(
+        '/api/users/me/password',
+        data: {'old_password': oldPassword, 'new_password': newPassword},
+        options: Options(headers: _authorizationHeaders()),
+      );
+    } on DioException catch (error) {
+      throw AuthFlowException(_apiMessage(error));
+    }
+  }
+
   Future<String> getCheckInMode() async {
     try {
       final response = await _authorizedGet('/api/settings/checkin-mode');
@@ -416,7 +428,7 @@ class AuthFlowService {
   }
 
   Future<List<AppUser>> getAdminUsers() async {
-    final response = await _authorizedGet('/admin/users');
+    final response = await _authorizedGet('/api/users');
     final data = response['data'];
     if (data is! List) return const [];
     return data
@@ -617,7 +629,7 @@ class AuthFlowService {
     String? status,
   }) async {
     final response = await _authorizedPost(
-      '/admin/tasks',
+      '/api/tasks',
       data: {
         'title': title,
         'description': description,

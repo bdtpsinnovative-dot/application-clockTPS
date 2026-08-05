@@ -97,13 +97,9 @@ class TaskAssignmentViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final isEmployee = service.currentUser?.role == 'employee';
-      // `/api/tasks` is scoped by the backend to tasks created by, directly
-      // assigned to, or jointly assigned to the signed-in user.
       final loadedTasks = await service.getMyTasks();
       final auxiliary = await Future.wait<Object>([
-        (isEmployee ? Future.value(<AppUser>[]) : service.getAdminUsers())
-            .catchError((_) => <AppUser>[]),
+        service.getAdminUsers().catchError((_) => <AppUser>[]),
         service.getBrands().catchError((_) => <BrandRecord>[]),
         service.getTaskCategories().catchError((_) => <TaskCategoryRecord>[]),
       ]);

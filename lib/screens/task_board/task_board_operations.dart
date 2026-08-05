@@ -169,9 +169,12 @@ extension _TaskBoardOperations on _TaskBoardPageState {
   Future<void> _createNewList() async {
     final titleController = TextEditingController();
     final descController = TextEditingController();
-    DateTime? selectedDueDate;
+    final today = workDateOnly(DateTime.now());
+    DateTime? selectedDueDate = today;
     String selectedPriority = 'medium';
-    String selectedStatus = 'todo';
+    // The API accepts pending/in_progress/completed. The UI label for
+    // pending is the "รอรับ" state, so keep the transport value consistent.
+    String selectedStatus = 'pending';
     List<UserSummary> selectedAssignees = [];
 
     await showModalBottomSheet<void>(
@@ -374,14 +377,13 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                       const SizedBox(height: 8),
                                       InkWell(
                                         onTap: () async {
-                                          final picked = await showDatePicker(
-                                            context: context,
-                                            initialDate:
-                                                selectedDueDate ??
-                                                DateTime.now(),
-                                            firstDate: DateTime(2020),
-                                            lastDate: DateTime(2030),
-                                          );
+                                          final picked =
+                                              await showWorkDueDatePicker(
+                                                context,
+                                                initialDate:
+                                                    selectedDueDate ??
+                                                    DateTime.now(),
+                                              );
                                           if (picked != null) {
                                             setModalState(() {
                                               selectedDueDate = picked;
@@ -640,7 +642,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                             ),
                                             items: const [
                                               DropdownMenuItem(
-                                                value: 'todo',
+                                                value: 'pending',
                                                 child: Text(
                                                   'รอรับ',
                                                   style: TextStyle(
@@ -1225,8 +1227,9 @@ extension _TaskBoardOperations on _TaskBoardPageState {
   Future<void> _createNewCard(String listId) async {
     final titleController = TextEditingController();
     final descController = TextEditingController();
-    DateTime? startDate;
-    DateTime? dueDate;
+    final today = workDateOnly(DateTime.now());
+    DateTime? startDate = today;
+    DateTime? dueDate = today;
     String priority = 'medium';
     List<UserSummary> selectedAssignees = [];
     List<UserSummary> allMembers = [];
@@ -1473,23 +1476,10 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                       Expanded(
                         child: InkWell(
                           onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
+                            final picked = await showWorkDueDatePicker(
+                              context,
                               initialDate: startDate ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2035),
-                              builder: (context, child) {
-                                return Theme(
-                                  data: Theme.of(context).copyWith(
-                                    colorScheme: const ColorScheme.light(
-                                      primary: workBlue,
-                                      onPrimary: Colors.white,
-                                      onSurface: workText,
-                                    ),
-                                  ),
-                                  child: child!,
-                                );
-                              },
+                              title: 'เลือกวันที่เริ่ม',
                             );
                             if (picked != null) {
                               setDlgState(() => startDate = picked);

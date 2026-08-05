@@ -4,14 +4,10 @@ import '../models/app_user.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/skeleton_loading.dart';
-import '../widgets/app_loading_view.dart';
 import '../widgets/user_avatar.dart';
 
 class AdminUsersPage extends StatefulWidget {
-  const AdminUsersPage({
-    super.key,
-    required this.service,
-  });
+  const AdminUsersPage({super.key, required this.service});
 
   final AuthFlowService service;
 
@@ -19,22 +15,21 @@ class AdminUsersPage extends StatefulWidget {
   State<AdminUsersPage> createState() => _AdminUsersPageState();
 }
 
-class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+class _AdminUsersPageState extends State<AdminUsersPage> {
   bool _loading = true;
   List<AppUser> _allUsers = [];
   String? _error;
 
+  bool get _isAdmin => widget.service.currentUser?.role == 'admin';
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadUsers();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -64,6 +59,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
   }
 
   Future<void> _approveUser(AppUser user) async {
+    if (widget.service.currentUser?.role != 'admin') return;
     try {
       await widget.service.approveUser(user.id);
       if (mounted) {
@@ -92,9 +88,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ยืนยันการปลดล็อกอุปกรณ์'),
-        content: Text('ต้องการปลดล็อกอุปกรณ์มือถือของ ${user.fullName} หรือไม่? พนักงานจะสามารถเชื่อมโยงอุปกรณ์เครื่องใหม่ได้เมื่อล็อกอินครั้งถัดไป'),
+        content: Text(
+          'ต้องการปลดล็อกอุปกรณ์มือถือของ ${user.fullName} หรือไม่? พนักงานจะสามารถเชื่อมโยงอุปกรณ์เครื่องใหม่ได้เมื่อล็อกอินครั้งถัดไป',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -120,7 +121,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -131,9 +135,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ยืนยันการปิดใช้งานบัญชี'),
-        content: Text('ต้องการระงับการใช้งานบัญชีของ ${user.fullName} หรือไม่? พนักงานคนนี้จะไม่สามารถลงชื่อเข้าใช้งานแอปพลิเคชันได้'),
+        content: Text(
+          'ต้องการระงับการใช้งานบัญชีของ ${user.fullName} หรือไม่? พนักงานคนนี้จะไม่สามารถลงชื่อเข้าใช้งานแอปพลิเคชันได้',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -159,7 +168,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -170,9 +182,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ยืนยันการเปิดใช้งานบัญชี'),
-        content: Text('ต้องการยกเลิกการระงับและเปิดใช้งานบัญชีของ ${user.fullName} หรือไม่?'),
+        content: Text(
+          'ต้องการยกเลิกการระงับและเปิดใช้งานบัญชีของ ${user.fullName} หรือไม่?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.green),
@@ -198,7 +215,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -206,23 +226,30 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = _isAdmin;
     final pendingUsers = _allUsers.where((u) => u.status == 'pending').toList();
-    final activeUsers = _allUsers.where((u) => u.status == 'active' || u.status == 'disabled').toList();
 
     return Scaffold(
       backgroundColor: workBackground,
       appBar: AppBar(
-        title: const Text('จัดการข้อมูลพนักงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: workBlue,
-          unselectedLabelColor: workMuted,
-          indicatorColor: workBlue,
-          tabs: [
-            Tab(text: 'รออนุมัติ (${pendingUsers.length})'),
-            Tab(text: 'พนักงานทั้งหมด (${activeUsers.length})'),
-          ],
+        title: Text(
+          isAdmin ? 'จัดการข้อมูลพนักงาน' : 'พนักงานทั้งหมด',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
+        actions: [
+          if (isAdmin)
+            Badge(
+              isLabelVisible: pendingUsers.isNotEmpty,
+              label: Text('${pendingUsers.length}'),
+              backgroundColor: const Color(0xFFEF4444),
+              child: IconButton(
+                onPressed: () => _showPendingApprovals(pendingUsers),
+                icon: const Icon(Icons.notifications_none_rounded),
+                tooltip: 'คำขอสมัครสมาชิกที่รออนุมัติ',
+              ),
+            ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: _loading && _allUsers.isEmpty
           ? const Padding(
@@ -230,112 +257,29 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
               child: EmployeeListSkeleton(),
             )
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.red),
-                      const SizedBox(height: 12),
-                      Text('โหลดข้อมูลล้มเหลว: $_error', style: const TextStyle(color: workText)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _loadUsers, child: const Text('ลองอีกครั้ง')),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.cloud_off_rounded,
+                    size: 48,
+                    color: Colors.red,
                   ),
-                )
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildPendingList(pendingUsers),
-                    _buildActiveList(activeUsers),
-                  ],
-                ),
-    );
-  }
-
-  Widget _buildPendingList(List<AppUser> users) {
-    if (users.isEmpty) {
-      return const Center(
-        child: Text(
-          'ไม่มีพนักงานที่รอการอนุมัติในขณะนี้ 🎉',
-          style: TextStyle(color: workMuted, fontSize: 13),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: users.length,
-      itemBuilder: (context, index) {
-        final u = users[index];
-        final avatarUrl = u.avatarUrl;
-        final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
-        final httpAvatarUrl = hasAvatar
-            ? (avatarUrl.startsWith('r2://')
-                ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                : avatarUrl)
-            : '';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFF1F5F9)),
-            boxShadow: const [BoxShadow(color: Color(0x040F172A), blurRadius: 6, offset: Offset(0, 1))],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              UserAvatar(
-                avatarUrl: u.avatarUrl,
-                name: u.fullName,
-                radius: 18,
+                  const SizedBox(height: 12),
+                  Text(
+                    'โหลดข้อมูลล้มเหลว: $_error',
+                    style: const TextStyle(color: workText),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadUsers,
+                    child: const Text('ลองอีกครั้ง'),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      u.fullName,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: workText),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      u.email,
-                      style: const TextStyle(fontSize: 11, color: workMuted),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'แผนก: ${u.department.isEmpty ? 'ไม่ระบุ' : u.department} · ตำแหน่ง: ${u.position.isEmpty ? 'ไม่ระบุ' : u.position}',
-                      style: const TextStyle(fontSize: 10, color: workMuted),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () => _approveUser(u),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: workBlue,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            minimumSize: Size.zero,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                          child: const Text('อนุมัติบัญชี', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+            )
+          : _buildActiveList(_allUsers),
     );
   }
 
@@ -354,13 +298,6 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
       itemCount: users.length,
       itemBuilder: (context, index) {
         final u = users[index];
-        final avatarUrl = u.avatarUrl;
-        final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
-        final httpAvatarUrl = hasAvatar
-            ? (avatarUrl.startsWith('r2://')
-                ? avatarUrl.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                : avatarUrl)
-            : '';
 
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -369,15 +306,17 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFF1F5F9)),
-            boxShadow: const [BoxShadow(color: Color(0x040F172A), blurRadius: 6, offset: Offset(0, 1))],
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x040F172A),
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              UserAvatar(
-                avatarUrl: u.avatarUrl,
-                name: u.fullName,
-                radius: 18,
-              ),
+              UserAvatar(avatarUrl: u.avatarUrl, name: u.fullName, radius: 18),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -385,27 +324,69 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
                   children: [
                     Row(
                       children: [
-                        Text(
-                          u.fullName,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13.5,
-                            color: u.status == 'disabled' ? workMuted : workText,
-                            decoration: u.status == 'disabled' ? TextDecoration.lineThrough : null,
+                        Expanded(
+                          child: Text(
+                            u.fullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                              color: u.status == 'disabled'
+                                  ? workMuted
+                                  : workText,
+                              decoration: u.status == 'disabled'
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
                           ),
                         ),
                         if (u.status == 'disabled') ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.red.shade50,
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.red.shade200, width: 0.5),
+                              border: Border.all(
+                                color: Colors.red.shade200,
+                                width: 0.5,
+                              ),
                             ),
                             child: const Text(
                               'ระงับการใช้งาน',
-                              style: TextStyle(color: Colors.red, fontSize: 8, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ] else if (u.status == 'pending') ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF7ED),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: const Color(0xFFFED7AA),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: const Text(
+                              'รออนุมัติ',
+                              style: TextStyle(
+                                color: Color(0xFFC2410C),
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
@@ -414,63 +395,231 @@ class _AdminUsersPageState extends State<AdminUsersPage> with SingleTickerProvid
                     const SizedBox(height: 1),
                     Text(
                       u.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 11, color: workMuted),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       'ตำแหน่ง: ${u.position.isEmpty ? 'ไม่ระบุ' : u.position}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 10, color: workMuted),
                     ),
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'unbind') {
-                    _unbindDevice(u);
-                  } else if (value == 'disable') {
-                    _disableUser(u);
-                  } else if (value == 'enable') {
-                    _enableUser(u);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'unbind',
-                    child: Row(
-                      children: [
-                        Icon(Icons.phonelink_erase_rounded, color: Colors.amber, size: 16),
-                        SizedBox(width: 8),
-                        Text('ปลดล็อกเครื่องโทรศัพท์', style: TextStyle(fontSize: 11)),
-                      ],
+              if (_isAdmin)
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'unbind') {
+                      _unbindDevice(u);
+                    } else if (value == 'disable') {
+                      _disableUser(u);
+                    } else if (value == 'enable') {
+                      _enableUser(u);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'unbind',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.phonelink_erase_rounded,
+                            color: Colors.amber,
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'ปลดล็อกเครื่องโทรศัพท์',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (u.status == 'disabled')
+                      const PopupMenuItem(
+                        value: 'enable',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline_rounded,
+                              color: Colors.green,
+                              size: 16,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'เปิดใช้งานบัญชี',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      const PopupMenuItem(
+                        value: 'disable',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.block_rounded,
+                              color: Colors.red,
+                              size: 16,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'ระงับการใช้งานบัญชี',
+                              style: TextStyle(fontSize: 11, color: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: workMuted,
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPendingApprovals(List<AppUser> users) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.78,
+            ),
+            decoration: const BoxDecoration(
+              color: workBackground,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 12, 10),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'พนักงานรออนุมัติ',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: workText,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                if (users.isEmpty)
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'ไม่มีบัญชีที่รออนุมัติ',
+                        style: TextStyle(color: workMuted),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: users.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final user = users[index];
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              UserAvatar(
+                                avatarUrl: user.avatarUrl,
+                                name: user.fullName,
+                                radius: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.fullName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: workText,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      user.email,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: workMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton(
+                                onPressed: () async {
+                                  await _approveUser(user);
+                                  if (sheetContext.mounted) {
+                                    Navigator.pop(sheetContext);
+                                  }
+                                },
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: workBlue,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  minimumSize: Size.zero,
+                                ),
+                                child: const Text(
+                                  'อนุมัติ',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  if (u.status == 'disabled')
-                    const PopupMenuItem(
-                      value: 'enable',
-                      child: Row(
-                        children: [
-                          Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 16),
-                          SizedBox(width: 8),
-                          Text('เปิดใช้งานบัญชี', style: TextStyle(fontSize: 11, color: Colors.green)),
-                        ],
-                      ),
-                    )
-                  else
-                    const PopupMenuItem(
-                      value: 'disable',
-                      child: Row(
-                        children: [
-                          Icon(Icons.block_rounded, color: Colors.red, size: 16),
-                          SizedBox(width: 8),
-                          Text('ระงับการใช้งานบัญชี', style: TextStyle(fontSize: 11, color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                ],
-                icon: const Icon(Icons.more_vert_rounded, color: workMuted, size: 20),
-              )
-            ],
+              ],
+            ),
           ),
         );
       },

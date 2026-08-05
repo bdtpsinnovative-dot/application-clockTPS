@@ -30,6 +30,7 @@ class _CreateTaskModal extends StatefulWidget {
     required this.onSubmit,
     this.currentUser,
     this.initialTask,
+    this.onDelete,
   });
 
   final List<AppUser> users;
@@ -38,6 +39,7 @@ class _CreateTaskModal extends StatefulWidget {
   final AppUser? currentUser;
   final TaskRecord? initialTask;
   final _CreateTaskSubmit onSubmit;
+  final Future<void> Function()? onDelete;
 
   @override
   State<_CreateTaskModal> createState() => _CreateTaskModalState();
@@ -658,6 +660,21 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
         ),
         child: Row(
           children: [
+            if (_isEditing && widget.onDelete != null)
+              TextButton.icon(
+                onPressed: _submitting ? null : _deleteTask,
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFDC2626),
+                  minimumSize: const Size(0, 44),
+                ),
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                label: const Text(
+                  'ลบงาน',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              )
+            else
+              const Spacer(),
             const Spacer(),
             TextButton(
               onPressed: _submitting ? null : () => Navigator.pop(context),
@@ -732,6 +749,44 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
       if (mounted) Navigator.pop(context, _isEditing ? true : null);
     } catch (error) {
       if (mounted) _showError('เกิดข้อผิดพลาด: $error');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _deleteTask() async {
+    final task = widget.initialTask;
+    final onDelete = widget.onDelete;
+    if (task == null || onDelete == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('ยืนยันการลบงาน'),
+        content: Text('ต้องการลบงาน “${task.title}” หรือไม่?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+            child: const Text('ลบงาน'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _submitting = true);
+    try {
+      await onDelete();
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) _showError('ลบงานล้มเหลว: $error');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

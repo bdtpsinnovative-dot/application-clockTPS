@@ -72,21 +72,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   }
 
   Future<void> _pickStartDate() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showWorkDueDatePicker(
+      context,
       initialDate: _startDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: workBlue,
-            onPrimary: Colors.white,
-            onSurface: workText,
-          ),
-        ),
-        child: child!,
-      ),
+      title: 'เลือกวันที่เริ่ม',
     );
     if (picked != null) {
       setState(() {
@@ -96,21 +85,9 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   }
 
   Future<void> _pickDueDate() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showWorkDueDatePicker(
+      context,
       initialDate: _dueDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: workBlue,
-            onPrimary: Colors.white,
-            onSurface: workText,
-          ),
-        ),
-        child: child!,
-      ),
     );
     if (picked != null) {
       setState(() {
@@ -538,32 +515,22 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text(
           'ลบรายการย่อย',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        content: Text(
-          'คุณต้องการลบรายการย่อย "${widget.item.title}" หรือไม่?',
-        ),
+        content: Text('คุณต้องการลบรายการย่อย "${widget.item.title}" หรือไม่?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'ยกเลิก',
-              style: TextStyle(color: workMuted),
-            ),
+            child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
               'ลบ',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -607,7 +574,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
           children: [
             const Text(
               'ประวัติการส่งงาน / ตรวจงาน',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: workText),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: workText,
+              ),
             ),
             const SizedBox(height: 12),
             Expanded(child: _buildVerificationRoundsSection()),
@@ -634,7 +605,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
             children: [
               // ─── Header Bar ───
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
@@ -681,18 +655,30 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.access_time_rounded, color: Color(0xFF64748B), size: 20),
+                      icon: const Icon(
+                        Icons.access_time_rounded,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
                       onPressed: _showVerificationsHistory,
                       tooltip: 'ประวัติการตรวจงาน',
                     ),
                     if (widget.canEdit)
                       IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF64748B), size: 20),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Color(0xFF64748B),
+                          size: 20,
+                        ),
                         onPressed: _confirmDeleteSubItem,
                         tooltip: 'ลบรายการย่อย',
                       ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.pop(context),
                       tooltip: 'ปิด',
                     ),
@@ -711,8 +697,14 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                   indicatorWeight: 2.5,
                   labelColor: workBlue,
                   unselectedLabelColor: Color(0xFF64748B),
-                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                  labelStyle: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  unselectedLabelStyle: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
                   tabs: [
                     Tab(text: 'ข้อมูลทั่วไป (General Info)'),
                     Tab(text: 'เอกสาร & หมายเหตุ (Docs & Notes)'),
@@ -772,7 +764,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: workBlue,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -798,7 +793,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
           // ชื่อรายการคอร์สงาน
           const Text(
             'ชื่อรายการคอร์สงาน',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
           ),
           const SizedBox(height: 6),
           TextField(
@@ -808,7 +807,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
               hintText: 'พิมพ์ชื่อรายการคอร์สงาน...',
               filled: true,
               fillColor: const Color(0xFFF8FAFC),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -831,7 +833,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                   children: [
                     const Text(
                       'วันกำหนดส่ง',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: workText),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                        color: workText,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     InkWell(
@@ -854,11 +860,17 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                                     : 'วว/ดด/ปปปป',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: _dueDate != null ? workText : workMuted,
+                                  color: _dueDate != null
+                                      ? workText
+                                      : workMuted,
                                 ),
                               ),
                             ),
-                            const Icon(Icons.calendar_today_rounded, size: 15, color: Color(0xFF64748B)),
+                            const Icon(
+                              Icons.calendar_today_rounded,
+                              size: 15,
+                              color: Color(0xFF64748B),
+                            ),
                           ],
                         ),
                       ),
@@ -875,7 +887,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                   children: [
                     const Text(
                       'ความสำคัญ (Priority)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: workText),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                        color: workText,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Container(
@@ -890,13 +906,28 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                         child: DropdownButton<String>(
                           value: _subItemPriority,
                           isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 18,
+                          ),
                           style: const TextStyle(fontSize: 12, color: workText),
                           items: const [
-                            DropdownMenuItem(value: 'low', child: Text('⚡ ต่ำ (Low)')),
-                            DropdownMenuItem(value: 'medium', child: Text('⚡ ด่วนปานกลาง (Medium)')),
-                            DropdownMenuItem(value: 'high', child: Text('⚡ ด่วนมาก (High)')),
-                            DropdownMenuItem(value: 'urgent', child: Text('⚡ ด่วนที่สุด (Urgent)')),
+                            DropdownMenuItem(
+                              value: 'low',
+                              child: Text('⚡ ต่ำ (Low)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'medium',
+                              child: Text('⚡ ด่วนปานกลาง (Medium)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'high',
+                              child: Text('⚡ ด่วนมาก (High)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'urgent',
+                              child: Text('⚡ ด่วนที่สุด (Urgent)'),
+                            ),
                           ],
                           onChanged: (val) {
                             if (val != null) {
@@ -918,7 +949,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
           // สถานะงาน (Status)
           const Text(
             'สถานะงาน (Status)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
           ),
           const SizedBox(height: 6),
           Container(
@@ -936,10 +971,22 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                 icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
                 style: const TextStyle(fontSize: 12.5, color: workText),
                 items: const [
-                  DropdownMenuItem(value: 'pending', child: Text('รอรับงาน (Pending)')),
-                  DropdownMenuItem(value: 'in_progress', child: Text('กำลังทำ (In Progress)')),
-                  DropdownMenuItem(value: 'in_review', child: Text('รอตรวจสอบ (In Review)')),
-                  DropdownMenuItem(value: 'completed', child: Text('เสร็จสิ้น (Completed)')),
+                  DropdownMenuItem(
+                    value: 'pending',
+                    child: Text('รอรับงาน (Pending)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'in_progress',
+                    child: Text('กำลังทำ (In Progress)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'in_review',
+                    child: Text('รอตรวจสอบ (In Review)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'completed',
+                    child: Text('เสร็จสิ้น (Completed)'),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -954,7 +1001,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
           // มอบหมายให้ (Assignees)
           const Text(
             'มอบหมายให้ (Assignees)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -983,7 +1034,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
           // รายละเอียดเพิ่มเติม (Details)
           const Text(
             'รายละเอียดเพิ่มเติม (Details)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
           ),
           const SizedBox(height: 6),
           TextField(
@@ -1015,7 +1070,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   Widget _buildDocsAndNotesTab(BuildContext context, bool isAdminOrHr) {
     final attachmentUrls = _getAttachmentUrls();
     final linkUrls = _getLinkUrls();
-    final hasAttachments = attachmentUrls.isNotEmpty || linkUrls.isNotEmpty || _uploadingFiles.isNotEmpty;
+    final hasAttachments =
+        attachmentUrls.isNotEmpty ||
+        linkUrls.isNotEmpty ||
+        _uploadingFiles.isNotEmpty;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1025,7 +1083,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
           // NOTE / Remark (ความคิดเห็นจากผู้ดูแล)
           const Text(
             'NOTE / Remark (ความคิดเห็นจากผู้ดูแล)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
           ),
           const SizedBox(height: 6),
           TextField(
@@ -1053,7 +1115,11 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
           // เอกสารแนบ & ลิงก์ไฟล์งาน (Attachments)
           const Text(
             'เอกสารแนบ & ลิงก์ไฟล์งาน (Attachments)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workText),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
           ),
           const SizedBox(height: 8),
 
@@ -1085,7 +1151,9 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                     onDelete: () {
                       setState(() {
                         attachmentUrls.removeAt(i);
-                        _attachmentUrlController.text = attachmentUrls.join(',');
+                        _attachmentUrlController.text = attachmentUrls.join(
+                          ',',
+                        );
                       });
                     },
                   ),
@@ -1113,12 +1181,25 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _pickFileOrImageCombined(),
-                    icon: const Icon(Icons.attach_file_rounded, size: 16, color: Color(0xFF6366F1)),
-                    label: const Text('แนบไฟล์ (ลิงก์)', style: TextStyle(color: Color(0xFF6366F1), fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    icon: const Icon(
+                      Icons.attach_file_rounded,
+                      size: 16,
+                      color: Color(0xFF6366F1),
+                    ),
+                    label: const Text(
+                      'แนบไฟล์ (ลิงก์)',
+                      style: TextStyle(
+                        color: Color(0xFF6366F1),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       side: const BorderSide(color: Color(0xFFA5B4FC)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -1126,12 +1207,22 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final textController = TextEditingController(text: _linkUrlController.text);
+                      final textController = TextEditingController(
+                        text: _linkUrlController.text,
+                      );
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          title: const Text('แนบลิงก์อ้างอิง', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          title: const Text(
+                            'แนบลิงก์อ้างอิง',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
                           content: TextField(
                             controller: textController,
                             autofocus: true,
@@ -1141,18 +1232,26 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                               fillColor: Color(0xFFF8FAFC),
                               border: OutlineInputBorder(
                                 borderSide: BorderSide.none,
-                                borderRadius: BorderRadius.all(Radius.circular(10)),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(10),
+                                ),
                               ),
                             ),
                           ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context, false),
-                              child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
+                              child: const Text(
+                                'ยกเลิก',
+                                style: TextStyle(color: workMuted),
+                              ),
                             ),
                             ElevatedButton(
                               onPressed: () => Navigator.pop(context, true),
-                              style: ElevatedButton.styleFrom(backgroundColor: workBlue, foregroundColor: Colors.white),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: workBlue,
+                                foregroundColor: Colors.white,
+                              ),
                               child: const Text('ตกลง'),
                             ),
                           ],
@@ -1164,12 +1263,25 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                         });
                       }
                     },
-                    icon: const Icon(Icons.link_rounded, size: 16, color: Color(0xFF10B981)),
-                    label: const Text('แนบลิงก์', style: TextStyle(color: Color(0xFF10B981), fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    icon: const Icon(
+                      Icons.link_rounded,
+                      size: 16,
+                      color: Color(0xFF10B981),
+                    ),
+                    label: const Text(
+                      'แนบลิงก์',
+                      style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       side: const BorderSide(color: Color(0xFF6EE7B7)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),

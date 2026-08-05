@@ -7,6 +7,7 @@ class _EditTaskModal extends StatelessWidget {
     required this.brands,
     required this.categories,
     required this.onSave,
+    required this.onDelete,
     this.currentUser,
   });
 
@@ -26,6 +27,7 @@ class _EditTaskModal extends StatelessWidget {
     required String status,
   })
   onSave;
+  final Future<void> Function() onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +37,7 @@ class _EditTaskModal extends StatelessWidget {
       categories: categories,
       currentUser: currentUser,
       initialTask: task,
+      onDelete: onDelete,
       onSubmit:
           (
             title,

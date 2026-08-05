@@ -253,6 +253,10 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         brands: _brands,
         categories: _categories,
         currentUser: widget.service.currentUser,
+        onDelete: () async {
+          await widget.service.deleteTask(task.id);
+          await _loadData();
+        },
         onSave:
             ({
               required title,
@@ -531,28 +535,26 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                     size: 20,
                   ),
                 ),
-                if (widget.service.currentUser?.role != 'employee') ...[
-                  const SizedBox(width: 3),
-                  Tooltip(
-                    message: 'มอบหมายงานใหม่',
-                    child: TextButton(
-                      key: const Key('create-task-button'),
-                      onPressed: _showCreateTaskModal,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: workBlue,
-                        minimumSize: const Size(36, 36),
-                        maximumSize: const Size(36, 36),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                const SizedBox(width: 3),
+                Tooltip(
+                  message: 'มอบหมายงานใหม่',
+                  child: TextButton(
+                    key: const Key('create-task-button'),
+                    onPressed: _showCreateTaskModal,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: workBlue,
+                      minimumSize: const Size(36, 36),
+                      maximumSize: const Size(36, 36),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.add_rounded, size: 21),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
+                    child: const Icon(Icons.add_rounded, size: 21),
                   ),
-                ],
+                ),
               ],
             ),
           ),
@@ -816,6 +818,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
 
     final isEmployee = widget.service.currentUser?.role == 'employee';
     final currentUser = widget.service.currentUser;
+    final isAdmin = currentUser?.role == 'admin';
     // Multiple assignees mapping
     final assignees = isEmployee && currentUser != null
         ? [currentUser]
@@ -945,7 +948,9 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                           ],
                         ),
                       ),
-                      if (widget.service.currentUser?.role == 'admin')
+                      if (isAdmin ||
+                          (currentUser != null &&
+                              task.assignedBy == currentUser.id))
                         SizedBox(
                           width: 28,
                           height: 28,

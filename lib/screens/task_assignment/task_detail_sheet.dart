@@ -38,7 +38,7 @@ class _TaskDetailSheet extends StatelessWidget {
     final category = task.categoryId != null ? catMap[task.categoryId] : null;
     final meta = statusConfig[task.status] ?? statusConfig['pending']!;
     final isOverdue = isAssignmentOverdue(task.dueDate, task.status);
-    const otherStatuses = ['pending', 'in_progress', 'completed'];
+    const otherStatuses = ['pending', 'in_progress', 'in_review', 'completed'];
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(

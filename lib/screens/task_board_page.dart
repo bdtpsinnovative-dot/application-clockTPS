@@ -53,21 +53,9 @@ Future<void> showProjectTaskDetailSheet({
 
 String _formatDate(DateTime? dt) {
   if (dt == null) return '';
-  final thaiMonths = [
-    'ม.ค.',
-    'ก.พ.',
-    'มี.ค.',
-    'เม.ย.',
-    'พ.ค.',
-    'มิ.ย.',
-    'ก.ค.',
-    'ส.ค.',
-    'ก.ย.',
-    'ต.ค.',
-    'พ.ย.',
-    'ธ.ค.',
-  ];
-  return '${dt.day} ${thaiMonths[dt.month - 1]} ${dt.year + 543}';
+  final day = dt.day.toString().padLeft(2, '0');
+  final month = dt.month.toString().padLeft(2, '0');
+  return '$day/$month/${dt.year}';
 }
 
 class _BoardDockButton extends StatelessWidget {

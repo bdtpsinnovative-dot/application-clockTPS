@@ -157,21 +157,9 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
   }
 
   Future<void> _pickDueDate() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showWorkDueDatePicker(
+      context,
       initialDate: _dueDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2035),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: workBlue,
-            onPrimary: Colors.white,
-            onSurface: workText,
-          ),
-        ),
-        child: child!,
-      ),
     );
     if (picked != null && mounted) setState(() => _dueDate = picked);
   }
