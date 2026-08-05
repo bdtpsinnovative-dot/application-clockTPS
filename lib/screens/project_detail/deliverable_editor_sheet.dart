@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/work_models.dart';
 import '../../services/auth_flow_service.dart';
+import '../../widgets/user_avatar.dart';
 import 'project_detail_style.dart';
 
 typedef DeliverableCreateCallback =
@@ -103,61 +104,10 @@ class _DeliverableEditorSheetState extends State<DeliverableEditorSheet> {
   }
 
   Future<void> _addLink() async {
-    final nameController = TextEditingController();
-    final urlController = TextEditingController();
     final attachment = await showDialog<TaskListAttachment>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('แนบลิงก์'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'ชื่อลิงก์',
-                hintText: 'เช่น ไฟล์งานบน Google Drive',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: urlController,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                labelText: 'URL',
-                hintText: 'https://',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final url = urlController.text.trim();
-              if (url.isEmpty) return;
-              Navigator.pop(
-                dialogContext,
-                TaskListAttachment(
-                  name: nameController.text.trim().isEmpty
-                      ? url
-                      : nameController.text.trim(),
-                  url: url,
-                  type: 'link',
-                ),
-              );
-            },
-            child: const Text('แนบลิงก์'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) => const _AddLinkDialog(),
     );
-    nameController.dispose();
-    urlController.dispose();
     if (attachment != null && mounted) {
       setState(() => _attachments.add(attachment));
     }
@@ -451,49 +401,23 @@ class _DeliverableEditorSheetState extends State<DeliverableEditorSheet> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final member in _members)
-                  Builder(
-                    builder: (context) {
-                      final avatarUrl = member.resolvedAvatarUrl;
-                      final hasAvatar =
-                          avatarUrl != null && avatarUrl.isNotEmpty;
-                      return FilterChip(
-                        avatar: CircleAvatar(
-                          radius: 10,
-                          backgroundColor: const Color(0xFFDBEAFE),
-                          backgroundImage:
-                              hasAvatar ? NetworkImage(avatarUrl) : null,
-                          onBackgroundImageError:
-                              hasAvatar ? (error, stack) {} : null,
-                          child: !hasAvatar
-                              ? Text(
-                                  member.firstName.isNotEmpty
-                                      ? member.firstName[0]
-                                      : '?',
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1E40AF),
-                                  ),
-                                )
-                              : null,
-                        ),
-                        label: Text(
-                          member.fullName.trim().isEmpty
-                              ? member.firstName
-                              : member.fullName,
-                        ),
-                        selected: _assigneeIds.contains(member.id),
-                        onSelected: (selected) {
-                          setState(() {
-                            if (selected) {
-                              _assigneeIds.add(member.id);
-                            } else {
-                              _assigneeIds.remove(member.id);
-                            }
-                          });
-                        },
-                      );
+                 for (final member in _members)
+                  FilterChip(
+                    avatar: UserAvatar(
+                      avatarUrl: member.avatarUrl,
+                      name: member.displayName,
+                      radius: 10,
+                    ),
+                    label: Text(member.displayName),
+                    selected: _assigneeIds.contains(member.id),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _assigneeIds.add(member.id);
+                        } else {
+                          _assigneeIds.remove(member.id);
+                        }
+                      });
                     },
                   ),
               ],
@@ -707,6 +631,84 @@ class _AttachmentEditorRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AddLinkDialog extends StatefulWidget {
+  const _AddLinkDialog();
+
+  @override
+  State<_AddLinkDialog> createState() => _AddLinkDialogState();
+}
+
+class _AddLinkDialogState extends State<_AddLinkDialog> {
+  late final TextEditingController nameController;
+  late final TextEditingController urlController;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController = TextEditingController();
+    urlController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    urlController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('แนบลิงก์'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nameController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'ชื่อลิงก์',
+              hintText: 'เช่น ไฟล์งานบน Google Drive',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: urlController,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'URL',
+              hintText: 'https://',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('ยกเลิก'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final url = urlController.text.trim();
+            if (url.isEmpty) return;
+            Navigator.pop(
+              context,
+              TaskListAttachment(
+                name: nameController.text.trim().isEmpty
+                    ? url
+                    : nameController.text.trim(),
+                url: url,
+                type: 'link',
+              ),
+            );
+          },
+          child: const Text('แนบลิงก์'),
+        ),
+      ],
     );
   }
 }

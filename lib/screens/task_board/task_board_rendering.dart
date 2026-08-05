@@ -56,11 +56,10 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     Expanded(
                       child: InkWell(
                         onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
+                          final picked = await showWorkDueDatePicker(
+                            context,
                             initialDate: startDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2035),
+                            title: 'เลือกวันที่เริ่ม',
                           );
                           if (picked != null) {
                             setDlgState(() => startDate = picked);
@@ -109,11 +108,9 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     Expanded(
                       child: InkWell(
                         onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
+                          final picked = await showWorkDueDatePicker(
+                            context,
                             initialDate: dueDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2035),
                           );
                           if (picked != null) {
                             setDlgState(() => dueDate = picked);
@@ -216,6 +213,489 @@ extension _TaskBoardRendering on _TaskBoardPageState {
         }
       }
     }
+  }
+
+  Widget _buildSingleTaskBoard(List<TaskListRecord> lists) {
+    return RefreshIndicator(
+      onRefresh: _loadBoard,
+      color: workBlue,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+              ), // slate-200 border
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x06000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Custom Board Header styled like the screenshot
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        // Drag indicator icon
+                        const Icon(
+                          Icons.drag_indicator_rounded,
+                          color: Color(0xFF94A3B8), // slate-400
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        // Board/Project Title
+                        Expanded(
+                          child: Text(
+                            widget.task.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: workText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Progress Bar and Percentage Row
+                    Row(
+                      children: [
+                        // Progress Bar
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: lists.isNotEmpty
+                                  ? (lists
+                                            .where(
+                                              (l) => l.status == 'completed',
+                                            )
+                                            .length /
+                                        lists.length)
+                                  : 0.0,
+                              backgroundColor: const Color(
+                                0xFFE2E8F0,
+                              ), // light slate background
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(
+                                  0xFF10B981,
+                                ), // Emerald green progress fill
+                              ),
+                              minHeight: 4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Percentage Text
+                        Text(
+                          lists.isNotEmpty
+                              ? '${((lists.where((l) => l.status == 'completed').length / lists.length) * 100).toInt()}%'
+                              : '0%',
+                          style: const TextStyle(
+                            color: Color(0xFF10B981), // Emerald green text
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (lists.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.inbox_outlined,
+                            color: workMuted,
+                            size: 28,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'ยังไม่มีงานในบอร์ดนี้',
+                            style: TextStyle(
+                              color: workMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (lists.isNotEmpty)
+                  ...lists.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final list = entry.value;
+                    return _buildTaskBoardRow(
+                      list,
+                      isLast: index == lists.length - 1,
+                    );
+                  }),
+                // "+ เพิ่มการ์ด" Button
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: _createNewList,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9), // slate-100 background
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0), // slate-200 border
+                        width: 1,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_rounded,
+                            size: 18,
+                            color: Color(0xFF475569), // slate-600
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'เพิ่มการ์ด',
+                            style: TextStyle(
+                              color: Color(0xFF475569), // slate-600
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskBoardRow(TaskListRecord list, {required bool isLast}) {
+    final isCompleted = list.status == 'completed';
+    final isInProgress = list.status == 'in_progress';
+    final isUpdating = _updatingListIds.contains(list.id);
+
+    final dateLabel = _formatDateRange(list.startDate, list.dueDate);
+    final dateColor = _deadlineColor(list.dueDate, isCompleted: isCompleted);
+    final badgeText = _statusTextColors[list.status] ?? workMuted;
+    final badgeLabel = _statusLabels[list.status] ?? 'รอทำ';
+
+    Color cardBg;
+    Color cardBorder;
+    if (isCompleted) {
+      cardBg = const Color(0xFFF0FDF4); // Soft emerald green background
+      cardBorder = const Color(0xFFBBF7D0); // Soft emerald green border
+    } else if (isInProgress) {
+      cardBg = const Color(0xFFFFF7ED); // Soft orange background
+      cardBorder = const Color(0xFFFED7AA); // Soft orange border
+    } else {
+      cardBg = Colors.white; // Clean white background for pending
+      cardBorder = const Color(0xFFE2E8F0); // Light slate/grey border
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+      child: Material(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: isUpdating ? null : () => _showTaskListDetailSheet(list),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cardBorder, width: 1),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x05000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 1.5),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Checkbox on the left
+                Semantics(
+                  label: isCompleted
+                      ? 'ทำเครื่องหมายว่ายังไม่เสร็จ'
+                      : 'ทำเครื่องหมายว่าเสร็จแล้ว',
+                  button: true,
+                  child: GestureDetector(
+                    onTap: isUpdating ? null : () => _toggleListCompleted(list),
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      margin: const EdgeInsets.only(top: 1, right: 10),
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? const Color(0xFF10B981)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isCompleted
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFCBD5E1),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: isCompleted
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 13,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+                // Card Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Row of Title and Status text
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              list.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                                color: isCompleted
+                                    ? const Color(
+                                        0xFF6B7280,
+                                      ) // Muted slate-green
+                                    : workText,
+                                decoration: isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (isUpdating)
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: workBlue,
+                              ),
+                            )
+                          else ...[
+                            // Status Text (e.g. เสร็จสิ้น) aligned to the right without container
+                            Text(
+                              badgeLabel,
+                              style: TextStyle(
+                                color: badgeText,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: workMuted,
+                              size: 16,
+                            ),
+                          ],
+                        ],
+                      ),
+                      // Date row (only if date is present)
+                      if (list.startDate != null || list.dueDate != null) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 11,
+                              color: dateColor == workMuted
+                                  ? const Color(0xFF94A3B8)
+                                  : dateColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              dateLabel,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: dateColor == workMuted
+                                    ? const Color(0xFF64748B)
+                                    : dateColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showTaskDetailModal(TaskListRecord list) async {
+    final isCompleted = list.status == 'completed';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              list.name,
+              style: const TextStyle(
+                color: workText,
+                fontSize: 20,
+                height: 1.25,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  isCompleted
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: isCompleted ? const Color(0xFF16A34A) : workMuted,
+                  size: 18,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  isCompleted ? 'เสร็จแล้ว' : 'ยังไม่เสร็จ',
+                  style: TextStyle(
+                    color: isCompleted ? const Color(0xFF15803D) : workMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            if (list.description.trim().isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const Text(
+                'รายละเอียด',
+                style: TextStyle(
+                  color: workMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                list.description.trim(),
+                style: const TextStyle(
+                  color: workText,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ],
+            if (list.dueDate != null) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    color: workMuted,
+                    size: 15,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    _formatDate(list.dueDate),
+                    style: const TextStyle(
+                      color: workText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _toggleListCompleted(list);
+                },
+                icon: Icon(
+                  isCompleted
+                      ? Icons.undo_rounded
+                      : Icons.check_circle_outline_rounded,
+                ),
+                label: Text(
+                  isCompleted
+                      ? 'ทำเครื่องหมายว่ายังไม่เสร็จ'
+                      : 'ทำเครื่องหมายว่าเสร็จแล้ว',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildListHeaderContent(TaskListRecord list) {
@@ -655,33 +1135,12 @@ extension _TaskBoardRendering on _TaskBoardPageState {
               child: Builder(
                 builder: (context) {
                   final user = visible[i];
-                  final avatarUrl = user.resolvedAvatarUrl;
-                  final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
                   return Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 1.5),
                     ),
-                    child: CircleAvatar(
-                      radius: 10,
-                      backgroundColor: const Color(0xFFDBEAFE),
-                      backgroundImage:
-                          hasAvatar ? NetworkImage(avatarUrl) : null,
-                      onBackgroundImageError:
-                          hasAvatar ? (error, stack) {} : null,
-                      child: !hasAvatar
-                          ? Text(
-                              user.firstName.isNotEmpty
-                                  ? user.firstName[0]
-                                  : '?',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Color(0xFF1E40AF),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : null,
-                    ),
+                    child: _buildUserAvatar(user, radius: 10),
                   );
                 },
               ),
@@ -715,44 +1174,55 @@ extension _TaskBoardRendering on _TaskBoardPageState {
   }
 
   Widget _buildCardContent(TaskCardRecord card) {
-    final doneCount = card.subItems.where((s) => s.isDone).length;
-    final totalCount = card.subItems.length;
-    final pct = totalCount == 0 ? 0 : (doneCount / totalCount * 100).toInt();
+    // Cards are the actual work items. The legacy nested sub-item checklist
+    // is intentionally not rendered on the board anymore.
+    const doneCount = 0;
+    const totalCount = 0;
+    const pct = 0;
 
     final isCompleted = card.status == 'completed';
+    final isInProgress = card.status == 'in_progress';
     final dateLabel = _formatDateRange(card.startDate, card.dueDate);
     final dateColor = _deadlineColor(card.dueDate, isCompleted: isCompleted);
-    final badgeBg = _statusBgColors[card.status] ?? const Color(0xFFF1F5F9);
     final badgeText = _statusTextColors[card.status] ?? workMuted;
     final badgeLabel = _statusLabels[card.status] ?? 'รอทำ';
 
+    Color cardBg;
+    Color cardBorder;
+    if (isCompleted) {
+      cardBg = const Color(0xFFF0FDF4); // Soft emerald green background
+      cardBorder = const Color(0xFFBBF7D0); // Soft emerald green border
+    } else if (isInProgress) {
+      cardBg = const Color(0xFFFFF7ED); // Soft orange background
+      cardBorder = const Color(0xFFFED7AA); // Soft orange border
+    } else {
+      cardBg = Colors.white; // Clean white background for pending
+      cardBorder = const Color(0xFFE2E8F0); // Light slate/grey border
+    }
+
     return InkWell(
       onTap: () => _showCardDetailSheet(card),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: _isCompactMode
-            ? const EdgeInsets.fromLTRB(8, 6, 5, 6)
-            : const EdgeInsets.fromLTRB(10, 8, 6, 8),
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+            : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isCompleted ? const Color(0xFFF0FDF4) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isCompleted
-                ? const Color(0xFFBBF7D0)
-                : const Color(0xFFF1F5F9),
-          ),
+          color: cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cardBorder, width: 1),
           boxShadow: const [
             BoxShadow(
               color: Color(0x05000000),
-              blurRadius: 3,
-              offset: Offset(0, 1),
+              blurRadius: 4,
+              offset: Offset(0, 1.5),
             ),
           ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tick checkbox — touch target 44×44 ตาม WCAG
+            // Checkbox on the left
             Semantics(
               label: isCompleted
                   ? 'ทำเครื่องหมายว่ายังไม่เสร็จ'
@@ -769,175 +1239,127 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                     _loadBoard();
                   } catch (_) {}
                 },
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Center(
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      margin: const EdgeInsets.only(right: 0),
-                      decoration: BoxDecoration(
-                        color: isCompleted
-                            ? const Color(0xFF10B981)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(5),
-                        border: Border.all(
-                          color: isCompleted
-                              ? const Color(0xFF10B981)
-                              : const Color(0xFFCBD5E1),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: isCompleted
-                          ? const Icon(
-                              Icons.check_rounded,
-                              size: 13,
-                              color: Colors.white,
-                            )
-                          : null,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  margin: const EdgeInsets.only(top: 1, right: 10),
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? const Color(0xFF10B981)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isCompleted
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFCBD5E1),
+                      width: 1.5,
                     ),
                   ),
+                  child: isCompleted
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        )
+                      : null,
                 ),
               ),
             ),
-            // Card content
+            // Card Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Row of Title and Status text
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Text(
                           card.title,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: _isCompactMode ? 11.5 : 12.5,
+                            fontSize: _isCompactMode ? 12 : 13.5,
                             color: isCompleted
-                                ? const Color(0xFF6B7280)
+                                ? const Color(0xFF6B7280) // Muted slate-green
                                 : workText,
                             decoration: isCompleted
                                 ? TextDecoration.lineThrough
                                 : null,
+                            height: 1.25,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: PriorityBadge(
-                          priority: card.priority,
-                          isCompact: true,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: badgeBg,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          badgeLabel,
-                          style: TextStyle(
-                            color: badgeText,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const SizedBox(width: 8),
+                      // Status Text (e.g. เสร็จสิ้น) aligned to the right without container
+                      Text(
+                        badgeLabel,
+                        style: TextStyle(
+                          color: badgeText,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
+                  // Description (if not empty and not compact mode)
                   if (!_isCompactMode && card.description.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       card.description,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: workMuted, fontSize: 10.5),
+                      style: const TextStyle(
+                        color: workMuted,
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
                     ),
                   ],
-                  if (card.startDate != null ||
-                      card.dueDate != null ||
-                      card.assignees.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (card.startDate != null || card.dueDate != null) ...[
-                          Icon(
-                            dateColor == workMuted
-                                ? Icons.calendar_today_outlined
-                                : Icons.schedule_rounded,
-                            size: 10.5,
-                            color: dateColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              dateLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: dateColor,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          const Spacer(),
-                        ],
-                        if (card.assignees.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          _buildAssigneeAvatars(card.assignees),
-                        ],
-                      ],
-                    ),
-                  ],
-                  if (card.subItems.isNotEmpty) ...[
+                  // Sub-items checklist (if not empty)
+                  if (false && card.subItems.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.only(left: 7),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          left: BorderSide(
-                            color: Color(0xFFCBD5E1),
-                            width: 1.5,
-                          ),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? const Color(0xFFF8FAFC).withValues(alpha: 0.5)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 0.8,
                         ),
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           for (final subItem in card.subItems.take(2))
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 3),
+                              padding: const EdgeInsets.only(bottom: 4),
                               child: Row(
                                 children: [
                                   Icon(
                                     subItem.isDone
                                         ? Icons.check_circle_rounded
                                         : Icons.radio_button_unchecked_rounded,
-                                    size: 10,
+                                    size: 11,
                                     color: subItem.isDone
-                                        ? const Color(0xFF16A34A)
+                                        ? const Color(0xFF10B981)
                                         : const Color(0xFF94A3B8),
                                   ),
-                                  const SizedBox(width: 5),
+                                  const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       subItem.title,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: 10.5,
                                         color: subItem.isDone
-                                            ? workMuted
+                                            ? const Color(0xFF94A3B8)
                                             : workText,
                                         decoration: subItem.isDone
                                             ? TextDecoration.lineThrough
@@ -949,12 +1371,12 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                               ),
                             ),
                           if (card.subItems.length > 2)
-                            Align(
-                              alignment: Alignment.centerLeft,
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2, left: 17),
                               child: Text(
-                                '+${card.subItems.length - 2} รายการย่อย',
+                                '+อีก ${card.subItems.length - 2} รายการย่อย',
                                 style: const TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 9.5,
                                   color: workMuted,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -964,48 +1386,92 @@ extension _TaskBoardRendering on _TaskBoardPageState {
                       ),
                     ),
                   ],
-                  if (totalCount > 0) ...[
+                  // Progress bar (if sub-items exist)
+                  if (false && totalCount > 0) ...[
                     const SizedBox(height: 6),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.playlist_add_check_rounded,
-                              size: 12,
-                              color: workBlue,
-                            ),
-                            SizedBox(width: 3),
-                            Text(
-                              'ความคืบหน้า',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: workMuted,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                        const Icon(
+                          Icons.playlist_add_check_rounded,
+                          size: 13,
+                          color: workBlue,
                         ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$doneCount/$totalCount',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: workMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: doneCount / totalCount,
+                              backgroundColor: const Color(0xFFE2E8F0),
+                              color: pct == 100
+                                  ? const Color(0xFF10B981)
+                                  : workBlue,
+                              minHeight: 4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Text(
                           '$pct%',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            color: workBlue,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: pct == 100
+                                ? const Color(0xFF10B981)
+                                : workBlue,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 3),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
-                      child: LinearProgressIndicator(
-                        value: totalCount == 0 ? 0 : doneCount / totalCount,
-                        backgroundColor: const Color(0xFFE2E8F0),
-                        color: workBlue,
-                        minHeight: 3,
-                      ),
+                  ],
+                  // Date and Assignees row
+                  if (card.startDate != null ||
+                      card.dueDate != null ||
+                      card.assignees.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (card.startDate != null || card.dueDate != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 11,
+                                color: dateColor == workMuted
+                                    ? const Color(0xFF94A3B8)
+                                    : dateColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                dateLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: dateColor == workMuted
+                                      ? const Color(0xFF64748B)
+                                      : dateColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          const Spacer(),
+                        if (card.assignees.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          _buildAssigneeAvatars(card.assignees),
+                        ],
+                      ],
                     ),
                   ],
                 ],

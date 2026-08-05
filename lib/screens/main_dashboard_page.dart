@@ -3,24 +3,27 @@ import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/user_avatar.dart';
 import '../widgets/app_loading_view.dart';
 import '../services/fcm_service.dart';
 import 'admin_websites_page.dart';
 import 'admin_tasks_page.dart';
+import 'admin_users_page.dart';
+import 'admin_locations_page.dart';
+import 'admin_attendance_history_page.dart';
+import 'admin_holidays_page.dart';
 
 class MainDashboardPage extends StatefulWidget {
   const MainDashboardPage({
     super.key,
     required this.user,
     required this.service,
-    required this.onMenu,
     required this.onSelectTab,
     required this.isActive,
   });
 
   final AppUser user;
   final AuthFlowService service;
-  final VoidCallback onMenu;
   final ValueChanged<int> onSelectTab;
   final bool isActive;
 
@@ -266,31 +269,118 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                       subtitle: 'สิ่งที่ใช้บ่อยและเข้าถึงได้ทันที',
                     ),
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        _buildCircularMenu(
-                          label: 'มอบหมายงาน',
-                          icon: Icons.task_alt_rounded,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  AdminTasksPage(service: widget.service),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final itemWidth = (constraints.maxWidth - 16) / 3;
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 16,
+                          children: [
+                            SizedBox(
+                              width: itemWidth,
+                              child: Center(
+                                child: _buildCircularMenu(
+                                  label: 'พนักงาน',
+                                  icon: Icons.people_alt_rounded,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AdminUsersPage(
+                                        service: widget.service,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        _buildCircularMenu(
-                          label: 'เว็บไซต์บริษัท',
-                          icon: Icons.language_rounded,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CompanyWebsitesPage(),
+                            SizedBox(
+                              width: itemWidth,
+                              child: Center(
+                                child: _buildCircularMenu(
+                                  label: 'จุดทำงาน',
+                                  icon: Icons.map_rounded,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AdminLocationsPage(
+                                        service: widget.service,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
+                            SizedBox(
+                              width: itemWidth,
+                              child: Center(
+                                child: _buildCircularMenu(
+                                  label: 'บันทึกเวลา',
+                                  icon: Icons.menu_book_rounded,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          AdminAttendanceHistoryPage(
+                                            service: widget.service,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: Center(
+                                child: _buildCircularMenu(
+                                  label: 'วันหยุด',
+                                  icon: Icons.edit_calendar_rounded,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AdminHolidaysPage(
+                                        service: widget.service,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: Center(
+                                child: _buildCircularMenu(
+                                  label: 'มอบหมายงาน',
+                                  icon: Icons.task_alt_rounded,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AdminTasksPage(
+                                        service: widget.service,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: itemWidth,
+                              child: Center(
+                                child: _buildCircularMenu(
+                                  label: 'เว็บไซต์บริษัท',
+                                  icon: Icons.language_rounded,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const CompanyWebsitesPage(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -355,16 +445,6 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 children: [
                   Row(
                     children: [
-                      IconButton(
-                        tooltip: 'เปิดเมนู',
-                        onPressed: widget.onMenu,
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size(44, 44),
-                          foregroundColor: Colors.white,
-                          backgroundColor: Colors.white.withValues(alpha: 0.14),
-                        ),
-                        icon: const Icon(Icons.menu_rounded),
-                      ),
                       const Spacer(),
                       Semantics(
                         label: 'รูปโปรไฟล์ของ ${widget.user.fullName}',
@@ -372,21 +452,14 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                         child: Container(
                           width: 48,
                           height: 48,
-                          decoration: borderDecoration.copyWith(
-                            image: hasAvatar
-                                ? DecorationImage(
-                                    image: NetworkImage(avatarUrl),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
+                          decoration: borderDecoration,
+                          child: UserAvatar(
+                            avatarUrl: widget.user.avatarUrl,
+                            name: widget.user.nickname.isNotEmpty
+                                ? widget.user.nickname
+                                : widget.user.firstName,
+                            radius: 24,
                           ),
-                          child: hasAvatar
-                              ? null
-                              : const Icon(
-                                  Icons.person_rounded,
-                                  color: workMuted,
-                                  size: 25,
-                                ),
                         ),
                       ),
                     ],

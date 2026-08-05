@@ -6,21 +6,20 @@ import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/skeleton_loading.dart';
-import '../widgets/app_loading_view.dart';
+import '../widgets/user_avatar.dart';
 
 class AdminAttendanceHistoryPage extends StatefulWidget {
-  const AdminAttendanceHistoryPage({
-    super.key,
-    required this.service,
-  });
+  const AdminAttendanceHistoryPage({super.key, required this.service});
 
   final AuthFlowService service;
 
   @override
-  State<AdminAttendanceHistoryPage> createState() => _AdminAttendanceHistoryPageState();
+  State<AdminAttendanceHistoryPage> createState() =>
+      _AdminAttendanceHistoryPageState();
 }
 
-class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage> {
+class _AdminAttendanceHistoryPageState
+    extends State<AdminAttendanceHistoryPage> {
   String _activeTab = 'log'; // 'log' or 'summary'
   bool _loading = true;
   String? _error;
@@ -60,20 +59,60 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
     try {
       final parsedParts = _filterMonth.split('-');
       final year = int.parse(parsedParts[0]);
-      
-      final results = await Future.wait([
-        widget.service.getAdminMonthlyHistory(_filterMonth),
-        widget.service.getAdminUsers(),
-        widget.service.getHolidays(year),
-      ]);
+      final isAdmin = widget.service.currentUser?.role == 'admin';
 
-      if (mounted) {
-        setState(() {
-          _allRows = results[0] as List<AdminHistoryRecord>;
-          _allUsers = (results[1] as List<AppUser>).where((u) => u.status == 'active').toList();
-          _holidays = results[2] as List<HolidayRecord>;
-          _loading = false;
-        });
+      if (isAdmin) {
+        final results = await Future.wait([
+          widget.service.getAdminMonthlyHistory(_filterMonth),
+          widget.service.getAdminUsers(),
+          widget.service.getHolidays(year),
+        ]);
+
+        if (mounted) {
+          setState(() {
+            _allRows = results[0] as List<AdminHistoryRecord>;
+            _allUsers = (results[1] as List<AppUser>)
+                .where((u) => u.status == 'active')
+                .toList();
+            _holidays = results[2] as List<HolidayRecord>;
+            _loading = false;
+          });
+        }
+      } else {
+        final results = await Future.wait([
+          widget.service.getAttendanceHistory(year, int.parse(parsedParts[1])),
+          widget.service.getHolidays(year),
+        ]);
+        final currentUser = widget.service.currentUser;
+        final attendance = results[0] as List<AttendanceRecord>;
+        final ownRows = attendance
+            .map(
+              (record) => AdminHistoryRecord(
+                date: record.date,
+                userName: currentUser?.fullName.isNotEmpty == true
+                    ? currentUser!.fullName
+                    : 'ฉัน',
+                email: currentUser?.email ?? widget.service.currentUserEmail,
+                department: currentUser?.department ?? '',
+                position: currentUser?.position ?? '',
+                status: record.status,
+                type: 'attendance',
+                reason: '',
+                checkInAt: record.checkInAt,
+                checkOutAt: record.checkOutAt,
+                createdAt: record.checkInAt ?? record.date,
+              ),
+            )
+            .toList(growable: false);
+
+        if (mounted) {
+          setState(() {
+            _allRows = ownRows;
+            _allUsers = currentUser == null ? const [] : [currentUser];
+            _holidays = results[1] as List<HolidayRecord>;
+            _loading = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -102,17 +141,19 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
     return list;
   }
 
-
-
   String _translateStatus(String status, DateTime date) {
-    if (status.contains('approved') || status.contains('rejected') || status.contains('pending')) {
+    if (status.contains('approved') ||
+        status.contains('rejected') ||
+        status.contains('pending')) {
       // It is a request status
       String prefix = '';
       if (status.contains('sick_leave') || status.contains('ลาป่วย')) {
         prefix = 'ลาป่วย';
-      } else if (status.contains('personal_leave') || status.contains('ลากิจ')) {
+      } else if (status.contains('personal_leave') ||
+          status.contains('ลากิจ')) {
         prefix = 'ลากิจ';
-      } else if (status.contains('annual_leave') || status.contains('ลาพักร้อน')) {
+      } else if (status.contains('annual_leave') ||
+          status.contains('ลาพักร้อน')) {
         prefix = 'ลาพักร้อน';
       } else if (status.contains('offsite') || status.contains('ออกหน้างาน')) {
         prefix = 'ออกหน้างาน';
@@ -157,7 +198,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
 
   Color _getStatusColor(String status) {
     final s = status.toLowerCase();
-    if (s == 'on_time' || s.contains('ตรงเวลา') || s.contains('approved') || s.contains('อนุมัติ')) {
+    if (s == 'on_time' ||
+        s.contains('ตรงเวลา') ||
+        s.contains('approved') ||
+        s.contains('อนุมัติ')) {
       return const Color(0xFF10B981); // Green
     }
     if (s == 'late' || s.contains('สาย')) {
@@ -173,7 +217,8 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
   List<AdminHistoryRecord> get _filteredRows {
     return _allRows.where((r) {
       // 1. Search Name
-      if (_searchName.isNotEmpty && !r.userName.toLowerCase().contains(_searchName.toLowerCase())) {
+      if (_searchName.isNotEmpty &&
+          !r.userName.toLowerCase().contains(_searchName.toLowerCase())) {
         return false;
       }
       // 2. Filter Day
@@ -199,7 +244,9 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
     int count = 0;
     final ymds = <String>[];
 
-    final holidaySet = _holidays.map((h) => DateFormat('yyyy-MM-dd').format(h.date.toLocal())).toSet();
+    final holidaySet = _holidays
+        .map((h) => DateFormat('yyyy-MM-dd').format(h.date.toLocal()))
+        .toSet();
 
     for (int day = 1; day <= totalDays; day++) {
       final d = DateTime(y, m, day);
@@ -218,10 +265,11 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
 
   List<Map<String, dynamic>> get _summaryData {
     final scheduledCount = _scheduledDaysAndYMDs['scheduledDays'] ?? 0;
-    
+
     // Setup mappings
-    final approvedLeaves = <String, double>{}; // user_ymd -> duration (1.0 or 0.5)
-    final morningLeaves = <String, bool>{};    // user_ymd -> has morning leave
+    final approvedLeaves =
+        <String, double>{}; // user_ymd -> duration (1.0 or 0.5)
+    final morningLeaves = <String, bool>{}; // user_ymd -> has morning leave
     final approvedOffsites = <String, bool>{}; // user_ymd -> is offsite
 
     for (var r in _allRows) {
@@ -229,7 +277,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
       final key = '${r.userName}_$ymd';
 
       if (r.type == 'leave' && r.status.contains('approved')) {
-        final isHalf = r.status.contains('ครึ่ง') || r.status.contains('morning') || r.status.contains('afternoon');
+        final isHalf =
+            r.status.contains('ครึ่ง') ||
+            r.status.contains('morning') ||
+            r.status.contains('afternoon');
         approvedLeaves[key] = isHalf ? 0.5 : 1.0;
         if (r.status.contains('ครึ่งเช้า') || r.status.contains('morning')) {
           morningLeaves[key] = true;
@@ -256,10 +307,12 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
         if (r.userName != u.fullName) continue;
 
         final ymd = DateFormat('yyyy-MM-dd').format(r.date.toLocal());
-        
+
         if (r.type == 'attendance') {
           if (r.status == 'on_time' || r.status == 'late') {
-            final isWeekend = r.date.toLocal().weekday == DateTime.saturday || r.date.toLocal().weekday == DateTime.sunday;
+            final isWeekend =
+                r.date.toLocal().weekday == DateTime.saturday ||
+                r.date.toLocal().weekday == DateTime.sunday;
             if (!isWeekend) {
               presentCount++;
               coveredDays.add(ymd);
@@ -270,11 +323,17 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
           final key = '${r.userName}_$ymd';
           if (!approvedLeaves.containsKey(key)) {
             if (r.status.contains('sick_leave')) {
-              final val = r.status.contains('morning') || r.status.contains('afternoon') ? 0.5 : 1.0;
+              final val =
+                  r.status.contains('morning') || r.status.contains('afternoon')
+                  ? 0.5
+                  : 1.0;
               sickLeave += val;
               if (val == 1.0) coveredDays.add(ymd);
             } else if (r.status.contains('personal_leave')) {
-              final val = r.status.contains('morning') || r.status.contains('afternoon') ? 0.5 : 1.0;
+              final val =
+                  r.status.contains('morning') || r.status.contains('afternoon')
+                  ? 0.5
+                  : 1.0;
               personalLeave += val;
               if (val == 1.0) coveredDays.add(ymd);
             } else if (r.status == 'annual_leave') {
@@ -295,7 +354,13 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
             final checkIn = r.checkInAt!.toLocal();
             final isMorningLeave = morningLeaves['${r.userName}_$ymd'] == true;
             final targetHour = isMorningLeave ? 13 : 9;
-            final target = DateTime(checkIn.year, checkIn.month, checkIn.day, targetHour, 0);
+            final target = DateTime(
+              checkIn.year,
+              checkIn.month,
+              checkIn.day,
+              targetHour,
+              0,
+            );
             final diff = checkIn.difference(target).inMinutes;
             if (diff > 0) {
               lateCount++;
@@ -313,12 +378,19 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
             }
           }
         } else if (r.type == 'leave' && r.status.contains('approved')) {
-          final val = r.status.contains('ครึ่ง') || r.status.contains('morning') || r.status.contains('afternoon') ? 0.5 : 1.0;
+          final val =
+              r.status.contains('ครึ่ง') ||
+                  r.status.contains('morning') ||
+                  r.status.contains('afternoon')
+              ? 0.5
+              : 1.0;
           if (r.status.contains('ลาป่วย') || r.status.contains('sick_leave')) {
             sickLeave += val;
-          } else if (r.status.contains('ลากิจ') || r.status.contains('personal_leave')) {
+          } else if (r.status.contains('ลากิจ') ||
+              r.status.contains('personal_leave')) {
             personalLeave += val;
-          } else if (r.status.contains('ลาพักร้อน') || r.status.contains('annual_leave')) {
+          } else if (r.status.contains('ลาพักร้อน') ||
+              r.status.contains('annual_leave')) {
             annualLeave += val;
           }
           if (val == 1.0) coveredDays.add(ymd);
@@ -330,7 +402,9 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
 
       // Calculate absent days
       int absentDays = 0;
-      final holidaySet = _holidays.map((h) => DateFormat('yyyy-MM-dd').format(h.date.toLocal())).toSet();
+      final holidaySet = _holidays
+          .map((h) => DateFormat('yyyy-MM-dd').format(h.date.toLocal()))
+          .toSet();
       final parts = _filterMonth.split('-');
       final y = int.parse(parts[0]);
       final m = int.parse(parts[1]);
@@ -338,7 +412,8 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
 
       for (int day = 1; day <= totalDays; day++) {
         final d = DateTime(y, m, day);
-        final isWeekend = d.weekday == DateTime.saturday || d.weekday == DateTime.sunday;
+        final isWeekend =
+            d.weekday == DateTime.saturday || d.weekday == DateTime.sunday;
         final ymdStr = DateFormat('yyyy-MM-dd').format(d);
         final isHoliday = holidaySet.contains(ymdStr);
 
@@ -350,7 +425,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
       }
 
       final onTimeRate = presentCount > 0
-          ? double.parse((((presentCount - lateCount) / presentCount) * 100).toStringAsFixed(1))
+          ? double.parse(
+              (((presentCount - lateCount) / presentCount) * 100)
+                  .toStringAsFixed(1),
+            )
           : 0.0;
 
       summaryList.add({
@@ -393,8 +471,13 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('เลือกเดือนรายงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                'เลือกเดือนรายงาน',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -405,17 +488,26 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                         onPressed: () {
                           setDialogState(() => selectedYear--);
                         },
-                        icon: const Icon(Icons.keyboard_arrow_left_rounded, color: workBlue),
+                        icon: const Icon(
+                          Icons.keyboard_arrow_left_rounded,
+                          color: workBlue,
+                        ),
                       ),
                       Text(
                         'ปี พ.ศ. ${selectedYear + 543}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                       IconButton(
                         onPressed: () {
                           setDialogState(() => selectedYear++);
                         },
-                        icon: const Icon(Icons.keyboard_arrow_right_rounded, color: workBlue),
+                        icon: const Icon(
+                          Icons.keyboard_arrow_right_rounded,
+                          color: workBlue,
+                        ),
                       ),
                     ],
                   ),
@@ -423,17 +515,21 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 1.3,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                          childAspectRatio: 1.3,
+                        ),
                     itemCount: 12,
                     itemBuilder: (context, index) {
                       final monthNum = index + 1;
                       final isSelected = selectedMonth == monthNum;
-                      final monthName = DateFormat('MMM', 'th').format(DateTime(2026, monthNum));
+                      final monthName = DateFormat(
+                        'MMM',
+                        'th',
+                      ).format(DateTime(2026, monthNum));
                       return InkWell(
                         onTap: () {
                           setDialogState(() => selectedMonth = monthNum);
@@ -443,7 +539,9 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                             color: isSelected ? workBlue : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSelected ? workBlue : const Color(0xFFCBD5E1),
+                              color: isSelected
+                                  ? workBlue
+                                  : const Color(0xFFCBD5E1),
                             ),
                           ),
                           alignment: Alignment.center,
@@ -451,7 +549,9 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                             monthName,
                             style: TextStyle(
                               color: isSelected ? Colors.white : workText,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                               fontSize: 12.5,
                             ),
                           ),
@@ -464,17 +564,23 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
+                  child: const Text(
+                    'ยกเลิก',
+                    style: TextStyle(color: workMuted),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    final monthStr = '$selectedYear-${selectedMonth.toString().padLeft(2, '0')}';
+                    final monthStr =
+                        '$selectedYear-${selectedMonth.toString().padLeft(2, '0')}';
                     Navigator.pop(context, monthStr);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: workBlue,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: const Text('ตกลง'),
                 ),
@@ -508,7 +614,11 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: workBlue, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 10,
+              color: workBlue,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(width: 4),
           GestureDetector(
@@ -530,9 +640,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
         return StatefulBuilder(
           builder: (context, setSheetState) {
             final parts = _filterMonth.split('-');
-            final displayMonthStr = DateFormat('MMMM yyyy', 'th').format(
-              DateTime(int.parse(parts[0]), int.parse(parts[1])),
-            );
+            final displayMonthStr = DateFormat(
+              'MMMM yyyy',
+              'th',
+            ).format(DateTime(int.parse(parts[0]), int.parse(parts[1])));
 
             return SingleChildScrollView(
               child: Padding(
@@ -546,7 +657,11 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                       children: [
                         const Text(
                           'ตัวกรองข้อมูล',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: workText),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: workText,
+                          ),
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(context),
@@ -557,7 +672,14 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                     const Divider(),
                     const SizedBox(height: 10),
                     // Month Picker
-                    const Text('เลือกเดือนรายงาน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workMuted)),
+                    const Text(
+                      'เลือกเดือนรายงาน',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: workMuted,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     InkWell(
                       onTap: () async {
@@ -566,7 +688,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                       },
                       child: Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                           borderRadius: BorderRadius.circular(10),
@@ -577,9 +702,16 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                           children: [
                             Text(
                               displayMonthStr,
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: workBlue),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: workBlue,
+                              ),
                             ),
-                            const Icon(Icons.calendar_month_rounded, color: workBlue, size: 18),
+                            const Icon(
+                              Icons.calendar_month_rounded,
+                              color: workBlue,
+                              size: 18,
+                            ),
                           ],
                         ),
                       ),
@@ -587,7 +719,14 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                     if (_activeTab == 'log') ...[
                       const SizedBox(height: 16),
                       // Day Selector
-                      const Text('เลือกวัน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workMuted)),
+                      const Text(
+                        'เลือกวัน',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: workMuted,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
@@ -604,7 +743,9 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                             items: _dayList.map((day) {
                               return DropdownMenuItem<String>(
                                 value: day,
-                                child: Text(day == 'All' ? 'ทุกวัน' : 'วันที่ $day'),
+                                child: Text(
+                                  day == 'All' ? 'ทุกวัน' : 'วันที่ $day',
+                                ),
                               );
                             }).toList(),
                             onChanged: (val) {
@@ -618,7 +759,14 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                       ),
                       const SizedBox(height: 16),
                       // Type Selector
-                      const Text('สถานะการเช็คอิน/การลา', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: workMuted)),
+                      const Text(
+                        'สถานะการเช็คอิน/การลา',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: workMuted,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
@@ -633,13 +781,34 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                             value: _filterType,
                             isExpanded: true,
                             items: const [
-                              DropdownMenuItem(value: 'All', child: Text('ทุกสถานะ')),
-                              DropdownMenuItem(value: 'ตรงเวลา', child: Text('ตรงเวลา')),
-                              DropdownMenuItem(value: 'สาย', child: Text('สาย')),
-                              DropdownMenuItem(value: 'ลาป่วย', child: Text('ลาป่วย')),
-                              DropdownMenuItem(value: 'ลากิจ', child: Text('ลากิจ')),
-                              DropdownMenuItem(value: 'ลาพักร้อน', child: Text('ลาพักร้อน')),
-                              DropdownMenuItem(value: 'ออกหน้างาน', child: Text('ออกหน้างาน')),
+                              DropdownMenuItem(
+                                value: 'All',
+                                child: Text('ทุกสถานะ'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ตรงเวลา',
+                                child: Text('ตรงเวลา'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'สาย',
+                                child: Text('สาย'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ลาป่วย',
+                                child: Text('ลาป่วย'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ลากิจ',
+                                child: Text('ลากิจ'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ลาพักร้อน',
+                                child: Text('ลาพักร้อน'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ออกหน้างาน',
+                                child: Text('ออกหน้างาน'),
+                              ),
                             ],
                             onChanged: (val) {
                               if (val != null) {
@@ -660,16 +829,23 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                               setState(() {
                                 _filterDay = 'All';
                                 _filterType = 'All';
-                                _filterMonth = DateFormat('yyyy-MM').format(DateTime.now());
+                                _filterMonth = DateFormat(
+                                  'yyyy-MM',
+                                ).format(DateTime.now());
                               });
                               _loadData();
                               Navigator.pop(context);
                             },
                             style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            child: const Text('รีเซ็ตทั้งหมด', style: TextStyle(color: workMuted)),
+                            child: const Text(
+                              'รีเซ็ตทั้งหมด',
+                              style: TextStyle(color: workMuted),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -682,7 +858,9 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: workBlue,
                               foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                             child: const Text('นำไปใช้'),
@@ -702,18 +880,23 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = widget.service.currentUser?.role == 'admin';
     final parts = _filterMonth.split('-');
     final selectedYear = int.parse(parts[0]);
     final selectedMonth = int.parse(parts[1]);
     final thaiYear = selectedYear + 543;
-    final monthName = DateFormat('MMMM', 'th').format(DateTime(selectedYear, selectedMonth));
+    final monthName = DateFormat(
+      'MMMM',
+      'th',
+    ).format(DateTime(selectedYear, selectedMonth));
 
     String subtitleText = '';
     if (_activeTab == 'log') {
       if (_filterDay == 'All') {
         subtitleText = 'ประจำเดือน $monthName พ.ศ. $thaiYear';
       } else {
-        subtitleText = 'ประจำวันที่ ${int.parse(_filterDay)} $monthName พ.ศ. $thaiYear';
+        subtitleText =
+            'ประจำวันที่ ${int.parse(_filterDay)} $monthName พ.ศ. $thaiYear';
       }
     } else {
       subtitleText = 'ประจำเดือน $monthName พ.ศ. $thaiYear';
@@ -728,13 +911,17 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'รายงานการเข้างาน',
+            Text(
+              isAdmin ? 'รายงานการเข้างาน' : 'บันทึกเวลาเข้างานของฉัน',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5),
             ),
             Text(
               subtitleText,
-              style: const TextStyle(fontSize: 10.5, color: workMuted, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 10.5,
+                color: workMuted,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -768,10 +955,18 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                           child: Container(
                             margin: const EdgeInsets.all(2.0),
                             decoration: BoxDecoration(
-                              color: _activeTab == 'log' ? Colors.white : Colors.transparent,
+                              color: _activeTab == 'log'
+                                  ? Colors.white
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: _activeTab == 'log'
-                                  ? const [BoxShadow(color: Color(0x080F172A), blurRadius: 4, offset: Offset(0, 2))]
+                                  ? const [
+                                      BoxShadow(
+                                        color: Color(0x080F172A),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ]
                                   : null,
                             ),
                             alignment: Alignment.center,
@@ -781,15 +976,21 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                                 Icon(
                                   Icons.description_rounded,
                                   size: 16,
-                                  color: _activeTab == 'log' ? workBlue : workMuted,
+                                  color: _activeTab == 'log'
+                                      ? workBlue
+                                      : workMuted,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'รายละเอียดรายวัน',
                                   style: TextStyle(
                                     fontSize: 12.5,
-                                    fontWeight: _activeTab == 'log' ? FontWeight.w700 : FontWeight.w500,
-                                    color: _activeTab == 'log' ? workText : workMuted,
+                                    fontWeight: _activeTab == 'log'
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: _activeTab == 'log'
+                                        ? workText
+                                        : workMuted,
                                   ),
                                 ),
                               ],
@@ -803,10 +1004,18 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                           child: Container(
                             margin: const EdgeInsets.all(2.0),
                             decoration: BoxDecoration(
-                              color: _activeTab == 'summary' ? Colors.white : Colors.transparent,
+                              color: _activeTab == 'summary'
+                                  ? Colors.white
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: _activeTab == 'summary'
-                                  ? const [BoxShadow(color: Color(0x080F172A), blurRadius: 4, offset: Offset(0, 2))]
+                                  ? const [
+                                      BoxShadow(
+                                        color: Color(0x080F172A),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ]
                                   : null,
                             ),
                             alignment: Alignment.center,
@@ -816,15 +1025,21 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                                 Icon(
                                   Icons.assessment_rounded,
                                   size: 16,
-                                  color: _activeTab == 'summary' ? workBlue : workMuted,
+                                  color: _activeTab == 'summary'
+                                      ? workBlue
+                                      : workMuted,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'สรุปประจำเดือน',
                                   style: TextStyle(
                                     fontSize: 12.5,
-                                    fontWeight: _activeTab == 'summary' ? FontWeight.w700 : FontWeight.w500,
-                                    color: _activeTab == 'summary' ? workText : workMuted,
+                                    fontWeight: _activeTab == 'summary'
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: _activeTab == 'summary'
+                                        ? workText
+                                        : workMuted,
                                   ),
                                 ),
                               ],
@@ -840,53 +1055,65 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                 // Search & Filter Row
                 Row(
                   children: [
-                    // Clean Search Bar
-                    Expanded(
-                      child: Container(
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        alignment: Alignment.center,
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search_rounded, color: workMuted, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                decoration: const InputDecoration(
-                                  hintText: 'ค้นหาชื่อ...',
-                                  hintStyle: TextStyle(color: workMuted, fontSize: 12.5),
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
+                    if (isAdmin)
+                      Expanded(
+                        child: Container(
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          alignment: Alignment.center,
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.search_rounded,
+                                color: workMuted,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'ค้นหาชื่อ...',
+                                    hintStyle: TextStyle(
+                                      color: workMuted,
+                                      fontSize: 12.5,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  style: const TextStyle(fontSize: 13),
+                                  onChanged: (val) {
+                                    setState(() => _searchName = val.trim());
+                                  },
                                 ),
-                                style: const TextStyle(fontSize: 13),
-                                onChanged: (val) {
-                                  setState(() => _searchName = val.trim());
-                                },
                               ),
-                            ),
-                            if (_searchName.isNotEmpty)
-                              IconButton(
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _searchName = '');
-                                },
-                                padding: EdgeInsets.zero,
-                                iconSize: 16,
-                                constraints: const BoxConstraints(),
-                                icon: const Icon(Icons.cancel_rounded, color: workMuted),
-                              ),
-                          ],
+                              if (_searchName.isNotEmpty)
+                                IconButton(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchName = '');
+                                  },
+                                  padding: EdgeInsets.zero,
+                                  iconSize: 16,
+                                  constraints: const BoxConstraints(),
+                                  icon: const Icon(
+                                    Icons.cancel_rounded,
+                                    color: workMuted,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
+                      )
+                    else
+                      const Spacer(),
                     const SizedBox(width: 8),
                     // Compact Funnel Filter Button
                     InkWell(
@@ -935,21 +1162,31 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
             child: _loading && _allRows.isEmpty
                 ? const AttendanceHistorySkeleton()
                 : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.red),
-                            const SizedBox(height: 12),
-                            Text('โหลดข้อมูลล้มเหลว: $_error', style: const TextStyle(color: workText)),
-                            const SizedBox(height: 16),
-                            ElevatedButton(onPressed: _loadData, child: const Text('ลองอีกครั้ง')),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          size: 48,
+                          color: Colors.red,
                         ),
-                      )
-                    : _activeTab == 'log'
-                        ? _buildDailyLogView()
-                        : _buildMonthlySummaryView(),
+                        const SizedBox(height: 12),
+                        Text(
+                          'โหลดข้อมูลล้มเหลว: $_error',
+                          style: const TextStyle(color: workText),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadData,
+                          child: const Text('ลองอีกครั้ง'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _activeTab == 'log'
+                ? _buildDailyLogView()
+                : _buildMonthlySummaryView(),
           ),
         ],
       ),
@@ -960,7 +1197,12 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
   Widget _buildDailyLogView() {
     final rows = _filteredRows;
     if (rows.isEmpty) {
-      return const Center(child: Text('ไม่พบข้อมูลบันทึกเวลา', style: TextStyle(color: workMuted)));
+      return const Center(
+        child: Text(
+          'ไม่พบข้อมูลบันทึกเวลา',
+          style: TextStyle(color: workMuted),
+        ),
+      );
     }
 
     return RefreshIndicator(
@@ -970,16 +1212,25 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
         itemCount: rows.length,
         itemBuilder: (context, index) {
           final row = rows[index];
-          final checkInStr = row.checkInAt != null ? DateFormat('HH:mm').format(row.checkInAt!.toLocal()) : '--:--';
-          final checkOutStr = row.checkOutAt != null ? DateFormat('HH:mm').format(row.checkOutAt!.toLocal()) : '--:--';
-          
+          final checkInStr = row.checkInAt != null
+              ? DateFormat('HH:mm').format(row.checkInAt!.toLocal())
+              : '--:--';
+          final checkOutStr = row.checkOutAt != null
+              ? DateFormat('HH:mm').format(row.checkOutAt!.toLocal())
+              : '--:--';
+
           final displayStatus = _translateStatus(row.status, row.date);
           final statusColor = _getStatusColor(row.status);
 
           // Calculate work hours
           double wh = 0.0;
           if (row.checkInAt != null && row.checkOutAt != null) {
-            wh = row.checkOutAt!.toLocal().difference(row.checkInAt!.toLocal()).inMinutes / 60.0;
+            wh =
+                row.checkOutAt!
+                    .toLocal()
+                    .difference(row.checkInAt!.toLocal())
+                    .inMinutes /
+                60.0;
           }
 
           // Calculate late minutes
@@ -988,15 +1239,24 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
             final checkInLocal = row.checkInAt!.toLocal();
             // check morning leave
             final ymd = DateFormat('yyyy-MM-dd').format(row.date.toLocal());
-            final isMorningLeave = _allRows.any((r) =>
-                r.userName == row.userName &&
-                DateFormat('yyyy-MM-dd').format(r.date.toLocal()) == ymd &&
-                r.type == 'leave' &&
-                r.status.contains('approved') &&
-                (r.status.contains('ครึ่งเช้า') || r.status.contains('morning')));
-            
+            final isMorningLeave = _allRows.any(
+              (r) =>
+                  r.userName == row.userName &&
+                  DateFormat('yyyy-MM-dd').format(r.date.toLocal()) == ymd &&
+                  r.type == 'leave' &&
+                  r.status.contains('approved') &&
+                  (r.status.contains('ครึ่งเช้า') ||
+                      r.status.contains('morning')),
+            );
+
             final targetHour = isMorningLeave ? 13 : 9;
-            final target = DateTime(checkInLocal.year, checkInLocal.month, checkInLocal.day, targetHour, 0);
+            final target = DateTime(
+              checkInLocal.year,
+              checkInLocal.month,
+              checkInLocal.day,
+              targetHour,
+              0,
+            );
             final diff = checkInLocal.difference(target).inMinutes;
             if (diff > 0) lateMin = diff;
           }
@@ -1010,20 +1270,19 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
             }
           }
 
-          final hasAvatar = matchedUser?.avatarUrl != null && matchedUser!.avatarUrl!.trim().isNotEmpty;
-          final avatarUrl = hasAvatar
-              ? (matchedUser.avatarUrl!.startsWith('r2://')
-                  ? matchedUser.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                  : matchedUser.avatarUrl!)
-              : '';
-
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFF1F5F9)),
-              boxShadow: const [BoxShadow(color: Color(0x040F172A), blurRadius: 6, offset: Offset(0, 1))],
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x040F172A),
+                  blurRadius: 6,
+                  offset: Offset(0, 1),
+                ),
+              ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
@@ -1040,26 +1299,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFFF1F5F9),
-                            image: hasAvatar
-                                ? DecorationImage(
-                                    image: NetworkImage(avatarUrl),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                          ),
-                          child: hasAvatar
-                              ? null
-                              : const Icon(
-                                  Icons.person_rounded,
-                                  color: workMuted,
-                                  size: 18,
-                                ),
+                        UserAvatar(
+                          avatarUrl: matchedUser?.avatarUrl,
+                          name: matchedUser?.fullName ?? row.email,
+                          radius: 16,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1068,11 +1311,18 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                             children: [
                               Text(
                                 row.userName,
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: workText),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: workText,
+                                ),
                               ),
                               Text(
                                 '${row.department.isEmpty ? '-' : row.department} · ${row.position.isEmpty ? '-' : row.position}',
-                                style: const TextStyle(fontSize: 10.5, color: workMuted),
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: workMuted,
+                                ),
                               ),
                             ],
                           ),
@@ -1080,15 +1330,24 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                         const SizedBox(width: 8),
                         // Type & Status Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: statusColor.withValues(alpha: 0.15)),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.15),
+                            ),
                           ),
                           child: Text(
                             displayStatus,
-                            style: TextStyle(color: statusColor, fontSize: 9.5, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -1100,25 +1359,42 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('วันที่บันทึก', style: TextStyle(fontSize: 10, color: workMuted)),
+                            const Text(
+                              'วันที่บันทึก',
+                              style: TextStyle(fontSize: 10, color: workMuted),
+                            ),
                             const SizedBox(height: 2),
                             Text(
-                              DateFormat('dd MMM yyyy', 'th').format(row.date.toLocal()),
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: workText),
+                              DateFormat(
+                                'dd MMM yyyy',
+                                'th',
+                              ).format(row.date.toLocal()),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: workText,
+                              ),
                             ),
                           ],
                         ),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            const Text('เข้า - ออก', style: TextStyle(fontSize: 10, color: workMuted)),
+                            const Text(
+                              'เข้า - ออก',
+                              style: TextStyle(fontSize: 10, color: workMuted),
+                            ),
                             const SizedBox(height: 2),
                             Text(
-                              row.type == 'attendance' ? '$checkInStr · $checkOutStr' : '-',
+                              row.type == 'attendance'
+                                  ? '$checkInStr · $checkOutStr'
+                                  : '-',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: row.status == 'late' ? const Color(0xFFEA580C) : workText,
+                                color: row.status == 'late'
+                                    ? const Color(0xFFEA580C)
+                                    : workText,
                               ),
                             ),
                           ],
@@ -1126,7 +1402,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            const Text('ชม.ทำงาน / สาย', style: TextStyle(fontSize: 10, color: workMuted)),
+                            const Text(
+                              'ชม.ทำงาน / สาย',
+                              style: TextStyle(fontSize: 10, color: workMuted),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               row.type == 'attendance'
@@ -1135,7 +1414,9 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: lateMin > 0 ? const Color(0xFFEA580C) : workText,
+                                color: lateMin > 0
+                                    ? const Color(0xFFEA580C)
+                                    : workText,
                               ),
                             ),
                           ],
@@ -1153,7 +1434,11 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                         ),
                         child: Text(
                           'เหตุผล/หมายเหตุ: ${row.reason}',
-                          style: const TextStyle(fontSize: 11, color: workMuted, fontStyle: FontStyle.italic),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: workMuted,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
                     ],
@@ -1171,7 +1456,12 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
   Widget _buildMonthlySummaryView() {
     final summaries = _summaryData;
     if (summaries.isEmpty) {
-      return const Center(child: Text('ไม่พบข้อมูลสรุปรายเดือน', style: TextStyle(color: workMuted)));
+      return const Center(
+        child: Text(
+          'ไม่พบข้อมูลสรุปรายเดือน',
+          style: TextStyle(color: workMuted),
+        ),
+      );
     }
 
     return RefreshIndicator(
@@ -1183,13 +1473,6 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
           final s = summaries[index];
           final AppUser user = s['user'] as AppUser;
           final onTimeRate = s['onTimeRate'] as double;
-
-          final hasAvatar = user.avatarUrl != null && user.avatarUrl!.trim().isNotEmpty;
-          final avatarUrl = hasAvatar
-              ? (user.avatarUrl!.startsWith('r2://')
-                  ? user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                  : user.avatarUrl!)
-              : '';
 
           // Determine on-time rate color
           Color rateColor = const Color(0xFFEF4444); // Red (< 75%)
@@ -1206,7 +1489,13 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFF1F5F9)),
-              boxShadow: const [BoxShadow(color: Color(0x040F172A), blurRadius: 8, offset: Offset(0, 2))],
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x040F172A),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1214,17 +1503,10 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                 // Header (User avatar + name + Circular progress)
                 Row(
                   children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFFF1F5F9),
-                        image: hasAvatar
-                            ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover)
-                            : null,
-                      ),
-                      child: hasAvatar ? null : const Icon(Icons.person_rounded, color: workMuted, size: 20),
+                    UserAvatar(
+                      avatarUrl: user.avatarUrl,
+                      name: user.fullName,
+                      radius: 19,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1233,11 +1515,18 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                         children: [
                           Text(
                             user.fullName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: workText),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                              color: workText,
+                            ),
                           ),
                           Text(
                             '${user.department.isEmpty ? '-' : user.department} · ${user.position.isEmpty ? '-' : user.position}',
-                            style: const TextStyle(fontSize: 10.5, color: workMuted),
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: workMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -1254,12 +1543,18 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                             value: onTimeRate / 100.0,
                             strokeWidth: 3.5,
                             backgroundColor: rateColor.withValues(alpha: 0.1),
-                            valueColor: AlwaysStoppedAnimation<Color>(rateColor),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              rateColor,
+                            ),
                           ),
                         ),
                         Text(
                           '${onTimeRate.toStringAsFixed(0)}%',
-                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: rateColor),
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: rateColor,
+                          ),
                         ),
                       ],
                     ),
@@ -1272,20 +1567,80 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
                 // Stats row 1
                 Row(
                   children: [
-                    Expanded(child: _buildMetricCol(label: 'วันทำการ', value: '${s['scheduledDays']}', icon: Icons.calendar_month_rounded, color: workText)),
-                    Expanded(child: _buildMetricCol(label: 'มาทำงาน', value: '${s['presentCount']}', icon: Icons.check_circle_rounded, color: const Color(0xFF10B981))),
-                    Expanded(child: _buildMetricCol(label: 'มาสาย', value: '${s['lateCount']}', icon: Icons.watch_later_rounded, color: const Color(0xFFEA580C))),
-                    Expanded(child: _buildMetricCol(label: 'สาย (นาที)', value: '${s['lateMinutes']}', icon: Icons.hourglass_bottom_rounded, color: const Color(0xFFEA580C))),
+                    Expanded(
+                      child: _buildMetricCol(
+                        label: 'วันทำการ',
+                        value: '${s['scheduledDays']}',
+                        icon: Icons.calendar_month_rounded,
+                        color: workText,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildMetricCol(
+                        label: 'มาทำงาน',
+                        value: '${s['presentCount']}',
+                        icon: Icons.check_circle_rounded,
+                        color: const Color(0xFF10B981),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildMetricCol(
+                        label: 'มาสาย',
+                        value: '${s['lateCount']}',
+                        icon: Icons.watch_later_rounded,
+                        color: const Color(0xFFEA580C),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildMetricCol(
+                        label: 'สาย (นาที)',
+                        value: '${s['lateMinutes']}',
+                        icon: Icons.hourglass_bottom_rounded,
+                        color: const Color(0xFFEA580C),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 // Stats row 2
                 Row(
                   children: [
-                    Expanded(child: _buildMetricCol(label: 'ขาดงาน', value: '${s['absentDays']}', icon: Icons.cancel_rounded, color: const Color(0xFFEF4444))),
-                    Expanded(child: _buildMetricCol(label: 'ลาป่วย', value: s['sickLeave'] > 0 ? '${s['sickLeave']}' : '0', icon: Icons.health_and_safety_rounded, color: const Color(0xFFEF4444))),
-                    Expanded(child: _buildMetricCol(label: 'ลากิจ', value: s['personalLeave'] > 0 ? '${s['personalLeave']}' : '0', icon: Icons.work_off_rounded, color: const Color(0xFFF59E0B))),
-                    Expanded(child: _buildMetricCol(label: 'ลาพักร้อน', value: s['annualLeave'] > 0 ? '${s['annualLeave']}' : '0', icon: Icons.beach_access_rounded, color: workBlue)),
+                    Expanded(
+                      child: _buildMetricCol(
+                        label: 'ขาดงาน',
+                        value: '${s['absentDays']}',
+                        icon: Icons.cancel_rounded,
+                        color: const Color(0xFFEF4444),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildMetricCol(
+                        label: 'ลาป่วย',
+                        value: s['sickLeave'] > 0 ? '${s['sickLeave']}' : '0',
+                        icon: Icons.health_and_safety_rounded,
+                        color: const Color(0xFFEF4444),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildMetricCol(
+                        label: 'ลากิจ',
+                        value: s['personalLeave'] > 0
+                            ? '${s['personalLeave']}'
+                            : '0',
+                        icon: Icons.work_off_rounded,
+                        color: const Color(0xFFF59E0B),
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildMetricCol(
+                        label: 'ลาพักร้อน',
+                        value: s['annualLeave'] > 0
+                            ? '${s['annualLeave']}'
+                            : '0',
+                        icon: Icons.beach_access_rounded,
+                        color: workBlue,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -1308,12 +1663,20 @@ class _AdminAttendanceHistoryPageState extends State<AdminAttendanceHistoryPage>
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: color),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            color: color,
+          ),
         ),
         const SizedBox(height: 1),
         Text(
           label,
-          style: const TextStyle(fontSize: 9, color: workMuted, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontSize: 9,
+            color: workMuted,
+            fontWeight: FontWeight.w600,
+          ),
           textAlign: TextAlign.center,
         ),
       ],

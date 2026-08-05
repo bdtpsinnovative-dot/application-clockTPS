@@ -2,11 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import '../widgets/avatar_picker.dart';
+import '../widgets/user_avatar.dart';
 
 import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../screens/account_settings_page.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({
@@ -57,9 +59,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   void _showEditProfileBottomSheet(BuildContext context) {
-    final firstCtrl = TextEditingController(text: widget.user.firstName);
-    final lastCtrl = TextEditingController(text: widget.user.lastName);
-    final nickCtrl = TextEditingController(text: widget.user.nickname);
     File? selectedFile;
     bool saving = false;
 
@@ -98,7 +97,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'แก้ไขข้อมูลโปรไฟล์',
+                      'เปลี่ยนรูปโปรไฟล์',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -106,7 +105,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
                     AvatarPicker(
                       initialImageUrl: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
                           ? (widget.user.avatarUrl!.startsWith('r2://')
@@ -124,86 +123,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         );
                       },
                     ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'ชื่อจริง',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: workMuted,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: firstCtrl,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'นามสกุล',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: workMuted,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: lastCtrl,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'ชื่อเล่น',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: workMuted,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: nickCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'ชื่อเล่น',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: saving
                           ? null
                           : () async {
-                              final fName = firstCtrl.text.trim();
-                              final lName = lastCtrl.text.trim();
-                              final nName = nickCtrl.text.trim();
-                              if (fName.isEmpty || lName.isEmpty || nName.isEmpty) {
+                              if (selectedFile == null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('กรุณากรอกชื่อ นามสกุล และชื่อเล่น'),
-                                    backgroundColor: Colors.red,
+                                    content: Text('กรุณาเลือกรูปภาพใหม่'),
+                                    backgroundColor: Colors.orange,
                                   ),
                                 );
                                 return;
@@ -214,24 +143,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               });
 
                               try {
-                                String finalAvatarUrl = widget.user.avatarUrl ?? '';
-                                if (selectedFile != null) {
-                                  final uploadedUrl = await widget.service.uploadImage(selectedFile!);
-                                  finalAvatarUrl = uploadedUrl;
-                                }
-
+                                final uploadedUrl = await widget.service.uploadImage(selectedFile!);
+                                
                                 await widget.service.updateProfileInfo(
-                                  firstName: fName,
-                                  lastName: lName,
-                                  nickname: nName,
-                                  avatarUrl: finalAvatarUrl,
+                                  firstName: widget.user.firstName,
+                                  lastName: widget.user.lastName,
+                                  nickname: widget.user.nickname,
+                                  avatarUrl: uploadedUrl,
                                 );
 
                                 if (context.mounted) {
                                   widget.onProfileUpdated();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว'),
+                                      content: Text('อัปเดตรูปโปรไฟล์เรียบร้อยแล้ว'),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
@@ -247,9 +172,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   );
                                 }
                               } finally {
-                                setModalState(() {
-                                  saving = false;
-                                });
+                                if (context.mounted) {
+                                  setModalState(() {
+                                    saving = false;
+                                  });
+                                }
                               }
                             },
                       style: ElevatedButton.styleFrom(
@@ -262,12 +189,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('บันทึกข้อมูล', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                          : const Text(
+                              'บันทึกรูปโปรไฟล์',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
                     ),
                   ],
                 ),
@@ -370,6 +297,21 @@ class _UserProfilePageState extends State<UserProfilePage> {
               title: 'โปรไฟล์ของฉัน',
               subtitle: widget.user.email,
               bottomPadding: 56,
+              action: IconButton(
+                icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AccountSettingsPage(
+                        service: widget.service,
+                        user: widget.user,
+                        onProfileUpdated: widget.onProfileUpdated,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
             Transform.translate(
               offset: const Offset(0, -42),
@@ -403,24 +345,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                               offset: const Offset(0, 3),
                                             ),
                                           ],
-                                          image: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
-                                              ? DecorationImage(
-                                                  image: NetworkImage(
-                                                    widget.user.avatarUrl!.startsWith('r2://')
-                                                        ? widget.user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                                                        : widget.user.avatarUrl!,
-                                                  ),
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : null,
                                         ),
-                                        child: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
-                                            ? null
-                                            : const Icon(
-                                                Icons.person_rounded,
-                                                color: workMuted,
-                                                size: 38,
-                                              ),
+                                        child: UserAvatar(
+                                          avatarUrl: widget.user.avatarUrl,
+                                          name: widget.user.nickname.isNotEmpty
+                                              ? widget.user.nickname
+                                              : widget.user.firstName,
+                                          radius: 32,
+                                        ),
                                       ),
                                       Positioned(
                                         bottom: 0,

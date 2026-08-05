@@ -5,7 +5,17 @@ class _FilterBottomSheetContent extends StatefulWidget {
   final List<TaskCategoryRecord> categories;
   final String? initialBrandId;
   final String? initialCategoryId;
-  final Function(String? brandId, String? categoryId) onApply;
+  final String? initialOwnership;
+  final String? initialStatus;
+  final bool initialStarredOnly;
+  final Function(
+    String? brandId,
+    String? categoryId,
+    String? ownership,
+    String? status,
+    bool starredOnly,
+  )
+  onApply;
 
   const _FilterBottomSheetContent({
     super.key,
@@ -13,6 +23,9 @@ class _FilterBottomSheetContent extends StatefulWidget {
     required this.categories,
     this.initialBrandId,
     this.initialCategoryId,
+    this.initialOwnership,
+    this.initialStatus,
+    this.initialStarredOnly = false,
     required this.onApply,
   });
 
@@ -24,26 +37,32 @@ class _FilterBottomSheetContent extends StatefulWidget {
 class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
   String? _tempBrandId;
   String? _tempCategoryId;
+  String? _tempOwnership;
+  String? _tempStatus;
+  bool _tempStarredOnly = false;
 
   @override
   void initState() {
     super.initState();
     _tempBrandId = widget.initialBrandId;
     _tempCategoryId = widget.initialCategoryId;
+    _tempOwnership = widget.initialOwnership;
+    _tempStatus = widget.initialStatus;
+    _tempStarredOnly = widget.initialStarredOnly;
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-        20,
         16,
-        20,
-        MediaQuery.of(context).viewInsets.bottom + 24,
+        12,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -68,13 +87,46 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                   ],
                 ),
                 IconButton(
+                  key: const Key('close-task-filter'),
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close_rounded, color: workMuted),
                 ),
               ],
             ),
             const Divider(color: Color(0xFFF1F5F9)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+
+            const Text(
+              'มุมมองงาน',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                _buildFilterChip(
+                  label: 'ทั้งหมด',
+                  isSelected: _tempOwnership == null,
+                  onTap: () => setState(() => _tempOwnership = null),
+                ),
+                _buildFilterChip(
+                  label: 'งานที่ฉันสร้าง',
+                  isSelected: _tempOwnership == 'created_by_me',
+                  onTap: () => setState(() => _tempOwnership = 'created_by_me'),
+                ),
+                _buildFilterChip(
+                  label: 'งานที่ถูกเพิ่มเข้า',
+                  isSelected: _tempOwnership == 'joined',
+                  onTap: () => setState(() => _tempOwnership = 'joined'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
             const Text(
               'แบรนด์ (Brand)',
@@ -103,7 +155,7 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             const Text(
               'หมวดหมู่ (Category)',
@@ -132,7 +184,67 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                 ),
               ],
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
+
+            const Text(
+              'สถานะงาน (Status)',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildFilterChip(
+                  label: 'ทั้งหมด',
+                  isSelected: _tempStatus == null,
+                  onTap: () => setState(() => _tempStatus = null),
+                ),
+                _buildFilterChip(
+                  label: 'เฉพาะงานที่ยังไม่เสร็จ',
+                  isSelected: _tempStatus == 'active',
+                  onTap: () => setState(() => _tempStatus = 'active'),
+                ),
+                _buildFilterChip(
+                  label: 'เฉพาะงานที่เสร็จสิ้น',
+                  isSelected: _tempStatus == 'completed',
+                  onTap: () => setState(() => _tempStatus = 'completed'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            const Text(
+              'การติดดาว (Star status)',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: workText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildFilterChip(
+                  label: 'งานทั้งหมด',
+                  isSelected: !_tempStarredOnly,
+                  onTap: () => setState(() => _tempStarredOnly = false),
+                ),
+                _buildFilterChip(
+                  label: '⭐ แสดงเฉพาะงานที่ติดดาว',
+                  isSelected: _tempStarredOnly,
+                  onTap: () => setState(() => _tempStarredOnly = true),
+                  activeColor: Colors.amber,
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
 
             Row(
               children: [
@@ -142,6 +254,9 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                       setState(() {
                         _tempBrandId = null;
                         _tempCategoryId = null;
+                        _tempOwnership = null;
+                        _tempStatus = null;
+                        _tempStarredOnly = false;
                       });
                     },
                     style: OutlinedButton.styleFrom(
@@ -162,7 +277,13 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      widget.onApply(_tempBrandId, _tempCategoryId);
+                      widget.onApply(
+                        _tempBrandId,
+                        _tempCategoryId,
+                        _tempOwnership,
+                        _tempStatus,
+                        _tempStarredOnly,
+                      );
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
@@ -199,7 +320,7 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected ? finalActiveColor.withOpacity(0.1) : Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -212,7 +333,7 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
           label,
           style: TextStyle(
             color: isSelected ? finalActiveColor : workText,
-            fontSize: 12,
+            fontSize: 11.5,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
         ),

@@ -19,20 +19,22 @@ DateTime nextWorkMonday({DateTime? now}) {
 Future<DateTime?> showWorkDueDatePicker(
   BuildContext context, {
   DateTime? initialDate,
+  String title = 'เลือกวันที่สิ้นสุด',
 }) {
   return showModalBottomSheet<DateTime>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _WorkDueDatePicker(initialDate: initialDate),
+    builder: (_) => _WorkDueDatePicker(initialDate: initialDate, title: title),
   );
 }
 
 class _WorkDueDatePicker extends StatefulWidget {
-  const _WorkDueDatePicker({this.initialDate});
+  const _WorkDueDatePicker({this.initialDate, required this.title});
 
   final DateTime? initialDate;
+  final String title;
 
   @override
   State<_WorkDueDatePicker> createState() => _WorkDueDatePickerState();
@@ -114,8 +116,8 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
-              'เลือกวันที่สิ้นสุด',
+            Text(
+              widget.title,
               style: TextStyle(
                 color: workText,
                 fontSize: 16,

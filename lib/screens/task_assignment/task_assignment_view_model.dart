@@ -22,9 +22,16 @@ class TaskAssignmentViewModel extends ChangeNotifier {
   String? selectedBrandId;
   String? selectedCategoryId;
   String? selectedOwnership;
+  String? selectedStatus;
+  bool selectedStarredOnly = false;
+  String selectedQuickView = 'all';
 
   bool get hasSheetFilters =>
-      selectedBrandId != null || selectedCategoryId != null;
+      selectedBrandId != null ||
+      selectedCategoryId != null ||
+      selectedOwnership != null ||
+      selectedStatus != null ||
+      selectedStarredOnly;
 
   List<TaskRecord> get filteredTasks {
     final query = searchQuery.toLowerCase();
@@ -33,32 +40,55 @@ class TaskAssignmentViewModel extends ChangeNotifier {
       service.currentUserId,
     );
 
-    return tasks
-        .where((task) {
-          final isEmployee = service.currentUser?.role == 'employee';
-          if (!isEmployee &&
-              !taskMatchesAdminVisibilityFilter(task, currentUserId)) {
-            return false;
-          }
-          if (query.isNotEmpty &&
-              !task.title.toLowerCase().contains(query) &&
-              !task.description.toLowerCase().contains(query)) {
-            return false;
-          }
-          if (selectedBrandId != null && task.brandId != selectedBrandId) {
-            return false;
-          }
-          if (selectedCategoryId != null &&
-              task.categoryId != selectedCategoryId) {
-            return false;
-          }
-          return taskMatchesOwnershipFilter(
-            task,
-            currentUserId,
-            selectedOwnership,
-          );
-        })
-        .toList(growable: false);
+    final isEmployee = service.currentUser?.role == 'employee';
+    final filtered = tasks.where((task) {
+      if (!isEmployee &&
+          !taskMatchesAdminVisibilityFilter(task, currentUserId)) {
+        return false;
+      }
+      if (query.isNotEmpty &&
+          !task.title.toLowerCase().contains(query) &&
+          !task.description.toLowerCase().contains(query)) {
+        return false;
+      }
+      if (selectedBrandId != null && task.brandId != selectedBrandId) {
+        return false;
+      }
+      if (selectedCategoryId != null && task.categoryId != selectedCategoryId) {
+        return false;
+      }
+      if (selectedStatus == 'active' && task.status == 'completed') {
+        return false;
+      }
+      if (selectedStatus == 'completed' && task.status != 'completed') {
+        return false;
+      }
+      if (selectedStarredOnly && !task.isStarred) {
+        return false;
+      }
+      if (selectedQuickView == 'completed' && task.status != 'completed') {
+        return false;
+      }
+      if (selectedQuickView == 'all' && task.status == 'completed') {
+        return false;
+      }
+      if (selectedQuickView == 'starred' && !task.isStarred) {
+        return false;
+      }
+      return taskMatchesOwnershipFilter(task, currentUserId, selectedOwnership);
+    }).toList();
+
+    filtered.sort((a, b) {
+      final aHasDueDate = a.dueDate.year > 1;
+      final bHasDueDate = b.dueDate.year > 1;
+      if (aHasDueDate != bHasDueDate) return aHasDueDate ? -1 : 1;
+      if (aHasDueDate && bHasDueDate) {
+        final dueComparison = a.dueDate.compareTo(b.dueDate);
+        if (dueComparison != 0) return dueComparison;
+      }
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return List<TaskRecord>.unmodifiable(filtered);
   }
 
   Future<void> loadData() async {
@@ -67,13 +97,9 @@ class TaskAssignmentViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final isEmployee = service.currentUser?.role == 'employee';
-      final loadedTasks = await (isEmployee
-          ? service.getMyTasks()
-          : service.getAdminTasks());
+      final loadedTasks = await service.getMyTasks();
       final auxiliary = await Future.wait<Object>([
-        (isEmployee ? Future.value(<AppUser>[]) : service.getAdminUsers())
-            .catchError((_) => <AppUser>[]),
+        service.getAdminUsers().catchError((_) => <AppUser>[]),
         service.getBrands().catchError((_) => <BrandRecord>[]),
         service.getTaskCategories().catchError((_) => <TaskCategoryRecord>[]),
       ]);
@@ -116,9 +142,24 @@ class TaskAssignmentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void applySheetFilters(String? brandId, String? categoryId) {
+  void setQuickView(String value) {
+    if (value != 'all' && value != 'completed' && value != 'starred') return;
+    selectedQuickView = value;
+    notifyListeners();
+  }
+
+  void applySheetFilters(
+    String? brandId,
+    String? categoryId, {
+    String? ownership,
+    String? status,
+    bool starredOnly = false,
+  }) {
     selectedBrandId = brandId;
     selectedCategoryId = categoryId;
+    selectedOwnership = ownership;
+    selectedStatus = status;
+    selectedStarredOnly = starredOnly;
     notifyListeners();
   }
 
@@ -127,6 +168,8 @@ class TaskAssignmentViewModel extends ChangeNotifier {
     selectedBrandId = null;
     selectedCategoryId = null;
     selectedOwnership = null;
+    selectedStatus = null;
+    selectedStarredOnly = false;
     notifyListeners();
   }
 }

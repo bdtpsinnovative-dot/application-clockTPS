@@ -251,6 +251,18 @@ class AuthFlowService {
     }
   }
 
+  Future<void> updatePassword(String oldPassword, String newPassword) async {
+    try {
+      await _dio.put<Map<String, dynamic>>(
+        '/api/users/me/password',
+        data: {'old_password': oldPassword, 'new_password': newPassword},
+        options: Options(headers: _authorizationHeaders()),
+      );
+    } on DioException catch (error) {
+      throw AuthFlowException(_apiMessage(error));
+    }
+  }
+
   Future<String> getCheckInMode() async {
     try {
       final response = await _authorizedGet('/api/settings/checkin-mode');
@@ -416,7 +428,7 @@ class AuthFlowService {
   }
 
   Future<List<AppUser>> getAdminUsers() async {
-    final response = await _authorizedGet('/admin/users');
+    final response = await _authorizedGet('/api/users');
     final data = response['data'];
     if (data is! List) return const [];
     return data
@@ -613,9 +625,11 @@ class AuthFlowService {
     List<String>? subItems,
     List<String>? assigneeIds,
     List<String>? listNames,
+    String? priority,
+    String? status,
   }) async {
     final response = await _authorizedPost(
-      '/admin/tasks',
+      '/api/tasks',
       data: {
         'title': title,
         'description': description,
@@ -628,6 +642,8 @@ class AuthFlowService {
         if (assigneeIds != null && assigneeIds.isNotEmpty)
           'assignee_ids': assigneeIds,
         if (listNames != null && listNames.isNotEmpty) 'list_names': listNames,
+        if (priority != null && priority.isNotEmpty) 'priority': priority,
+        if (status != null && status.isNotEmpty) 'status': status,
       },
     );
     return TaskRecord.fromJson(response['data'] as Map<String, dynamic>);
@@ -645,6 +661,8 @@ class AuthFlowService {
     required DateTime dueDate,
     String? brandId,
     String? categoryId,
+    String? priority,
+    String? status,
   }) async {
     final response = await _authorizedPatch(
       '/api/tasks/$id',
@@ -655,6 +673,8 @@ class AuthFlowService {
         'due_date': _dateValue(dueDate),
         'brand_id': brandId ?? '',
         'category_id': categoryId ?? '',
+        if (priority != null && priority.isNotEmpty) 'priority': priority,
+        if (status != null && status.isNotEmpty) 'status': status,
       },
     );
     return TaskRecord.fromJson(response['data'] as Map<String, dynamic>);
@@ -887,6 +907,25 @@ class AuthFlowService {
 
   Future<void> deleteTask(String id) async {
     await _authorizedDelete('/admin/tasks/$id');
+  }
+
+  Future<List<TaskRecord>> getTrashTasks() async {
+    final response = await _authorizedGet('/api/tasks/trash');
+    final data = response['data'] as List? ?? [];
+    return data
+        .map((json) => TaskRecord.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> restoreTask(String id) async {
+    await _authorizedPost('/api/tasks/$id/restore', data: {});
+  }
+
+  Future<void> toggleStarTask(String id, bool isStarred) async {
+    await _authorizedPost(
+      '/api/tasks/$id/star',
+      data: {'is_starred': isStarred},
+    );
   }
 
   Future<void> updateFcmToken(String token) async {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/widgets/priority_selector.dart';
@@ -7,14 +8,16 @@ import 'package:hr_management/widgets/skeleton_loading.dart';
 import 'package:hr_management/widgets/work_ui.dart';
 import 'package:file_picker/file_picker.dart' as fp;
 import '../widgets/card_assignee_picker.dart';
-import '../widgets/card_comment_section.dart';
+import '../widgets/user_avatar.dart';
 import '../widgets/work_due_date_picker.dart';
+import 'task_board/task_list_sorting.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 part 'task_board/card_detail_sheet.dart';
-part 'task_board/sub_item_detail_sheet.dart';
+part 'task_board/task_list_detail_sheet.dart';
+part 'task_board/task_list_activity_sheet.dart';
 part 'task_board/board_support_widgets.dart';
 part 'task_board/task_board_operations.dart';
 part 'task_board/task_board_filters.dart';
@@ -50,21 +53,9 @@ Future<void> showProjectTaskDetailSheet({
 
 String _formatDate(DateTime? dt) {
   if (dt == null) return '';
-  final thaiMonths = [
-    'ม.ค.',
-    'ก.พ.',
-    'มี.ค.',
-    'เม.ย.',
-    'พ.ค.',
-    'มิ.ย.',
-    'ก.ค.',
-    'ส.ค.',
-    'ก.ย.',
-    'ต.ค.',
-    'พ.ย.',
-    'ธ.ค.',
-  ];
-  return '${dt.day} ${thaiMonths[dt.month - 1]} ${dt.year + 543}';
+  final day = dt.day.toString().padLeft(2, '0');
+  final month = dt.month.toString().padLeft(2, '0');
+  return '$day/$month/${dt.year}';
 }
 
 class _BoardDockButton extends StatelessWidget {
@@ -242,11 +233,13 @@ class TaskBoardPage extends StatefulWidget {
     required this.task,
     required this.service,
     required this.onRefreshNeeded,
+    this.initialListId,
   });
 
   final TaskRecord task;
   final AuthFlowService service;
   final VoidCallback onRefreshNeeded;
+  final String? initialListId;
 
   @override
   State<TaskBoardPage> createState() => _TaskBoardPageState();
@@ -256,12 +249,14 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   late PageController _pageController;
   late int _currentPage;
   List<TaskListRecord> _lists = [];
+  List<UserSummary> _members = [];
   bool _loading = false;
   bool _isDraggingList = false;
   bool _scrolling = false;
   bool _isCompactMode = false;
-  final bool _useBottomBoardTools = true;
   final ValueNotifier<double> _cardDragXNotifier = ValueNotifier<double>(0.0);
+  final Set<String> _updatingListIds = <String>{};
+  bool _openedInitialList = false;
 
   String _cardSearchQuery = '';
   List<String> _selectedListIds = [];
@@ -287,6 +282,87 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
     'completed': const Color(0xFFF0FDF4),
   };
 
+  Widget _buildUserAvatar(UserSummary user, {double radius = 10}) {
+    final avatarUrl = _resolveAvatarUrl(user.avatarUrl);
+    final hasAvatar = avatarUrl.isNotEmpty;
+    final isSvg =
+        hasAvatar &&
+        (avatarUrl.toLowerCase().contains('.svg') ||
+            avatarUrl.toLowerCase().contains('/svg'));
+
+    Widget avatarWidget;
+    if (hasAvatar) {
+      if (isSvg) {
+        avatarWidget = SvgPicture.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+          placeholderBuilder: (BuildContext context) =>
+              _buildFallbackText(user, radius),
+        );
+      } else {
+        avatarWidget = Image.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) =>
+              _buildFallbackText(user, radius),
+        );
+      }
+    } else {
+      avatarWidget = _buildFallbackText(user, radius);
+    }
+
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFFDBEAFE),
+      ),
+      child: ClipOval(child: avatarWidget),
+    );
+  }
+
+  String _resolveAvatarUrl(String? url) {
+    if (url == null) return '';
+    var trimmed = url.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('r2://')) {
+      return trimmed.replaceFirst(
+        'r2://',
+        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+      );
+    }
+    if (trimmed.startsWith('okpr2://')) {
+      return trimmed.replaceFirst(
+        'okpr2://',
+        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+      );
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    final apiBase = widget.service.baseUrl;
+    if (trimmed.startsWith('/')) {
+      return '$apiBase$trimmed';
+    }
+    return '$apiBase/$trimmed';
+  }
+
+  Widget _buildFallbackText(UserSummary user, double radius) {
+    return Container(
+      alignment: Alignment.center,
+      color: const Color(0xFFDBEAFE),
+      child: Text(
+        user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
+        style: TextStyle(
+          fontSize: radius * 0.9,
+          color: const Color(0xFF1E40AF),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -308,37 +384,12 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isBoardCreator =
-        widget.service.currentUser?.id == widget.task.assignedBy;
-    final boardCreatorName = widget.task.assignedByName.isNotEmpty
-        ? widget.task.assignedByName
-        : 'เพื่อนร่วมงาน';
-    final filteredLists = _lists.where((list) {
-      if (_selectedListIds.isNotEmpty && !_selectedListIds.contains(list.id)) {
-        return false;
-      }
-      return true;
-    }).toList();
-
-    final isListFilterActive = _selectedListIds.isNotEmpty;
-    final pageCount = filteredLists.length + (isListFilterActive ? 0 : 1);
-
-    final hasActiveFilters =
-        _cardSearchQuery.isNotEmpty ||
-        _selectedListIds.isNotEmpty ||
-        _selectedCardStatus != null;
-    final boardFilterCount =
-        (_selectedListIds.isNotEmpty ? 1 : 0) +
-        (_selectedCardStatus != null ? 1 : 0);
-    final selectedListLabel = _selectedListIds.isEmpty
-        ? null
-        : _lists
-              .where((list) => _selectedListIds.contains(list.id))
-              .map((list) => list.name)
-              .join(', ');
-    final selectedStatusLabel = _selectedCardStatus == null
-        ? null
-        : _statusLabels[_selectedCardStatus!];
+    final visibleLists = _lists
+        .where(
+          (list) =>
+              _selectedListIds.isEmpty || _selectedListIds.contains(list.id),
+        )
+        .toList();
     return Scaffold(
       backgroundColor: workBackground,
       body: BoardKeyboardDismissRegion(
@@ -401,42 +452,6 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                                           ),
                                         ),
                                       ),
-                                    const SizedBox(height: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.2,
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            isBoardCreator
-                                                ? Icons.star_rounded
-                                                : Icons.group_rounded,
-                                            size: 12,
-                                            color: Colors.white,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            isBoardCreator
-                                                ? 'คุณเป็นเจ้าของบอร์ดนี้'
-                                                : 'บอร์ดนี้เป็นของ $boardCreatorName (คุณถูกเพิ่มเข้ามา)',
-                                            style: const TextStyle(
-                                              fontSize: 10.5,
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -455,194 +470,6 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                   ),
                 ),
 
-                // Compact search and filters
-                if (!_useBottomBoardTools && _lists.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 5),
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          height: 42,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _cardSearchController,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _cardSearchQuery = value.trim();
-                                    });
-                                  },
-                                  textInputAction: TextInputAction.search,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: workText,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'ค้นหาชื่อการ์ด...',
-                                    hintStyle: const TextStyle(
-                                      color: workMuted,
-                                      fontSize: 12.5,
-                                    ),
-                                    prefixIcon: const Icon(
-                                      Icons.search_rounded,
-                                      color: workMuted,
-                                      size: 18,
-                                    ),
-                                    prefixIconConstraints: const BoxConstraints(
-                                      minWidth: 38,
-                                    ),
-                                    suffixIcon: _cardSearchQuery.isNotEmpty
-                                        ? IconButton(
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            icon: const Icon(
-                                              Icons.close_rounded,
-                                              color: workMuted,
-                                              size: 17,
-                                            ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _cardSearchQuery = '';
-                                                _cardSearchController.clear();
-                                              });
-                                            },
-                                          )
-                                        : null,
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 9,
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFFE2E8F0),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(
-                                        color: workBlue,
-                                        width: 1.25,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              InkWell(
-                                onTap: _showBoardFilterBottomSheet,
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  height: 42,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 11,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: boardFilterCount > 0
-                                        ? const Color(0xFFEFF6FF)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: boardFilterCount > 0
-                                          ? const Color(0xFFBFDBFE)
-                                          : const Color(0xFFE2E8F0),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.tune_rounded,
-                                        size: 17,
-                                        color: boardFilterCount > 0
-                                            ? workBlue
-                                            : workMuted,
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        boardFilterCount > 0
-                                            ? 'กรอง $boardFilterCount'
-                                            : 'กรอง',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: boardFilterCount > 0
-                                              ? workBlue
-                                              : workText,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (hasActiveFilters) ...[
-                          const SizedBox(height: 5),
-                          SizedBox(
-                            height: 26,
-                            child: ListView(
-                              scrollDirection: Axis.horizontal,
-                              children: [
-                                if (selectedListLabel != null)
-                                  _buildActiveBoardFilter(
-                                    icon: Icons.view_column_outlined,
-                                    label: selectedListLabel,
-                                    onRemove: () {
-                                      setState(() => _selectedListIds = []);
-                                    },
-                                  ),
-                                if (selectedStatusLabel != null)
-                                  _buildActiveBoardFilter(
-                                    icon: Icons.flag_outlined,
-                                    label: selectedStatusLabel,
-                                    onRemove: () {
-                                      setState(() {
-                                        _selectedCardStatus = null;
-                                      });
-                                    },
-                                  ),
-                                if (_cardSearchQuery.isNotEmpty)
-                                  _buildActiveBoardFilter(
-                                    icon: Icons.search_rounded,
-                                    label: '“$_cardSearchQuery”',
-                                    onRemove: () {
-                                      setState(() {
-                                        _cardSearchQuery = '';
-                                        _cardSearchController.clear();
-                                      });
-                                    },
-                                  ),
-                                TextButton(
-                                  onPressed: _clearAllBoardFilters,
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: workMuted,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Text(
-                                    'ล้างทั้งหมด',
-                                    style: TextStyle(fontSize: 10.5),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                // Lists PageView — physics จะถูก toggle โดย _cardAreaActive
-                // เมื่อนิ้วอยู่ใน Zone การ์ด: NeverScrollableScrollPhysics (PageView หยุด)
-                // เมื่อนิ้วอยู่ใน Header: PageScrollPhysics (PageView เลื่อนปกติ)
                 Expanded(
                   child: _loading && _lists.isEmpty
                       ? TaskBoardSkeleton(
@@ -650,144 +477,10 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
                             _isCompactMode,
                           ),
                         )
-                      : filteredLists.isEmpty && isListFilterActive
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.filter_list_off_rounded,
-                                size: 48,
-                                color: workMuted.withValues(alpha: 0.5),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'ไม่พบรายการที่ตรงตามตัวกรอง',
-                                style: TextStyle(
-                                  color: workMuted,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              OutlinedButton(
-                                onPressed: _clearAllBoardFilters,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: workBlue,
-                                  side: const BorderSide(color: workBlue),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                child: const Text(
-                                  'ล้างตัวกรองทั้งหมด',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Builder(
-                          builder: (context) {
-                            return PageView.builder(
-                              controller: _pageController,
-                              physics: const PageScrollPhysics(),
-                              onPageChanged: (idx) {
-                                setState(() {
-                                  _currentPage = idx;
-                                });
-                              },
-                              itemCount: pageCount,
-                              itemBuilder: (context, idx) {
-                                if (idx == filteredLists.length) {
-                                  return _buildAddListPage();
-                                }
-                                final list = filteredLists[idx];
-                                return _buildListPage(list, idx);
-                              },
-                            );
-                          },
-                        ),
+                      : _buildSingleTaskBoard(visibleLists),
                 ),
-
-                // Page indicators (Dots)
-                if (!_useBottomBoardTools && pageCount > 1)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: BoardPageIndicator(
-                      currentPage: _currentPage,
-                      pageCount: pageCount,
-                    ),
-                  ),
               ],
             ),
-
-            if (_useBottomBoardTools && _lists.isNotEmpty && pageCount > 1)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: MediaQuery.paddingOf(context).bottom + 68,
-                child: IgnorePointer(
-                  child: Center(
-                    child: BoardPageIndicator(
-                      currentPage: _currentPage,
-                      pageCount: pageCount,
-                    ),
-                  ),
-                ),
-              ),
-
-            if (_useBottomBoardTools && _lists.isNotEmpty)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _buildBoardBottomDock(filterCount: boardFilterCount),
-              ),
-
-            // Edge strips สำหรับ Column drag (เลื่อนหน้าจอตอนลาก Column)
-            if (_isDraggingList)
-              Positioned(
-                left: 0,
-                top: 120,
-                bottom: 80,
-                width: 50,
-                child: DragTarget<TaskListRecord>(
-                  onWillAcceptWithDetails: (details) {
-                    _startEdgeScroll(true);
-                    return false;
-                  },
-                  onLeave: (data) => _stopEdgeScroll(),
-                  builder: (context, candidateData, rejectedData) {
-                    return Container(color: Colors.transparent);
-                  },
-                ),
-              ),
-
-            if (_isDraggingList)
-              Positioned(
-                right: 0,
-                top: 120,
-                bottom: 80,
-                width: 50,
-                child: DragTarget<TaskListRecord>(
-                  onWillAcceptWithDetails: (details) {
-                    _startEdgeScroll(false);
-                    return false;
-                  },
-                  onLeave: (data) => _stopEdgeScroll(),
-                  builder: (context, candidateData, rejectedData) {
-                    return Container(color: Colors.transparent);
-                  },
-                ),
-              ),
           ],
         ),
       ),

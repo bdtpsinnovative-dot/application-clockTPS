@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
-import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/skeleton_loading.dart';
-import '../widgets/app_loading_view.dart';
 
 class AdminLocationsPage extends StatefulWidget {
-  const AdminLocationsPage({
-    super.key,
-    required this.service,
-  });
+  const AdminLocationsPage({super.key, required this.service});
 
   final AuthFlowService service;
 
@@ -59,9 +56,14 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ยืนยันการลบจุดทำงาน'),
-        content: Text('ต้องการลบจุดทำงาน "${loc['name']}" หรือไม่? การลบจะทำให้พนักงานไม่สามารถบันทึกเวลาในจุดพิกัดนี้ได้อีก'),
+        content: Text(
+          'ต้องการลบจุดทำงาน "${loc['name']}" หรือไม่? การลบจะทำให้พนักงานไม่สามารถบันทึกเวลาในจุดพิกัดนี้ได้อีก',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -108,9 +110,16 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
         child: Form(
           key: formKey,
           child: Column(
@@ -120,14 +129,29 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('เพิ่มจุดพิกัดสาขา/สถานที่ทำงาน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: workText)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+                  const Text(
+                    'เพิ่มจุดพิกัดสาขา/สถานที่ทำงาน',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: workText,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'ชื่อสถานที่ / สาขา', hintText: 'เช่น สำนักงานใหญ่, สาขาสาทร'),
-                validator: (val) => val == null || val.trim().isEmpty ? 'กรุณากรอกชื่อสถานที่' : null,
+                decoration: const InputDecoration(
+                  labelText: 'ชื่อสถานที่ / สาขา',
+                  hintText: 'เช่น สำนักงานใหญ่, สาขาสาทร',
+                ),
+                validator: (val) => val == null || val.trim().isEmpty
+                    ? 'กรุณากรอกชื่อสถานที่'
+                    : null,
                 onSaved: (val) => name = val!.trim(),
               ),
               const SizedBox(height: 12),
@@ -135,18 +159,34 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                 children: [
                   Expanded(
                     child: TextFormField(
-                      decoration: const InputDecoration(labelText: 'พิกัด ละติจูด (Latitude)', hintText: 'เช่น 13.7563'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (val) => val == null || double.tryParse(val) == null ? 'ข้อมูลไม่ถูกต้อง' : null,
+                      decoration: const InputDecoration(
+                        labelText: 'พิกัด ละติจูด (Latitude)',
+                        hintText: 'เช่น 13.7563',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (val) =>
+                          val == null || double.tryParse(val) == null
+                          ? 'ข้อมูลไม่ถูกต้อง'
+                          : null,
                       onSaved: (val) => lat = double.parse(val!),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
-                      decoration: const InputDecoration(labelText: 'พิกัด ลองจิจูด (Longitude)', hintText: 'เช่น 100.5018'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (val) => val == null || double.tryParse(val) == null ? 'ข้อมูลไม่ถูกต้อง' : null,
+                      decoration: const InputDecoration(
+                        labelText: 'พิกัด ลองจิจูด (Longitude)',
+                        hintText: 'เช่น 100.5018',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (val) =>
+                          val == null || double.tryParse(val) == null
+                          ? 'ข้อมูลไม่ถูกต้อง'
+                          : null,
                       onSaved: (val) => lng = double.parse(val!),
                     ),
                   ),
@@ -154,10 +194,15 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
               ),
               const SizedBox(height: 12),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'รัศมีการบันทึกเวลา (เมตร)', hintText: 'ปกติกำหนดเป็น 50 หรือ 100 เมตร'),
+                decoration: const InputDecoration(
+                  labelText: 'รัศมีการบันทึกเวลา (เมตร)',
+                  hintText: 'ปกติกำหนดเป็น 50 หรือ 100 เมตร',
+                ),
                 keyboardType: TextInputType.number,
                 initialValue: '100',
-                validator: (val) => val == null || double.tryParse(val) == null ? 'กรุณาระบุตัวเลขรัศมี' : null,
+                validator: (val) => val == null || double.tryParse(val) == null
+                    ? 'กรุณาระบุตัวเลขรัศมี'
+                    : null,
                 onSaved: (val) => radius = double.parse(val!),
               ),
               const SizedBox(height: 24),
@@ -167,10 +212,18 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                     formKey.currentState!.save();
 
                     try {
-                      await widget.service.createLocation(name: name, lat: lat, lng: lng, radius: radius);
+                      await widget.service.createLocation(
+                        name: name,
+                        lat: lat,
+                        lng: lng,
+                        radius: radius,
+                      );
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('เพิ่มจุดพิกัดทำงานสำเร็จแล้ว 🎉'), backgroundColor: Colors.green),
+                          const SnackBar(
+                            content: Text('เพิ่มจุดพิกัดทำงานสำเร็จแล้ว 🎉'),
+                            backgroundColor: Colors.green,
+                          ),
                         );
                         _loadLocations();
                         Navigator.pop(context);
@@ -178,7 +231,10 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
+                          SnackBar(
+                            content: Text('เกิดข้อผิดพลาด: $e'),
+                            backgroundColor: Colors.red,
+                          ),
                         );
                       }
                     }
@@ -187,9 +243,14 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: workBlue,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('บันทึกจุดพิกัดใหม่', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'บันทึกจุดพิกัดใหม่',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -200,16 +261,22 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = widget.service.currentUser?.role == 'admin';
+
     return Scaffold(
       backgroundColor: workBackground,
       appBar: AppBar(
-        title: const Text('จัดการจุดปฏิบัติงาน (Geofence)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(
+          isAdmin ? 'จัดการจุดปฏิบัติงาน (Geofence)' : 'จุดทำงาน',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         actions: [
-          IconButton(
-            onPressed: _showAddLocationDialog,
-            icon: const Icon(Icons.add_location_alt_rounded, color: workBlue),
-            tooltip: 'เพิ่มจุดทำงานใหม่',
-          )
+          if (isAdmin)
+            IconButton(
+              onPressed: _showAddLocationDialog,
+              icon: const Icon(Icons.add_location_alt_rounded, color: workBlue),
+              tooltip: 'เพิ่มจุดทำงานใหม่',
+            ),
         ],
       ),
       body: _loading && _locations.isEmpty
@@ -218,102 +285,312 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
               child: SimpleManagementListSkeleton(),
             )
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.red),
-                      const SizedBox(height: 12),
-                      Text('โหลดข้อมูลล้มเหลว: $_error', style: const TextStyle(color: workText)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _loadLocations, child: const Text('ลองอีกครั้ง')),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.cloud_off_rounded,
+                    size: 48,
+                    color: Colors.red,
                   ),
-                )
-              : _locations.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.map_rounded, size: 64, color: workMuted),
-                            const SizedBox(height: 16),
-                            const Text('ยังไม่มีการตั้งค่าจุดพิกัดปฏิบัติงาน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: workText)),
-                            const SizedBox(height: 8),
-                            const Text('กรุณากดเพิ่มจุดปฏิบัติงานใหม่ด้านบนเพื่อให้พนักงานลงเวลาสแกนหน้าได้', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: workMuted)),
-                            const SizedBox(height: 24),
-                            FilledButton.icon(
-                              onPressed: _showAddLocationDialog,
-                              icon: const Icon(Icons.add_location_alt_rounded),
-                              label: const Text('เพิ่มสาขาใหม่'),
-                              style: FilledButton.styleFrom(backgroundColor: workBlue),
-                            ),
-                          ],
+                  const SizedBox(height: 12),
+                  Text(
+                    'โหลดข้อมูลล้มเหลว: $_error',
+                    style: const TextStyle(color: workText),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadLocations,
+                    child: const Text('ลองอีกครั้ง'),
+                  ),
+                ],
+              ),
+            )
+          : _locations.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.map_rounded, size: 64, color: workMuted),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'ยังไม่มีการตั้งค่าจุดพิกัดปฏิบัติงาน',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: workText,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isAdmin
+                          ? 'กรุณากดเพิ่มจุดปฏิบัติงานใหม่ด้านบนเพื่อให้พนักงานลงเวลาสแกนหน้าได้'
+                          : 'ยังไม่มีจุดทำงานที่เปิดให้เช็คอิน',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12, color: workMuted),
+                    ),
+                    if (isAdmin) ...[
+                      const SizedBox(height: 24),
+                      FilledButton.icon(
+                        onPressed: _showAddLocationDialog,
+                        icon: const Icon(Icons.add_location_alt_rounded),
+                        label: const Text('เพิ่มสาขาใหม่'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: workBlue,
                         ),
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _locations.length,
-                      itemBuilder: (context, index) {
-                        final loc = _locations[index];
-                        final name = loc['name']?.toString() ?? 'สาขา';
-                        final lat = double.tryParse(loc['latitude']?.toString() ?? '') ?? 0.0;
-                        final lng = double.tryParse(loc['longitude']?.toString() ?? '') ?? 0.0;
-                        final radius = double.tryParse(loc['radius_m']?.toString() ?? '') ?? 100.0;
+                    ],
+                  ],
+                ),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _locations.length,
+              itemBuilder: (context, index) {
+                final loc = _locations[index];
+                final name = loc['name']?.toString() ?? 'สาขา';
+                final lat =
+                    double.tryParse(loc['latitude']?.toString() ?? '') ?? 0.0;
+                final lng =
+                    double.tryParse(loc['longitude']?.toString() ?? '') ?? 0.0;
+                final radius =
+                    double.tryParse(loc['radius_m']?.toString() ?? '') ?? 100.0;
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFF1F5F9)),
-                            boxShadow: const [BoxShadow(color: Color(0x040F172A), blurRadius: 6, offset: Offset(0, 1))],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: workBlue.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.location_on_rounded, color: workBlue, size: 20),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      name,
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: workText),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'พิกัด: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
-                                      style: const TextStyle(fontSize: 10, color: workMuted),
-                                    ),
-                                    const SizedBox(height: 1),
-                                    Text(
-                                      'รัศมีตรวจจับ Geofence: ${radius.toStringAsFixed(0)} เมตร',
-                                      style: const TextStyle(fontSize: 10, color: workMuted, fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: () => _deleteLocation(loc),
-                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 22),
-                                tooltip: 'ลบสาขา',
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x040F172A),
+                        blurRadius: 6,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: InkWell(
+                    onTap: () => _showLocationDetails(
+                      name: name,
+                      lat: lat,
+                      lng: lng,
+                      radius: radius,
                     ),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: workBlue.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.location_on_rounded,
+                              color: workBlue,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13.5,
+                                    color: workText,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'พิกัด: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: workMuted,
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  'แตะเพื่อดูพื้นที่เช็คอิน · รัศมี ${radius.toStringAsFixed(0)} เมตร',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: workMuted,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isAdmin)
+                            IconButton(
+                              onPressed: () => _deleteLocation(loc),
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: Colors.red,
+                                size: 22,
+                              ),
+                              tooltip: 'ลบสาขา',
+                            )
+                          else
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: workMuted,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  void _showLocationDetails({
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.location_on_rounded, color: workBlue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: workText,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: SizedBox(
+                  height: 220,
+                  width: double.infinity,
+                  child: FlutterMap(
+                    options: MapOptions(
+                      initialCenter: LatLng(lat, lng),
+                      initialZoom: 16,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.nexhr.hr_management',
+                      ),
+                      CircleLayer(
+                        circles: [
+                          CircleMarker(
+                            point: LatLng(lat, lng),
+                            radius: radius,
+                            useRadiusInMeter: true,
+                            color: const Color(0x332563EB),
+                            borderColor: workBlue,
+                            borderStrokeWidth: 2,
+                          ),
+                        ],
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: LatLng(lat, lng),
+                            width: 48,
+                            height: 48,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x330F172A),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.location_on_rounded,
+                                color: Colors.red,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      RichAttributionWidget(
+                        attributions: [
+                          TextSourceAttribution('OpenStreetMap contributors'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'พื้นที่อนุญาตให้เช็คอินประมาณ ${radius.toStringAsFixed(0)} เมตรจากจุดกลาง',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: workText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'พิกัด $lat, $lng',
+                style: const TextStyle(fontSize: 11, color: workMuted),
+              ),
+              const SizedBox(height: 14),
+              const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 16, color: workMuted),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'วงสีน้ำเงินคือพื้นที่ที่อนุญาตให้เช็คอินตามพิกัดจริงของจุดทำงาน',
+                      style: TextStyle(fontSize: 10.5, color: workMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

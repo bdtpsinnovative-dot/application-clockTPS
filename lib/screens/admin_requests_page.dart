@@ -7,6 +7,7 @@ import '../services/auth_flow_service.dart';
 import '../services/fcm_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/skeleton_loading.dart';
+import '../widgets/user_avatar.dart';
 
 class AdminRequestsPage extends StatefulWidget {
   const AdminRequestsPage({
@@ -298,17 +299,10 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                   // Employee Info
                   Row(
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFFF1F5F9),
-                          image: hasAvatar
-                              ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover)
-                              : null,
-                        ),
-                        child: hasAvatar ? null : const Icon(Icons.person_rounded, color: workMuted, size: 24),
+                      UserAvatar(
+                        avatarUrl: user?.avatarUrl,
+                        name: userName,
+                        radius: 22,
                       ),
                       const SizedBox(width: 12),
                       Expanded(

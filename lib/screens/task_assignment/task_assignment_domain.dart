@@ -70,6 +70,17 @@ bool taskMatchesAdminVisibilityFilter(TaskRecord task, String? currentUserId) {
   return assignees.contains(userId);
 }
 
+bool taskBelongsToCurrentUser(TaskRecord task, String? currentUserId) {
+  final userId = currentUserId?.trim() ?? '';
+  if (userId.isEmpty) return true;
+
+  final isCreator = task.assignedBy == userId;
+  final isAssignee = task.assigneeIds.isNotEmpty
+      ? task.assigneeIds.contains(userId)
+      : task.assignedTo == userId;
+  return isCreator || isAssignee;
+}
+
 bool taskMatchesOwnershipFilter(
   TaskRecord task,
   String? currentUserId,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:file_picker/file_picker.dart' as fp;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -605,12 +606,18 @@ class _CardCommentSectionState extends State<CardCommentSection>
                   ),
                 ),
                 if (hasAvatar)
-                  Image.network(
-                    resolvedAvatarUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox.shrink(),
-                  ),
+                  if (resolvedAvatarUrl.toLowerCase().contains('.svg') || resolvedAvatarUrl.toLowerCase().contains('/svg'))
+                    SvgPicture.network(
+                      resolvedAvatarUrl,
+                      fit: BoxFit.cover,
+                    )
+                  else
+                    Image.network(
+                      resolvedAvatarUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const SizedBox.shrink(),
+                    ),
               ],
             ),
           ),

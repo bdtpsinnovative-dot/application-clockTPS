@@ -35,6 +35,7 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   bool _verifying = false;
   String _selectedInspectionStatus = 'approved';
   List<SubItemVerification> _verifications = [];
+  String _subItemPriority = 'medium';
   String _currentStatus = 'pending';
   final List<Map<String, String>> _uploadingFiles = [];
 
@@ -71,21 +72,10 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   }
 
   Future<void> _pickStartDate() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showWorkDueDatePicker(
+      context,
       initialDate: _startDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: workBlue,
-            onPrimary: Colors.white,
-            onSurface: workText,
-          ),
-        ),
-        child: child!,
-      ),
+      title: 'เลือกวันที่เริ่ม',
     );
     if (picked != null) {
       setState(() {
@@ -95,21 +85,9 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   }
 
   Future<void> _pickDueDate() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showWorkDueDatePicker(
+      context,
       initialDate: _dueDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: workBlue,
-            onPrimary: Colors.white,
-            onSurface: workText,
-          ),
-        ),
-        child: child!,
-      ),
     );
     if (picked != null) {
       setState(() {
@@ -533,685 +511,784 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     }
   }
 
+  Future<void> _confirmDeleteSubItem() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text(
+          'ลบรายการย่อย',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text('คุณต้องการลบรายการย่อย "${widget.item.title}" หรือไม่?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'ลบ',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _saving = true);
+      try {
+        await widget.service.deleteTaskSubItem(widget.item.id);
+        widget.onChanged();
+        if (mounted) {
+          Navigator.pop(context); // Close detail sheet
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _saving = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('ลบรายการย่อยล้มเหลว: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _showVerificationsHistory() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'ประวัติการส่งงาน / ตรวจงาน',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: workText,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(child: _buildVerificationRoundsSection()),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isAdminOrHr =
         widget.service.currentUser?.role == 'admin' ||
         widget.service.currentUser?.role == 'hr';
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: workText),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+    return DefaultTabController(
+      length: 2,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.88,
+          color: Colors.white,
+          child: Column(
             children: [
-              Text(
-                '${widget.listName} › ${widget.parentCardTitle}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: workMuted,
-                  fontWeight: FontWeight.w500,
+              // ─── Header Bar ───
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.assignment_outlined,
+                        color: Color(0xFF6366F1),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${widget.listName} › ${widget.parentCardTitle}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: workMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          const Text(
+                            'แก้ไขข้อมูลงานย่อย',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: workText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.access_time_rounded,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      onPressed: _showVerificationsHistory,
+                      tooltip: 'ประวัติการตรวจงาน',
+                    ),
+                    if (widget.canEdit)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Color(0xFF64748B),
+                          size: 20,
+                        ),
+                        onPressed: _confirmDeleteSubItem,
+                        tooltip: 'ลบรายการย่อย',
+                      ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      tooltip: 'ปิด',
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 1),
-              const Text(
-                'รายละเอียดรายการย่อย',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: workText,
+
+              // ─── Tab Bar (2 Tabs) ───
+              Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                ),
+                child: const TabBar(
+                  indicatorColor: workBlue,
+                  indicatorWeight: 2.5,
+                  labelColor: workBlue,
+                  unselectedLabelColor: Color(0xFF64748B),
+                  labelStyle: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  unselectedLabelStyle: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                  tabs: [
+                    Tab(text: 'ข้อมูลทั่วไป (General Info)'),
+                    Tab(text: 'เอกสาร & หมายเหตุ (Docs & Notes)'),
+                  ],
+                ),
+              ),
+
+              // ─── Tab Bar Views ───
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    // Tab 1: General Info
+                    _buildGeneralInfoTab(context, isAdminOrHr),
+
+                    // Tab 2: Docs & Notes
+                    _buildDocsAndNotesTab(context, isAdminOrHr),
+                  ],
+                ),
+              ),
+
+              // ─── Sticky Bottom Footer Bar ───
+              Container(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  10,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom + 10,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: _saving ? null : _saveDetail,
+                      icon: const Icon(Icons.save_rounded, size: 18),
+                      label: Text(
+                        _saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: workBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          centerTitle: false,
-          actions: [
-            // Plus Action menu (+ ...)
-            PopupMenuButton<String>(
-              icon: const Icon(
-                Icons.add_circle_outline_rounded,
-                color: workBlue,
-              ),
-              onSelected: (action) {
-                if (action == 'pick_image') {
-                  _pickFileOrImage(true);
-                } else if (action == 'pick_pdf') {
-                  _pickFileOrImage(false);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'pick_image',
-                  child: Row(
-                    children: [
-                      Icon(Icons.image_rounded, color: workBlue, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'เลือกรูปภาพ (บีบอัด WebP)',
-                        style: TextStyle(fontSize: 12.5),
-                      ),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'pick_pdf',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.picture_as_pdf_rounded,
-                        color: workBlue,
-                        size: 18,
-                      ),
-                      SizedBox(width: 8),
-                      Text('เลือกไฟล์ PDF', style: TextStyle(fontSize: 12.5)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            // Delete SubItem Button
-            IconButton(
-              icon: const Icon(
-                Icons.delete_outline_rounded,
-                color: Colors.redAccent,
-              ),
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    title: const Text(
-                      'ลบรายการย่อย',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    content: Text(
-                      'คุณต้องการลบรายการย่อย "${widget.item.title}" หรือไม่?',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text(
-                          'ยกเลิก',
-                          style: TextStyle(color: workMuted),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text(
-                          'ลบ',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (confirm == true) {
-                  setState(() => _saving = true);
-                  try {
-                    await widget.service.deleteTaskSubItem(widget.item.id);
-                    widget.onChanged();
-                    if (mounted) {
-                      Navigator.pop(context); // Close dialog
-                      Navigator.pop(
-                        context,
-                      ); // Close detail sheet with empty update
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      setState(() => _saving = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('ลบรายการย่อยล้มเหลว: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              tooltip: 'ลบรายการย่อย',
-            ),
-          ],
-          bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1, color: Color(0xFFF1F5F9)),
-          ),
         ),
-        body: Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            16,
-            20,
-            MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+    );
+  }
+
+  /// ─── Tab 1: ข้อมูลทั่วไป (General Info) ───
+  Widget _buildGeneralInfoTab(BuildContext context, bool isAdminOrHr) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ชื่อรายการคอร์สงาน
+          const Text(
+            'ชื่อรายการคอร์สงาน',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'หัวข้อรายการย่อย',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: workText,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    hintText: 'พิมพ์หัวข้อรายการย่อย...',
-                    filled: true,
-                    fillColor: Color(0xFFF8FAFC),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide.none,
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _titleController,
+            style: const TextStyle(fontSize: 13.5, color: workText),
+            decoration: InputDecoration(
+              hintText: 'พิมพ์ชื่อรายการคอร์สงาน...',
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: workBlue, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
 
-                Row(
+          // Row: วันกำหนดส่ง & ความสำคัญ
+          Row(
+            children: [
+              // วันกำหนดส่ง
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'วันที่เริ่มต้น',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: workText,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          InkWell(
-                            onTap: _pickStartDate,
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calendar_today_rounded,
-                                    size: 16,
-                                    color: workMuted,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _startDate != null
-                                          ? _formatThaiDate(_startDate!)
-                                          : 'เลือกวันที่เริ่ม',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        color: _startDate != null
-                                            ? workText
-                                            : workMuted,
-                                      ),
-                                    ),
-                                  ),
-                                  if (_startDate != null)
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _startDate = null;
-                                        });
-                                      },
-                                      child: const Icon(
-                                        Icons.clear_rounded,
-                                        size: 16,
-                                        color: workMuted,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'วันครบกำหนด',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: workText,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          InkWell(
-                            onTap: _pickDueDate,
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calendar_month_rounded,
-                                    size: 16,
-                                    color: workMuted,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _dueDate != null
-                                          ? _formatThaiDate(_dueDate!)
-                                          : 'เลือกวันกำหนดส่ง',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        color: _dueDate != null
-                                            ? workText
-                                            : workMuted,
-                                      ),
-                                    ),
-                                  ),
-                                  if (_dueDate != null)
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _dueDate = null;
-                                        });
-                                      },
-                                      child: const Icon(
-                                        Icons.clear_rounded,
-                                        size: 16,
-                                        color: workMuted,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // ─── แนบหลักฐาน Section ───
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.inventory_2_outlined,
-                      color: workBlue,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
                     const Text(
-                      'แนบหลักฐาน',
+                      'วันกำหนดส่ง',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        fontSize: 12.5,
                         color: workText,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Attached Evidence Preview Card Box (If attached or uploading)
-                if (_getAttachmentUrls().isNotEmpty ||
-                    _getLinkUrls().isNotEmpty ||
-                    _uploadingFiles.isNotEmpty) ...[
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      for (int i = 0; i < _getAttachmentUrls().length; i++)
-                        _buildSubItemEvidencePreviewBox(
-                          url: _getAttachmentUrls()[i],
-                          isLink: false,
-                          onDelete: () {
-                            setState(() {
-                              final list = _getAttachmentUrls();
-                              list.removeAt(i);
-                              _attachmentUrlController.text = list.join(',');
-                            });
-                          },
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: _pickDueDate,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                      for (int i = 0; i < _getLinkUrls().length; i++)
-                        _buildSubItemEvidencePreviewBox(
-                          url: _getLinkUrls()[i],
-                          isLink: true,
-                          onDelete: () {
-                            setState(() {
-                              final list = _getLinkUrls();
-                              list.removeAt(i);
-                              _linkUrlController.text = list.join(',');
-                            });
-                          },
-                        ),
-                      for (int i = 0; i < _uploadingFiles.length; i++)
-                        _buildSubItemUploadingPreviewBox(_uploadingFiles[i]),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // 1 Row with 3 Action Boxes (แนบไฟล์, แนบลิงก์, ล้างหลักฐาน)
-                if (widget.canEdit) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => _pickFileOrImageCombined(),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: workBlue.withValues(alpha: 0.3),
-                                width: 1.5,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _dueDate != null
+                                    ? _formatThaiDate(_dueDate!)
+                                    : 'วว/ดด/ปปปป',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _dueDate != null
+                                      ? workText
+                                      : workMuted,
+                                ),
                               ),
                             ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: workBlue.withValues(alpha: 0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.attach_file_rounded,
-                                    size: 18,
-                                    color: workBlue,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'แนบไฟล์',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: workBlue,
-                                  ),
-                                ),
-                              ],
+                            const Icon(
+                              Icons.calendar_today_rounded,
+                              size: 15,
+                              color: Color(0xFF64748B),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () async {
-                            final textController = TextEditingController(
-                              text: _linkUrlController.text,
-                            );
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                title: const Text(
-                                  'แนบลิงก์อ้างอิง',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                content: TextField(
-                                  controller: textController,
-                                  autofocus: true,
-                                  decoration: const InputDecoration(
-                                    hintText: 'https://example.com...',
-                                    filled: true,
-                                    fillColor: Color(0xFFF8FAFC),
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide.none,
-                                      borderRadius: BorderRadius.all(
-                                        Radius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text(
-                                      'ยกเลิก',
-                                      style: TextStyle(color: workMuted),
-                                    ),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: workBlue,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                    child: const Text('ตกลง'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) {
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // ความสำคัญ
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ความสำคัญ (Priority)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                        color: workText,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _subItemPriority,
+                          isExpanded: true,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 18,
+                          ),
+                          style: const TextStyle(fontSize: 12, color: workText),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'low',
+                              child: Text('⚡ ต่ำ (Low)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'medium',
+                              child: Text('⚡ ด่วนปานกลาง (Medium)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'high',
+                              child: Text('⚡ ด่วนมาก (High)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'urgent',
+                              child: Text('⚡ ด่วนที่สุด (Urgent)'),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
                               setState(() {
-                                _linkUrlController.text = textController.text
-                                    .trim();
+                                _subItemPriority = val;
                               });
                             }
                           },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.green.withValues(alpha: 0.3),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.link_rounded,
-                                    size: 18,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'แนบลิงก์',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () {
-                            setState(() {
-                              _attachmentUrlController.clear();
-                              _linkUrlController.clear();
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('ล้างไฟล์แนบแล้ว'),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.redAccent.withValues(alpha: 0.3),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.redAccent.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.delete_outline_rounded,
-                                    size: 18,
-                                    color: Colors.redAccent,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'ล้างหลักฐาน',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.redAccent,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // สถานะงาน (Status)
+          const Text(
+            'สถานะงาน (Status)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _currentStatus,
+                isExpanded: true,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                style: const TextStyle(fontSize: 12.5, color: workText),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'pending',
+                    child: Text('รอรับงาน (Pending)'),
                   ),
-                  const SizedBox(height: 16),
+                  DropdownMenuItem(
+                    value: 'in_progress',
+                    child: Text('กำลังทำ (In Progress)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'in_review',
+                    child: Text('รอตรวจสอบ (In Review)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'completed',
+                    child: Text('เสร็จสิ้น (Completed)'),
+                  ),
                 ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _currentStatus = val);
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
 
-                const Text(
-                  'ข้อกำหนดในการตรวจสอบงาน',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: workText,
+          // มอบหมายให้ (Assignees)
+          const Text(
+            'มอบหมายให้ (Assignees)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              InkWell(
+                onTap: () {},
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
                   ),
+                  child: const Icon(Icons.add, size: 18, color: workBlue),
                 ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _verificationController,
-                  enabled: isAdminOrHr,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    hintText: 'กรอกรายละเอียดข้อกำหนดในการตรวจสอบงาน...',
-                    filled: true,
-                    fillColor: Color(0xFFF8FAFC),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide.none,
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
-                    ),
-                  ),
-                ),
-                _buildVerificationRoundsSection(),
-                _buildSubItemAdminCommentSection(),
-                const SizedBox(height: 24),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
 
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : _saveDetail,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: workBlue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+          // รายละเอียดเพิ่มเติม (Details)
+          const Text(
+            'รายละเอียดเพิ่มเติม (Details)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _verificationController,
+            maxLines: 4,
+            style: const TextStyle(fontSize: 13, color: workText),
+            decoration: InputDecoration(
+              hintText: 'กรอกรายละเอียดเพิ่มเติมของรายการย่อยนี้...',
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.all(12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: workBlue, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  /// ─── Tab 2: เอกสาร & หมายเหตุ (Docs & Notes) ───
+  Widget _buildDocsAndNotesTab(BuildContext context, bool isAdminOrHr) {
+    final attachmentUrls = _getAttachmentUrls();
+    final linkUrls = _getLinkUrls();
+    final hasAttachments =
+        attachmentUrls.isNotEmpty ||
+        linkUrls.isNotEmpty ||
+        _uploadingFiles.isNotEmpty;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // NOTE / Remark (ความคิดเห็นจากผู้ดูแล)
+          const Text(
+            'NOTE / Remark (ความคิดเห็นจากผู้ดูแล)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _adminCommentController,
+            maxLines: 4,
+            enabled: isAdminOrHr,
+            style: const TextStyle(fontSize: 13, color: workText),
+            decoration: InputDecoration(
+              hintText: 'เพิ่มคำอธิบายหรือความคิดเห็นผู้ดูแล...',
+              filled: true,
+              fillColor: const Color(0xFFFFFBEB),
+              contentPadding: const EdgeInsets.all(12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFFDE68A)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.amber, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // เอกสารแนบ & ลิงก์ไฟล์งาน (Attachments)
+          const Text(
+            'เอกสารแนบ & ลิงก์ไฟล์งาน (Attachments)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: workText,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          if (!hasAttachments)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Center(
+                child: Text(
+                  'ยังไม่มีเอกสารแนบในคอร์สงานนี้',
+                  style: TextStyle(fontSize: 12.5, color: workMuted),
+                ),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (int i = 0; i < attachmentUrls.length; i++)
+                  _buildSubItemEvidencePreviewBox(
+                    url: attachmentUrls[i],
+                    isLink: false,
+                    onDelete: () {
+                      setState(() {
+                        attachmentUrls.removeAt(i);
+                        _attachmentUrlController.text = attachmentUrls.join(
+                          ',',
+                        );
+                      });
+                    },
+                  ),
+                for (int i = 0; i < linkUrls.length; i++)
+                  _buildSubItemEvidencePreviewBox(
+                    url: linkUrls[i],
+                    isLink: true,
+                    onDelete: () {
+                      setState(() {
+                        linkUrls.removeAt(i);
+                        _linkUrlController.text = linkUrls.join(',');
+                      });
+                    },
+                  ),
+                for (int i = 0; i < _uploadingFiles.length; i++)
+                  _buildSubItemUploadingPreviewBox(_uploadingFiles[i]),
+              ],
+            ),
+          const SizedBox(height: 14),
+
+          // 2 Action Buttons: [ 📎 แนบไฟล์ (ลิงก์) ]  [ 🔗 แนบลิงก์ ]
+          if (widget.canEdit)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickFileOrImageCombined(),
+                    icon: const Icon(
+                      Icons.attach_file_rounded,
+                      size: 16,
+                      color: Color(0xFF6366F1),
+                    ),
+                    label: const Text(
+                      'แนบไฟล์ (ลิงก์)',
+                      style: TextStyle(
+                        color: Color(0xFF6366F1),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    child: Text(
-                      _saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Color(0xFFA5B4FC)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final textController = TextEditingController(
+                        text: _linkUrlController.text,
+                      );
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          title: const Text(
+                            'แนบลิงก์อ้างอิง',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          content: TextField(
+                            controller: textController,
+                            autofocus: true,
+                            decoration: const InputDecoration(
+                              hintText: 'https://example.com...',
+                              filled: true,
+                              fillColor: Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide.none,
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text(
+                                'ยกเลิก',
+                                style: TextStyle(color: workMuted),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: workBlue,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('ตกลง'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        setState(() {
+                          _linkUrlController.text = textController.text.trim();
+                        });
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.link_rounded,
+                      size: 16,
+                      color: Color(0xFF10B981),
+                    ),
+                    label: const Text(
+                      'แนบลิงก์',
+                      style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Color(0xFF6EE7B7)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-        ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }
