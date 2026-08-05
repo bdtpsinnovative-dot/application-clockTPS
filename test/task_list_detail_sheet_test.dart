@@ -70,6 +70,7 @@ class _TaskListService extends AuthFlowService {
         taskId: 'task-1',
         name: 'รายการทดสอบ',
         sortOrder: 0,
+        status: 'waiting',
         cards: <TaskCardRecord>[],
       ),
     ];

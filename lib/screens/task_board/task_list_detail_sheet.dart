@@ -427,6 +427,21 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
     decoration: _decoration(''),
   );
 
+  List<DropdownMenuItem<String>> get _statusItems {
+    final items = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(value: 'pending', child: Text('รอดำเนินการ')),
+      const DropdownMenuItem(value: 'in_progress', child: Text('กำลังทำ')),
+      const DropdownMenuItem(value: 'completed', child: Text('เสร็จสิ้น')),
+    ];
+
+    // Keep legacy or newly introduced backend statuses selectable so a
+    // notification cannot crash the detail sheet before the user can update it.
+    if (!items.any((item) => item.value == _status)) {
+      items.add(DropdownMenuItem(value: _status, child: Text(_status)));
+    }
+    return items;
+  }
+
   Widget _generalTab() => SingleChildScrollView(
     padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
     child: Column(
@@ -500,11 +515,7 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
         _label('สถานะงาน (Status)'),
         _select<String>(
           value: _status,
-          items: const [
-            DropdownMenuItem(value: 'pending', child: Text('รอดำเนินการ')),
-            DropdownMenuItem(value: 'in_progress', child: Text('กำลังทำ')),
-            DropdownMenuItem(value: 'completed', child: Text('เสร็จสิ้น')),
-          ],
+          items: _statusItems,
           onChanged: (value) => setState(() => _status = value ?? 'pending'),
         ),
         const SizedBox(height: 20),

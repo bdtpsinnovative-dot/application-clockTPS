@@ -14,14 +14,12 @@ class MainDashboardPage extends StatefulWidget {
     super.key,
     required this.user,
     required this.service,
-    required this.onMenu,
     required this.onSelectTab,
     required this.isActive,
   });
 
   final AppUser user;
   final AuthFlowService service;
-  final VoidCallback onMenu;
   final ValueChanged<int> onSelectTab;
   final bool isActive;
 
@@ -356,16 +354,6 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 children: [
                   Row(
                     children: [
-                      IconButton(
-                        tooltip: 'เปิดเมนู',
-                        onPressed: widget.onMenu,
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size(44, 44),
-                          foregroundColor: Colors.white,
-                          backgroundColor: Colors.white.withValues(alpha: 0.14),
-                        ),
-                        icon: const Icon(Icons.menu_rounded),
-                      ),
                       const Spacer(),
                       Semantics(
                         label: 'รูปโปรไฟล์ของ ${widget.user.fullName}',

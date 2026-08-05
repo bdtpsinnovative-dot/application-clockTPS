@@ -429,7 +429,6 @@ class _HomePageState extends State<HomePage> {
                     key: const PageStorageKey('main_dashboard'),
                     user: _currentUser,
                     service: widget.service,
-                    onMenu: _openMenu,
                     onSelectTab: _selectPage,
                     isActive: _selectedIndex == 0,
                   ),

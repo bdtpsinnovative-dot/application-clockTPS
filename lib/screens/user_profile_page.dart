@@ -138,14 +138,23 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     TextFormField(
                       controller: firstCtrl,
                       decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFF1F5F9)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: workBlue, width: 1.5),
                         ),
                       ),
-                      style: const TextStyle(fontSize: 13),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: workText),
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -160,14 +169,23 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     TextFormField(
                       controller: lastCtrl,
                       decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFF1F5F9)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: workBlue, width: 1.5),
                         ),
                       ),
-                      style: const TextStyle(fontSize: 13),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: workText),
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -183,14 +201,24 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       controller: nickCtrl,
                       decoration: InputDecoration(
                         hintText: 'ชื่อเล่น',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFF1F5F9)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: workBlue, width: 1.5),
                         ),
                       ),
-                      style: const TextStyle(fontSize: 13),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: workText),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
@@ -256,8 +284,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: workBlue,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: saving
                           ? const SizedBox(
@@ -296,7 +325,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: balances.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         final b = balances[index];
         Color progressColor;
@@ -328,15 +357,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   b.leaveType,
                   style: const TextStyle(
                     color: workText,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
                   'ใช้ $used / ทั้งหมด $total วัน (เหลือ $remaining)',
                   style: const TextStyle(
                     color: workMuted,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -347,7 +376,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
               borderRadius: BorderRadius.circular(99),
               child: LinearProgressIndicator(
                 value: total == 0 ? 0 : used / total,
-                minHeight: 6,
+                minHeight: 8,
                 color: progressColor,
                 backgroundColor: const Color(0xFFF1F5F9),
               ),
@@ -614,16 +643,23 @@ class _ProfileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: workMuted, size: 18),
-          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: const Color(0xFF64748B), size: 18),
+          ),
+          const SizedBox(width: 12),
           Text(
             label,
             style: const TextStyle(
               color: workMuted,
-              fontSize: 13,
+              fontSize: 14,
             ),
           ),
           const SizedBox(width: 16),
@@ -639,20 +675,24 @@ class _ProfileRow extends StatelessWidget {
                     maxLines: 1,
                     style: TextStyle(
                       color: valueColor ?? workText,
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 if (onEdit != null)
                   Padding(
-                    padding: const EdgeInsets.only(left: 4),
+                    padding: const EdgeInsets.only(left: 8),
                     child: InkWell(
                       onTap: onEdit,
                       borderRadius: BorderRadius.circular(12),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4.0),
-                        child: Icon(Icons.edit_outlined, size: 14, color: workBlue),
+                      child: Container(
+                        padding: const EdgeInsets.all(6.0),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEFF6FF),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.edit_outlined, size: 14, color: workBlue),
                       ),
                     ),
                   ),
