@@ -353,17 +353,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         physics: const BouncingScrollPhysics(),
                         children: [
                           _buildTodoCard(
-                            title: 'คำขอรออนุมัติ',
-                            sub: _stats!.pendingRequestsCount > 0
-                                ? 'มี ${_stats!.pendingRequestsCount} คำขอค้างพิจารณา'
-                                : 'ไม่มีคำขอใหม่',
+                            title: 'Project หลัก',
+                            sub: 'จัดการและมอบหมายงาน',
                             badgeCount: 0,
-                            icon: Icons.assignment_late_rounded,
+                            icon: Icons.assignment_rounded,
                             color: workBlue,
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => AdminAttendanceHistoryPage(service: widget.service),
+                                builder: (context) => AdminTasksPage(service: widget.service),
                               ),
                             ),
                           ),

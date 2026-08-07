@@ -10,6 +10,14 @@ class TaskAssignmentViewModel extends ChangeNotifier {
 
   final AuthFlowService service;
 
+  bool _isDisposed = false;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
   List<TaskRecord> tasks = const [];
   List<AppUser> users = const [];
   List<BrandRecord> brands = const [];
@@ -124,6 +132,7 @@ class TaskAssignmentViewModel extends ChangeNotifier {
       isLoading = false;
     }
 
+    if (_isDisposed) return;
     notifyListeners();
   }
 
