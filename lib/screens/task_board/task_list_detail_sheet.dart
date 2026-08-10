@@ -80,6 +80,7 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
     _dueDate = widget.list.dueDate;
     _attachments = List<TaskListAttachment>.from(widget.list.attachments);
     _assigneeIds = List<String>.from(widget.list.assigneeIds);
+    _members = List<UserSummary>.from(widget.list.assignees);
     _loadMembers();
   }
 
@@ -93,8 +94,12 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
 
   Future<void> _loadMembers() async {
     try {
-      final members = await widget.service.getTaskMembers(widget.task.id);
-      if (mounted) setState(() => _members = members);
+      final loadedMembers = await widget.service.getTaskMembers(widget.task.id);
+      final merged = <String, UserSummary>{
+        for (final member in widget.list.assignees) member.id: member,
+        for (final member in loadedMembers) member.id: member,
+      };
+      if (mounted) setState(() => _members = merged.values.toList());
     } catch (error) {
       debugPrint('Failed to load task members: $error');
     } finally {
@@ -510,26 +515,44 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
         _label('มอบหมายให้ (Assignees)'),
         InkWell(
           onTap: _pickAssignees,
-          child: Row(
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 8,
             children: [
               for (final member
-                  in _members.where((m) => _assigneeIds.contains(m.id)).take(3))
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: UserAvatar(
-                    avatarUrl: member.avatarUrl,
-                    name: member.displayName,
-                    radius: 18,
-                  ),
+                  in _members.where((m) => _assigneeIds.contains(m.id)).take(4))
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    UserAvatar(
+                      avatarUrl: member.avatarUrl,
+                      name: member.displayName,
+                      radius: 17,
+                    ),
+                    const SizedBox(width: 5),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 100),
+                      child: Text(
+                        member.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: workText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               Container(
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFCBD5E1)),
                 ),
-                child: const Icon(Icons.add, color: workMuted, size: 19),
+                child: const Icon(Icons.add, color: workMuted, size: 18),
               ),
             ],
           ),

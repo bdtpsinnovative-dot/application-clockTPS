@@ -51,6 +51,32 @@ Future<void> showProjectTaskDetailSheet({
   );
 }
 
+Future<void> showProjectTaskListDetailSheet({
+  required BuildContext context,
+  required TaskRecord task,
+  required TaskListRecord list,
+  required AuthFlowService service,
+  required bool canEdit,
+  required VoidCallback onChanged,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (context) => _TaskListDetailSheet(
+      task: task,
+      list: list,
+      service: service,
+      canEdit: canEdit,
+      onChanged: onChanged,
+    ),
+  );
+}
+
 String _formatDate(DateTime? dt) {
   if (dt == null) return '';
   final day = dt.day.toString().padLeft(2, '0');

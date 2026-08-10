@@ -389,7 +389,9 @@ class TaskListRecord {
     this.adminComment = '',
     this.attachments = const [],
     this.assigneeIds = const [],
+    this.assignees = const [],
     this.cards = const [],
+    this.projectName,
   });
 
   factory TaskListRecord.fromJson(Map<String, dynamic> json) {
@@ -411,6 +413,7 @@ class TaskListRecord {
               .toList()
         : <TaskListAttachment>[];
     final rawAssigneeIds = json['assignee_ids'];
+    final rawAssignees = json['assignees'];
 
     return TaskListRecord(
       id: json['id'] as String? ?? '',
@@ -431,7 +434,17 @@ class TaskListRecord {
       assigneeIds: rawAssigneeIds is List
           ? rawAssigneeIds.map((id) => id.toString()).toList()
           : const [],
+      assignees: rawAssignees is List
+          ? rawAssignees
+                .whereType<Map>()
+                .map(
+                  (item) =>
+                      UserSummary.fromJson(Map<String, dynamic>.from(item)),
+                )
+                .toList()
+          : const [],
       cards: cardsList,
+      projectName: json['project_name'] as String?,
     );
   }
 
@@ -447,6 +460,8 @@ class TaskListRecord {
   final String adminComment;
   final List<TaskListAttachment> attachments;
   final List<String> assigneeIds;
+  final List<UserSummary> assignees;
+  final String? projectName;
 
   /// Legacy task cards are retained for data compatibility but are no longer
   /// part of the employee-facing Project → Deliverable experience.

@@ -13,6 +13,7 @@ import 'admin_holidays_page.dart';
 import 'admin_attendance_history_page.dart';
 import 'admin_tasks_page.dart';
 import 'admin_websites_page.dart';
+import 'admin_daily_board_page.dart';
 import '../widgets/user_avatar.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -366,16 +367,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ),
                           ),
                           _buildTodoCard(
-                            title: 'อนุมัติพนักงานใหม่',
-                            sub: _stats!.pendingUsersCount > 0
-                                ? 'มี ${_stats!.pendingUsersCount} บัญชีรอการยืนยัน'
-                                : 'อนุมัติครบทั้งหมดแล้ว',
-                            badgeCount: _stats!.pendingUsersCount,
-                            icon: Icons.group_add_rounded,
+                            title: 'Project รายวัน',
+                            sub: 'ดูงานที่เลยกำหนดและวันนี้',
+                            badgeCount: 0,
+                            icon: Icons.view_kanban_rounded,
                             color: const Color(0xFFF59E0B),
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => AdminUsersPage(service: widget.service)),
+                              MaterialPageRoute(builder: (context) => AdminDailyBoardPage(service: widget.service)),
                             ),
                           ),
                         ],

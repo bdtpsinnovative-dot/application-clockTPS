@@ -597,6 +597,14 @@ class AuthFlowService {
         .toList();
   }
 
+  Future<List<TaskListRecord>> getDailyTaskLists() async {
+    final response = await _authorizedGet('/api/tasks/daily-lists');
+    final data = response['data'] as List? ?? [];
+    return data
+        .map((json) => TaskListRecord.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<BrandRecord>> getBrands() async {
     final response = await _authorizedGet('/api/brands');
     final data = response['data'] as List? ?? [];
