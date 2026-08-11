@@ -57,12 +57,14 @@ class NotificationsPage extends StatefulWidget {
     required this.isActive,
     required this.service,
     this.onNavigateToRequests,
+    this.onUnreadCountChanged,
   });
 
   final VoidCallback onMenu;
   final bool isActive;
   final AuthFlowService service;
   final ValueChanged<String?>? onNavigateToRequests;
+  final ValueChanged<int>? onUnreadCountChanged;
 
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
@@ -104,6 +106,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _notifications = records;
         _loading = false;
       });
+      widget.onUnreadCountChanged?.call(_unreadCount);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -132,6 +135,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
     try {
       await widget.service.markNotificationRead(n.id);
+      widget.onUnreadCountChanged?.call(_unreadCount);
     } catch (_) {
       // Revert on error
       if (!mounted) return;
@@ -153,6 +157,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           .map((n) => n.copyWith(isRead: true))
           .toList();
     });
+    widget.onUnreadCountChanged?.call(0);
     try {
       await widget.service.markAllNotificationsRead();
     } catch (_) {

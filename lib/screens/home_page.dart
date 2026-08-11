@@ -38,6 +38,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   int _animatingSelectedIndex = 0;
   int _pendingCount = 0;
+  int _notificationCount = 0;
   late AppUser _currentUser;
   String? _targetRequestId;
   StreamSubscription<FcmNotificationTarget>? _notificationTapSubscription;
@@ -51,6 +52,7 @@ class _HomePageState extends State<HomePage> {
     if (_currentUser.role == 'admin') {
       _loadPendingCount();
     }
+    _loadNotificationCount();
     _notificationTapSubscription = FcmService.instance.notificationTaps.listen(
       _openNotificationTarget,
     );
@@ -131,6 +133,20 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
   }
 
+  Future<void> _loadNotificationCount() async {
+    try {
+      final notifications = await widget.service.getMyNotifications();
+      if (mounted) {
+        setState(() {
+          _notificationCount = notifications.where((item) {
+            final isRead = item['is_read'] as bool? ?? item['read'] as bool?;
+            return isRead != true;
+          }).length;
+        });
+      }
+    } catch (_) {}
+  }
+
   void _openMenu() => _scaffoldKey.currentState?.openDrawer();
 
   void _selectPage(int index, {String? targetRequestId}) {
@@ -155,6 +171,9 @@ class _HomePageState extends State<HomePage> {
 
     if (widget.user.role == 'admin') {
       _loadPendingCount();
+    }
+    if (index == 4) {
+      _loadNotificationCount();
     }
   }
 
@@ -285,10 +304,11 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    final Widget badgeIcon = (index == 2 && _pendingCount > 0)
+    final badgeCount = index == 2 ? _pendingCount : _notificationCount;
+    final Widget badgeIcon = (index == 2 || index == 4) && badgeCount > 0
         ? Badge(
             label: Text(
-              '$_pendingCount',
+              badgeCount > 99 ? '99+' : '$badgeCount',
               style: const TextStyle(
                 fontSize: 8,
                 color: Colors.white,
@@ -296,6 +316,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             backgroundColor: const Color(0xFFEF4444),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: iconWidget,
           )
         : iconWidget;
@@ -480,6 +501,11 @@ class _HomePageState extends State<HomePage> {
               service: widget.service,
               onNavigateToRequests: (targetId) =>
                   _selectPage(2, targetRequestId: targetId),
+              onUnreadCountChanged: (count) {
+                if (mounted && _notificationCount != count) {
+                  setState(() => _notificationCount = count);
+                }
+              },
             ),
             // Index 5: โปรไฟล์
             UserProfilePage(

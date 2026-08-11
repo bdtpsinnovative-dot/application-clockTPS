@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Full-colour icon used in expanded Android notification layouts. -->
+<!-- Full-colour bell icon used in expanded Android notification layouts. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
@@ -10,5 +10,5 @@
         android:pathData="M24,2A22,22 0,1 0,24 46A22,22 0,1 0,24 2" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M22,9L26,9L26,22.8L35.5,28.3L33.5,31.8L22,25.2Z" />
+        android:pathData="M24,39c2.2,0 4,-1.8 4,-4h-8c0,2.2 1.8,4 4,4zM36,29V19c0,-6.14 -3.26,-10.88 -8.5,-12.5V5c0,-1.93 -1.57,-3.5 -3.5,-3.5S20.5,3.07 20.5,5v1.5C15.26,8.12 12,12.86 12,19v10l-4,4v2h32v-2l-4,-4z" />
 </vector>
