@@ -572,21 +572,39 @@ class _AdminDailyBoardPageState extends State<AdminDailyBoardPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Text(
-                          list.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isCompleted
-                                ? const Color(0xFF6B7280)
-                                : workText,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            height: 1.25,
-                            decoration: isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (list.projectName != null && list.projectName!.trim().isNotEmpty) ...[
+                              Text(
+                                list.projectName!.trim(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: workMuted,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                            ],
+                            Text(
+                              list.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isCompleted
+                                    ? const Color(0xFF6B7280)
+                                    : workText,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                height: 1.25,
+                                decoration: isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 8),

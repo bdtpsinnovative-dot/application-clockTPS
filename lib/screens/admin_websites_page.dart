@@ -44,53 +44,103 @@ class CompanyWebsitesPage extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.only(top: 16),
-        child: SizedBox(
-          height: 185,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            physics: const BouncingScrollPhysics(),
-            children: [
-              _buildBannerCard(
-                context,
-                imagePath: 'assets/images/banner_zenslab.webp',
-                url: 'https://www.zen-slab.com',
-                title: 'Zen Slab',
-                description: 'เราเริ่มต้นจากแก่นแท้ของต้นไม้ คุณค่าที่สำคัญที่สุดคือความเป็นธรรมชาติ...',
-              ),
-              _buildBannerCard(
-                context,
-                imagePath: 'assets/images/banner_wallcraft.webp',
-                url: 'https://wallcraftthailand.com',
-                title: 'Wallcraft Thailand',
-                description: 'Wallcraft ศูนย์รวมสินค้าผนังและระแนงไม้คุณภาพสูง',
-              ),
-              _buildBannerCard(
-                context,
-                imagePath: 'assets/images/banner_terrahome.webp',
-                url: 'https://terrahome-studio.com',
-                title: 'Terra Home Studio',
-                description: 'ของตกแต่งบ้าน ดีไซน์มินิมอล สไตล์ wabi-sabi',
-              ),
-              _buildBannerCard(
-                context,
-                imagePath: 'assets/images/banner_emberash.webp',
-                url: 'https://emberandashliving.vercel.app/',
-                title: 'Ember & Ash Living',
-                description: 'เฟอร์นิเจอร์ดีไซน์พรีเมียม สไตล์โมเดิร์นร่วมสมัย',
-              ),
-            ],
+      body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        physics: const BouncingScrollPhysics(),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 20, bottom: 12),
+            child: Text(
+              'เว็บไซต์บริษัท',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: workText),
+            ),
           ),
-        ),
+          SizedBox(
+            height: 185,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _buildBannerCard(
+                  context,
+                  imagePath: 'assets/images/banner_zenslab.webp',
+                  url: 'https://www.zen-slab.com',
+                  title: 'Zen Slab',
+                  description: 'เราเริ่มต้นจากแก่นแท้ของต้นไม้ คุณค่าที่สำคัญที่สุดคือความเป็นธรรมชาติ...',
+                ),
+                _buildBannerCard(
+                  context,
+                  imagePath: 'assets/images/banner_wallcraft.webp',
+                  url: 'https://wallcraftthailand.com',
+                  title: 'Wallcraft Thailand',
+                  description: 'Wallcraft ศูนย์รวมสินค้าผนังและระแนงไม้คุณภาพสูง',
+                ),
+                _buildBannerCard(
+                  context,
+                  imagePath: 'assets/images/banner_terrahome.webp',
+                  url: 'https://terrahome-studio.com',
+                  title: 'Terra Home Studio',
+                  description: 'ของตกแต่งบ้าน ดีไซน์มินิมอล สไตล์ wabi-sabi',
+                ),
+                _buildBannerCard(
+                  context,
+                  imagePath: 'assets/images/banner_emberash.webp',
+                  url: 'https://emberandashliving.vercel.app/',
+                  title: 'Ember & Ash Living',
+                  description: 'เฟอร์นิเจอร์ดีไซน์พรีเมียม สไตล์โมเดิร์นร่วมสมัย',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.only(left: 20, bottom: 12),
+            child: Text(
+              'ระบบจัดการภายใน',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: workText),
+            ),
+          ),
+          SizedBox(
+            height: 185,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _buildBannerCard(
+                  context,
+                  imageUrl: 'https://pub-258bd10e7e8c4a7690a74c54cfbdef93.r2.dev/original/1786337274724-157.webp',
+                  url: 'https://admin.wallcraftthailand.com/',
+                  title: 'ระบบจัดการ แอพ wallcraft',
+                  description: 'หน้าสำหรับเข้าสู่ระบบแอดมิน',
+                ),
+                _buildBannerCard(
+                  context,
+                  imageUrl: 'https://pub-258bd10e7e8c4a7690a74c54cfbdef93.r2.dev/original/1786335480045-409.webp',
+                  url: 'https://admin-and-manager-seven.vercel.app/',
+                  title: 'ระบบจัดการสินค้า',
+                  description: 'ระบบจัดการสินค้าทั้งหมดและดูยอดขาย',
+                ),
+                _buildBannerCard(
+                  context,
+                  imageUrl: 'https://pub-258bd10e7e8c4a7690a74c54cfbdef93.r2.dev/original/1786335471296-496.webp',
+                  url: 'https://taskmanagementsystem.wallcraftthailand.com/',
+                  title: 'ระบบจัดการงาน',
+                  description: 'ระบบจัดการงานและเช็คอินพนักงาน',
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildBannerCard(
     BuildContext context, {
-    required String imagePath,
+    String? imagePath,
+    String? imageUrl,
     required String url,
     required String title,
     required String description,
@@ -117,12 +167,31 @@ class CompanyWebsitesPage extends StatelessWidget {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Image.asset(
-                  imagePath,
-                  width: 175,
-                  height: 110,
-                  fit: BoxFit.cover,
-                ),
+                child: imageUrl != null
+                    ? Image.network(
+                        imageUrl,
+                        width: 175,
+                        height: 110,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 175,
+                          height: 110,
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      )
+                    : Image.asset(
+                        imagePath!,
+                        width: 175,
+                        height: 110,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 175,
+                          height: 110,
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 8),

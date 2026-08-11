@@ -72,6 +72,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _loading = true;
   String? _error;
   List<NotificationRecord> _notifications = [];
+  int _displayLimit = 15;
 
   @override
   void initState() {
@@ -169,200 +170,247 @@ class _NotificationsPageState extends State<NotificationsPage> {
       child: RefreshIndicator(
         color: workBlue,
         onRefresh: _loadNotifications,
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            WorkHeader(
-              title: 'แจ้งเตือน',
-              subtitle: 'ศูนย์การแจ้งเตือนและข่าวสาร',
-              onMenu: widget.onMenu,
-              bottomPadding: 58,
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'กล่องข้อความแจ้งเตือน',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (ScrollNotification scrollInfo) {
+            if (!_loading &&
+                scrollInfo.metrics.pixels >=
+                    scrollInfo.metrics.maxScrollExtent - 200) {
+              if (_displayLimit < _notifications.length) {
+                // We don't want to call setState too frequently, but here it's fast.
+                // We'll delay it to avoid build during scroll issues.
+                Future.microtask(() {
+                  if (mounted && _displayLimit < _notifications.length) {
+                    setState(() {
+                      _displayLimit += 15;
+                    });
+                  }
+                });
+              }
+            }
+            return false;
+          },
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              WorkHeader(
+                title: 'แจ้งเตือน',
+                subtitle: 'ศูนย์การแจ้งเตือนและข่าวสาร',
+                onMenu: widget.onMenu,
+                bottomPadding: 58,
+                child: const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'กล่องข้อความแจ้งเตือน',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
-            ),
-            Transform.translate(
-              offset: const Offset(0, -32),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: WorkCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: WorkCardTitle(
-                              icon: Icons.notifications_active_rounded,
-                              title: 'รายการแจ้งเตือนล่าสุด',
+              Transform.translate(
+                offset: const Offset(0, -32),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: WorkCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: WorkCardTitle(
+                                icon: Icons.notifications_active_rounded,
+                                title: 'รายการแจ้งเตือนล่าสุด',
+                              ),
                             ),
-                          ),
-                          if (!_loading && _unreadCount > 0)
-                            GestureDetector(
-                              onTap: _markAllRead,
-                              child: Text(
-                                'อ่านทั้งหมด ($_unreadCount)',
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  color: workBlue,
-                                  fontWeight: FontWeight.w600,
+                            if (!_loading && _unreadCount > 0)
+                              GestureDetector(
+                                onTap: _markAllRead,
+                                child: Text(
+                                  'อ่านแล้วทั้งหมด ($_unreadCount)',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: workBlue,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (_loading && _notifications.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: SimpleManagementListSkeleton(),
-                        )
-                      else if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.wifi_off_rounded,
-                                  size: 40, color: workMuted),
-                              const SizedBox(height: 8),
-                              Text(
-                                _error!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                    color: workMuted, fontSize: 12),
-                              ),
-                              const SizedBox(height: 12),
-                              FilledButton.tonal(
-                                onPressed: _loadNotifications,
-                                child: const Text('ลองใหม่'),
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (_notifications.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 32),
-                          child: Center(
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (_loading && _notifications.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: SimpleManagementListSkeleton(),
+                          )
+                        else if (_error != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
                             child: Column(
                               children: [
-                                Icon(Icons.notifications_off_outlined,
-                                    size: 40, color: workMuted),
-                                SizedBox(height: 8),
+                                const Icon(
+                                  Icons.wifi_off_rounded,
+                                  size: 40,
+                                  color: workMuted,
+                                ),
+                                const SizedBox(height: 8),
                                 Text(
-                                  'ยังไม่มีการแจ้งเตือนสำหรับคุณ',
-                                  style:
-                                      TextStyle(color: workMuted, fontSize: 13),
+                                  _error!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: workMuted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton.tonal(
+                                  onPressed: _loadNotifications,
+                                  child: const Text('ลองใหม่'),
                                 ),
                               ],
                             ),
-                          ),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _notifications.length,
-                          separatorBuilder: (context, index) => const Divider(
-                            height: 24,
-                            color: Color(0xFFF1F5F9),
-                          ),
-                          itemBuilder: (context, index) {
-                            final n = _notifications[index];
-                            return InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () => _markRead(n),
-                              child: Opacity(
-                                opacity: n.isRead ? 0.65 : 1.0,
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: _getIconBgColor(n),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        _getIconData(n),
-                                        color: _getIconColor(n),
-                                        size: 18,
-                                      ),
+                          )
+                        else if (_notifications.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 32),
+                            child: Center(
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.notifications_off_outlined,
+                                    size: 40,
+                                    color: workMuted,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'ยังไม่มีการแจ้งเตือนสำหรับคุณ',
+                                    style: TextStyle(
+                                      color: workMuted,
+                                      fontSize: 13,
                                     ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          Builder(
+                            builder: (context) {
+                              final displayed = _notifications
+                                  .take(_displayLimit)
+                                  .toList();
+                              return ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: displayed.length,
+                                separatorBuilder: (context, index) =>
+                                    const Divider(
+                                      height: 24,
+                                      color: Color(0xFFF1F5F9),
+                                    ),
+                                itemBuilder: (context, index) {
+                                  final n = displayed[index];
+                                  return InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () => _markRead(n),
+                                    child: Opacity(
+                                      opacity: n.isRead ? 0.65 : 1.0,
+                                      child: Row(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  n.title,
-                                                  style: TextStyle(
-                                                    fontSize: 13.5,
-                                                    fontWeight: n.isRead
-                                                        ? FontWeight.w500
-                                                        : FontWeight.w700,
-                                                    color: workText,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (!n.isRead)
-                                                Container(
-                                                  width: 6,
-                                                  height: 6,
-                                                  margin: const EdgeInsets.only(
-                                                      left: 6, top: 4),
-                                                  decoration:
-                                                      const BoxDecoration(
-                                                    color: Color(0xFFEF4444),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            n.body,
-                                            style: const TextStyle(
-                                              fontSize: 11.5,
-                                              color: workMuted,
-                                              height: 1.4,
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: _getIconBgColor(n),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              _getIconData(n),
+                                              color: _getIconColor(n),
+                                              size: 18,
                                             ),
                                           ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            _formatTime(n.createdAt),
-                                            style: const TextStyle(
-                                                fontSize: 10,
-                                                color: workMuted),
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        n.title,
+                                                        style: TextStyle(
+                                                          fontSize: 13.5,
+                                                          fontWeight: n.isRead
+                                                              ? FontWeight.w500
+                                                              : FontWeight.w700,
+                                                          color: workText,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (!n.isRead)
+                                                      Container(
+                                                        width: 6,
+                                                        height: 6,
+                                                        margin:
+                                                            const EdgeInsets.only(
+                                                              left: 6,
+                                                              top: 4,
+                                                            ),
+                                                        decoration:
+                                                            const BoxDecoration(
+                                                              color: Color(
+                                                                0xFFEF4444,
+                                                              ),
+                                                              shape: BoxShape
+                                                                  .circle,
+                                                            ),
+                                                      ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  n.body,
+                                                  style: const TextStyle(
+                                                    fontSize: 11.5,
+                                                    color: workMuted,
+                                                    height: 1.4,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  _formatTime(n.createdAt),
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    color: workMuted,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

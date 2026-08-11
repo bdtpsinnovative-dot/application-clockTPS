@@ -12,6 +12,7 @@ import 'admin_users_page.dart';
 import 'admin_locations_page.dart';
 import 'admin_attendance_history_page.dart';
 import 'admin_holidays_page.dart';
+import 'admin_daily_board_page.dart';
 
 class MainDashboardPage extends StatefulWidget {
   const MainDashboardPage({
@@ -204,59 +205,49 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
               hasAvatar: hasAvatar,
               avatarUrl: httpAvatarUrl,
             ),
-            const SizedBox(height: 24),
+            // 2. 2 Big Buttons (เหมือนแอดมิน)
             _StaggeredFadeIn(
               delayIndex: 1,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _SectionHeading(
-                      title: 'ทำรายการด่วน',
-                      subtitle: 'จัดการงานสำคัญของคุณได้ในไม่กี่แตะ',
+              child: Transform.translate(
+                offset: const Offset(0, -20),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: SizedBox(
+                    height: 110,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      children: [
+                        _buildTodoCard(
+                          title: 'Project หลัก',
+                          sub: 'จัดการและมอบหมายงาน',
+                          badgeCount: 0,
+                          icon: Icons.assignment_rounded,
+                          color: workBlue,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AdminTasksPage(service: widget.service),
+                            ),
+                          ),
+                        ),
+                        _buildTodoCard(
+                          title: 'Project รายวัน',
+                          sub: 'ดูงานที่เลยกำหนดและวันนี้',
+                          badgeCount: 0,
+                          icon: Icons.view_kanban_rounded,
+                          color: const Color(0xFFF59E0B),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => AdminDailyBoardPage(service: widget.service)),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      height: 128,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.only(right: 20),
-                        children: [
-                          _buildQuickActionCard(
-                            title: 'ลงเวลาทำงาน',
-                            sub: _todayAttendance != null
-                                ? (_todayAttendance!.checkOutAt != null
-                                      ? 'ลงเวลาเสร็จสิ้นวันนี้'
-                                      : 'เข้างานแล้ว / รอเช็คเอาท์')
-                                : 'เช็คอิน / เช็คเอาท์',
-                            icon: Icons.fingerprint_rounded,
-                            color: workBlue,
-                            onTap: () => widget.onSelectTab(1),
-                          ),
-                          _buildQuickActionCard(
-                            title: 'ยื่นคำขอใบลา',
-                            sub: 'ลาป่วย, ลากิจ, ลาพักร้อน',
-                            icon: Icons.event_busy_rounded,
-                            color: const Color(0xFFDC4A4A),
-                            onTap: () => widget.onSelectTab(2),
-                          ),
-                          _buildQuickActionCard(
-                            title: 'ขอออกหน้างาน',
-                            sub: 'ปฏิบัติหน้าที่นอกสถานที่',
-                            icon: Icons.directions_car_rounded,
-                            color: const Color(0xFF0F9F83),
-                            onTap: () => widget.onSelectTab(2),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 28),
             _StaggeredFadeIn(
               delayIndex: 2,
               child: Padding(
@@ -264,11 +255,15 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _SectionHeading(
-                      title: 'ทางลัดของคุณ',
-                      subtitle: 'สิ่งที่ใช้บ่อยและเข้าถึงได้ทันที',
+                    const Text(
+                      'การจัดการข้อมูล',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: workText,
+                      ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final itemWidth = (constraints.maxWidth - 16) / 3;
@@ -349,14 +344,13 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                               width: itemWidth,
                               child: Center(
                                 child: _buildCircularMenu(
-                                  label: 'มอบหมายงาน',
-                                  icon: Icons.task_alt_rounded,
+                                  label: 'เว็บไซต์บริษัท\nและระบบหลังบ้าน',
+                                  icon: Icons.language_rounded,
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => AdminTasksPage(
-                                        service: widget.service,
-                                      ),
+                                      builder: (context) =>
+                                          const CompanyWebsitesPage(),
                                     ),
                                   ),
                                 ),
@@ -366,15 +360,37 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                               width: itemWidth,
                               child: Center(
                                 child: _buildCircularMenu(
-                                  label: 'เว็บไซต์บริษัท',
-                                  icon: Icons.language_rounded,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const CompanyWebsitesPage(),
-                                    ),
-                                  ),
+                                  label: 'มอบหมายงาน',
+                                  icon: Icons.task_alt_rounded,
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16)),
+                                        title: const Row(
+                                          children: [
+                                            Icon(Icons.build_circle_rounded,
+                                                color: Colors.orange, size: 28),
+                                            SizedBox(width: 10),
+                                            Text('แจ้งเตือน',
+                                                style: TextStyle(fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        content: const Text(
+                                          'กำลังปรับปรุงโมดูล\nกรุณาเข้าใช้งานผ่านเมนูใหม่ด้านบน',
+                                          style: TextStyle(fontSize: 14),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('ตกลง',
+                                                style: TextStyle(fontWeight: FontWeight.bold)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
@@ -504,6 +520,104 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
     );
   }
 
+  Widget _buildTodoCard({
+    required String title,
+    required String sub,
+    required int badgeCount,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 190,
+        margin: const EdgeInsets.only(right: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x060F172A),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            )
+          ],
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: color, size: 18),
+                    ),
+                    if (badgeCount > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$badgeCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Colors.grey.shade400),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: workText,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sub,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: workMuted,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuickActionCard({
     required String title,
     required String sub,
@@ -626,6 +740,7 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 const SizedBox(height: 8),
                 Text(
                   label,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,

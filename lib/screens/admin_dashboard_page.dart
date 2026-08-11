@@ -443,20 +443,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ),
                           ),
                           _buildCircularMenu(
-                            label: 'มอบหมายงาน',
-                            icon: Icons.assignment_rounded,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => AdminTasksPage(service: widget.service)),
-                            ),
-                          ),
-                          _buildCircularMenu(
-                            label: 'เว็บไซต์บริษัท',
+                            label: 'เว็บไซต์บริษัท\nและระบบหลังบ้าน',
                             icon: Icons.language_rounded,
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => const CompanyWebsitesPage()),
                             ),
+                          ),
+                          _buildCircularMenu(
+                            label: 'มอบหมายงาน',
+                            icon: Icons.assignment_rounded,
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  title: const Row(
+                                    children: [
+                                      Icon(Icons.build_circle_rounded,
+                                          color: Colors.orange, size: 28),
+                                      SizedBox(width: 10),
+                                      Text('แจ้งเตือน',
+                                          style: TextStyle(fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  content: const Text(
+                                    'กำลังปรับปรุงโมดูล\nกรุณาเข้าใช้งานผ่านเมนูใหม่ด้านบน',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('ตกลง',
+                                          style: TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -675,9 +700,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           const SizedBox(height: 6),
           Text(
             label,
+            textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               color: workText,
             ),
           ),

@@ -4,13 +4,95 @@ import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
+
+const String _notificationChannelId = 'clock_in_tps_notifications_v2';
+const String _notificationChannelName = 'Clock in TPS';
+const String _notificationChannelDescription =
+    'การแจ้งเตือนจากระบบ Clock in TPS';
+
+String? _readMessageValue(Map<String, dynamic> data, List<String> keys) {
+  for (final key in keys) {
+    final value = data[key]?.toString().trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  return null;
+}
+
+Future<void> _showBackgroundDataNotification(RemoteMessage message) async {
+  final notificationPlugin = FlutterLocalNotificationsPlugin();
+  const initializationSettings = InitializationSettings(
+    android: AndroidInitializationSettings('ic_stat_clock_in_tps'),
+  );
+  await notificationPlugin.initialize(initializationSettings);
+
+  const channel = AndroidNotificationChannel(
+    _notificationChannelId,
+    _notificationChannelName,
+    description: _notificationChannelDescription,
+    importance: Importance.max,
+    sound: RawResourceAndroidNotificationSound('custom_notification'),
+    playSound: true,
+  );
+  final androidPlugin = notificationPlugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+  await androidPlugin?.createNotificationChannel(channel);
+
+  final title = _readMessageValue(message.data, const [
+    'title',
+    'notification_title',
+  ]);
+  final body = _readMessageValue(message.data, const [
+    'body',
+    'message',
+    'content',
+    'text',
+    'notification_body',
+  ]);
+  if (title == null && body == null) return;
+
+  await notificationPlugin.show(
+    message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch,
+    title ?? _notificationChannelName,
+    body,
+    NotificationDetails(
+      android: AndroidNotificationDetails(
+        channel.id,
+        channel.name,
+        channelDescription: channel.description,
+        icon: 'ic_stat_clock_in_tps',
+        largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
+        color: const Color(0xFF0EB7A8),
+        category: AndroidNotificationCategory.message,
+        priority: Priority.high,
+        visibility: NotificationVisibility.public,
+        onlyAlertOnce: true,
+        styleInformation: BigTextStyleInformation(
+          body ?? '',
+          contentTitle: title ?? _notificationChannelName,
+          summaryText: _notificationChannelName,
+        ),
+        sound: const RawResourceAndroidNotificationSound('custom_notification'),
+        playSound: true,
+      ),
+    ),
+    payload: jsonEncode(message.data),
+  );
+}
 
 // Background message handler
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  // Notification payloads are rendered by Android while the app is in the
+  // background. Data-only payloads need an explicit local notification.
+  if (message.notification == null) {
+    await _showBackgroundDataNotification(message);
+  }
   debugPrint("Handling background message: ${message.messageId}");
 }
 
@@ -47,6 +129,9 @@ class FcmService {
       StreamController<FcmNotificationTarget>.broadcast();
 
   bool _initialized = false;
+  bool _backgroundHandlerRegistered = false;
+  bool _registeringDevice = false;
+  bool _deviceRegistered = false;
   FcmNotificationTarget? _pendingTarget;
   AuthFlowService? _tokenAuthService;
   StreamSubscription<String>? _tokenRefreshSubscription;
@@ -65,13 +150,18 @@ class FcmService {
 
     try {
       // 1. Register background handler
-      FirebaseMessaging.onBackgroundMessage(
-        _firebaseMessagingBackgroundHandler,
-      );
+      if (!_backgroundHandlerRegistered) {
+        FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler,
+        );
+        _backgroundHandlerRegistered = true;
+      }
 
-      // 2. Setup local notifications for Foreground banner displays
+      // 2. Setup local notifications for foreground banner displays.
+      // Use a dedicated monochrome notification icon. Launcher icons contain
+      // full-colour/adaptive layers and render as a white box on some devices.
       const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
+          AndroidInitializationSettings('ic_stat_clock_in_tps');
       const InitializationSettings initializationSettings =
           InitializationSettings(
             android: initializationSettingsAndroid,
@@ -85,10 +175,9 @@ class FcmService {
 
       // 3. Create Android notification channel with custom sound
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
-        'custom_sound_channel', // id
-        'Custom Sound Notifications', // title
-        description:
-            'This channel is used for custom sound notifications.', // description
+        _notificationChannelId,
+        _notificationChannelName,
+        description: _notificationChannelDescription,
         importance: Importance.max,
         sound: RawResourceAndroidNotificationSound('custom_notification'),
         playSound: true,
@@ -103,18 +192,48 @@ class FcmService {
       // 4. Handle foreground notifications
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         final RemoteNotification? notification = message.notification;
+        final title =
+            notification?.title ??
+            _readMessageValue(message.data, const [
+              'title',
+              'notification_title',
+            ]);
+        final body =
+            notification?.body ??
+            _readMessageValue(message.data, const [
+              'body',
+              'message',
+              'content',
+              'text',
+              'notification_body',
+            ]);
 
-        if (notification != null && !kIsWeb) {
+        if ((notification != null || title != null || body != null) &&
+            !kIsWeb) {
           _localNotifications.show(
-            notification.hashCode,
-            notification.title,
-            notification.body,
+            message.messageId?.hashCode ??
+                DateTime.now().millisecondsSinceEpoch,
+            title ?? _notificationChannelName,
+            body,
             NotificationDetails(
               android: AndroidNotificationDetails(
                 channel.id,
                 channel.name,
                 channelDescription: channel.description,
-                icon: '@mipmap/ic_launcher',
+                icon: 'ic_stat_clock_in_tps',
+                largeIcon: const DrawableResourceAndroidBitmap(
+                  'ic_notification_large',
+                ),
+                color: const Color(0xFF0EB7A8),
+                category: AndroidNotificationCategory.message,
+                priority: Priority.high,
+                visibility: NotificationVisibility.public,
+                onlyAlertOnce: true,
+                styleInformation: BigTextStyleInformation(
+                  body ?? '',
+                  contentTitle: title ?? _notificationChannelName,
+                  summaryText: _notificationChannelName,
+                ),
                 sound: const RawResourceAndroidNotificationSound(
                   'custom_notification',
                 ),
@@ -146,6 +265,9 @@ class FcmService {
   }
 
   Future<void> registerDevice(AuthFlowService authService) async {
+    if (_deviceRegistered || _registeringDevice) return;
+
+    _registeringDevice = true;
     try {
       _tokenAuthService = authService;
       debugPrint('[FCM LOG] registerDevice called');
@@ -192,6 +314,7 @@ class FcmService {
           debugPrint('[FCM LOG] Sending FCM token to backend...');
           await authService.updateFcmToken(token);
           debugPrint('[FCM LOG] FCM token successfully updated on backend');
+          _deviceRegistered = true;
         } else {
           debugPrint('[FCM LOG] FCM Token is null!');
         }
@@ -217,6 +340,8 @@ class FcmService {
       }
     } catch (e) {
       debugPrint('[FCM LOG] Failed to register device for FCM: $e');
+    } finally {
+      _registeringDevice = false;
     }
   }
 
