@@ -576,17 +576,30 @@ class _AdminDailyBoardPageState extends State<AdminDailyBoardPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (list.projectName != null && list.projectName!.trim().isNotEmpty) ...[
-                              Text(
-                                list.projectName!.trim(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: workMuted,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.folder_open_rounded,
+                                    size: 12,
+                                    color: workMuted,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      list.projectName!.trim(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: workMuted,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                             ],
                             Text(
                               list.name,
