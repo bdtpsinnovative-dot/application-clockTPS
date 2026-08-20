@@ -523,6 +523,38 @@ class AuthFlowService {
     await _authorizedPatch('/admin/users/$id/approve', data: {});
   }
 
+  Future<void> updateUserWorkSchedule({
+    required String userId,
+    required String workStartTime,
+    required String workEndTime,
+  }) async {
+    await _authorizedPut(
+      '/admin/users/$userId/work-schedule',
+      data: {'work_start_time': workStartTime, 'work_end_time': workEndTime},
+    );
+  }
+
+  Future<AttendanceRecord> updateAttendanceAdmin({
+    required String attendanceId,
+    required DateTime checkInAt,
+    DateTime? checkOutAt,
+    String? status,
+  }) async {
+    final response = await _authorizedPatch(
+      '/admin/attendance/$attendanceId',
+      data: {
+        'check_in_at': checkInAt.toUtc().toIso8601String(),
+        'check_out_at': checkOutAt?.toUtc().toIso8601String(),
+        'status': ?status,
+      },
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return AttendanceRecord.fromJson(data);
+    }
+    throw const AuthFlowException('ข้อมูลตอบกลับจากการแก้ไขเวลาไม่ถูกต้อง');
+  }
+
   Future<void> updateLeaveStatusAdmin(String id, String status) async {
     await _authorizedPatch(
       '/admin/leaves/$id/status',
@@ -564,6 +596,24 @@ class AuthFlowService {
 
   Future<void> deleteLocation(String id) async {
     await _authorizedDelete('/admin/locations/$id');
+  }
+
+  Future<void> updateLocation({
+    required String id,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radius,
+  }) async {
+    await _authorizedPut(
+      '/admin/locations/$id',
+      data: {
+        'name': name,
+        'latitude': lat,
+        'longitude': lng,
+        'radius_m': radius,
+      },
+    );
   }
 
   Future<void> createHoliday({
@@ -976,6 +1026,7 @@ class AuthFlowService {
     required String deviceId,
     required List<double> faceVector,
     String? photoUrl,
+    double? accuracyM,
   }) async {
     final response = await _authorizedPost(
       '/api/attendance/checkin',
@@ -985,6 +1036,7 @@ class AuthFlowService {
         'device_id': deviceId,
         'face_vector': faceVector,
         'photo_url': ?photoUrl,
+        'accuracy_m': ?accuracyM,
       },
     );
     final data = response['data'];
@@ -998,10 +1050,16 @@ class AuthFlowService {
     double? lat,
     double? lng,
     String? photoUrl,
+    double? accuracyM,
   }) async {
     final response = await _authorizedPost(
       '/api/attendance/checkout',
-      data: {'lat': ?lat, 'lng': ?lng, 'photo_url': ?photoUrl},
+      data: {
+        'lat': ?lat,
+        'lng': ?lng,
+        'photo_url': ?photoUrl,
+        'accuracy_m': ?accuracyM,
+      },
     );
     final data = response['data'];
     if (data is Map<String, dynamic>) {

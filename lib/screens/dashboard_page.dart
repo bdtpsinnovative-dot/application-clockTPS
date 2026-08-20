@@ -6,8 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:image/image.dart' as img;
 
 import 'face_scanner_page.dart';
 import 'selfie_camera_page.dart';
@@ -18,8 +16,6 @@ import '../widgets/skeleton_loading.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
 import '../widgets/app_loading_view.dart';
-
-import 'package:image_picker/image_picker.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
@@ -102,12 +98,12 @@ class _DashboardPageState extends State<DashboardPage> {
     _isInsideAny = false;
     double minDistance = double.infinity;
     String closestName = '';
-    double closestRadius = 50.0;
+    double closestRadius = 100.0;
 
     for (final loc in _workLocations) {
       double lat = 0.0;
       double lng = 0.0;
-      double radius = 50.0;
+      double radius = 100.0;
 
       if (loc['latitude'] is num) {
         lat = (loc['latitude'] as num).toDouble();
@@ -124,7 +120,7 @@ class _DashboardPageState extends State<DashboardPage> {
       if (loc['radius_m'] is num) {
         radius = (loc['radius_m'] as num).toDouble();
       } else if (loc['radius_m'] is String) {
-        radius = double.tryParse(loc['radius_m'] as String) ?? 50.0;
+        radius = double.tryParse(loc['radius_m'] as String) ?? 100.0;
       }
 
       final String name = loc['name'] as String? ?? 'สาขา';
@@ -191,8 +187,10 @@ class _DashboardPageState extends State<DashboardPage> {
       Position? currentPos;
       try {
         currentPos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 5),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5),
+          ),
         );
       } catch (_) {
         try {
@@ -224,7 +222,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 context: context,
                 barrierDismissible: false,
                 builder: (context) => AlertDialog(
-                  title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
+                  title: const Text(
+                    'บัญชีถูกระงับ',
+                    textAlign: TextAlign.center,
+                  ),
                   content: const Text(
                     'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
                     textAlign: TextAlign.center,
@@ -281,8 +282,10 @@ class _DashboardPageState extends State<DashboardPage> {
       Position? currentPos;
       try {
         currentPos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 5),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5),
+          ),
         );
       } catch (_) {
         try {
@@ -315,7 +318,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 context: context,
                 barrierDismissible: false,
                 builder: (context) => AlertDialog(
-                  title: const Text('บัญชีถูกระงับ', textAlign: TextAlign.center),
+                  title: const Text(
+                    'บัญชีถูกระงับ',
+                    textAlign: TextAlign.center,
+                  ),
                   content: const Text(
                     'บัญชีของคุณถูกระงับการใช้งาน\nกรุณาติดต่อผู้ดูแลระบบ',
                     textAlign: TextAlign.center,
@@ -347,6 +353,10 @@ class _DashboardPageState extends State<DashboardPage> {
       return AuthFlowService.mockDeviceId!;
     }
     final deviceInfo = DeviceInfoPlugin();
+    if (kIsWeb) {
+      final webInfo = await deviceInfo.webBrowserInfo;
+      return webInfo.userAgent ?? 'web_browser_device';
+    }
     if (Platform.isIOS) {
       final iosInfo = await deviceInfo.iosInfo;
       return iosInfo.identifierForVendor ?? 'ios_unknown_device';
@@ -360,7 +370,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return 'unknown_device';
   }
 
-  Future<Position> _determinePosition() async {
+  Future<Position> _determinePosition({bool requireAccurate = false}) async {
     bool serviceEnabled;
     LocationPermission permission;
 
@@ -383,9 +393,20 @@ class _DashboardPageState extends State<DashboardPage> {
       );
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
+    Position? position;
+    for (var attempt = 0; attempt < (requireAccurate ? 3 : 1); attempt++) {
+      position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      if (!requireAccurate || position.accuracy <= 100) break;
+    }
+
+    if (position == null || (requireAccurate && position.accuracy > 100)) {
+      throw Exception('GPS ยังไม่แม่นยำ กรุณาออกไปยังบริเวณเปิดและลองอีกครั้ง');
+    }
 
     if (position.isMocked) {
       throw Exception(
@@ -394,6 +415,67 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     return position;
+  }
+
+  String _areaNameFor(Position? position) {
+    if (position == null) return 'ไม่สามารถระบุตำแหน่ง';
+    Map<String, dynamic>? closest;
+    var closestDistance = double.infinity;
+    for (final location in _workLocations) {
+      final lat =
+          (location['latitude'] as num?)?.toDouble() ??
+          double.tryParse('${location['latitude']}');
+      final lng =
+          (location['longitude'] as num?)?.toDouble() ??
+          double.tryParse('${location['longitude']}');
+      if (lat == null || lng == null) continue;
+      final distance = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        lat,
+        lng,
+      );
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closest = location;
+      }
+    }
+    if (closest == null) return 'นอกพื้นที่';
+    final radius =
+        (closest['radius_m'] as num?)?.toDouble() ??
+        double.tryParse('${closest['radius_m']}') ??
+        100;
+    if (closestDistance <= radius) {
+      return closest['name'] as String? ?? 'พื้นที่ทำงาน';
+    }
+    return _attendance?.isOffsite == true || _attendance?.status == 'offsite'
+        ? 'ออกหน้างาน'
+        : 'นอกพื้นที่';
+  }
+
+  Future<bool> _confirmClockOut(String areaName) async {
+    if (!mounted) return false;
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('ยืนยันลงชื่อออก'),
+            content: Text(
+              'เวลา ${DateFormat('HH:mm').format(DateTime.now())} น. · $areaName\n'
+              'เมื่อลงชื่อออกแล้วจะบันทึกเวลานี้ทันที',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('ลงชื่อออก'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   void _showMessage(String message) {
@@ -420,7 +502,7 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() => _submitting = true);
       final mode = await widget.service.getCheckInMode();
 
-      final position = await _determinePosition();
+      final position = await _determinePosition(requireAccurate: true);
       final deviceId = await _getDeviceId();
 
       File? imageFile;
@@ -428,7 +510,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
       if (mode == 'selfie') {
         // โหมดเซลฟี่: เปิดหน้ากล้องที่สร้างเองเพื่อถ่ายรูป (ไม่ใช้ ImagePicker)
-        setState(() => _submitting = false); // ซ่อน loading ชั่วคราวระหว่างถ่ายรูป
+        setState(
+          () => _submitting = false,
+        ); // ซ่อน loading ชั่วคราวระหว่างถ่ายรูป
         if (!mounted) return;
         final photoFile = await Navigator.of(context).push<File>(
           MaterialPageRoute(builder: (_) => const SelfieCameraPage()),
@@ -444,7 +528,9 @@ class _DashboardPageState extends State<DashboardPage> {
       } else {
         // โหมดสแกนใบหน้า: สแกนด้วย FaceScannerPage
         if (!mounted) return;
-        setState(() => _submitting = false); // ซ่อน loading ชั่วคราวเพื่อให้สแกนหน้าได้
+        setState(
+          () => _submitting = false,
+        ); // ซ่อน loading ชั่วคราวเพื่อให้สแกนหน้าได้
         final result = await Navigator.of(context).push<FaceScannerResult>(
           MaterialPageRoute(builder: (_) => const FaceScannerPage()),
         );
@@ -462,6 +548,7 @@ class _DashboardPageState extends State<DashboardPage> {
         deviceId: deviceId,
         faceVector: faceVector,
         photoUrl: photoUrl,
+        accuracyM: position.accuracy,
       );
 
       await _loadToday();
@@ -475,13 +562,22 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _clockOut() async {
     try {
-      final position = await _determinePosition();
+      Position? position;
+      try {
+        position = await _determinePosition();
+      } catch (_) {
+        // Checkout must remain available even when GPS is unavailable.
+      }
+
+      final confirmed = await _confirmClockOut(_areaNameFor(position));
+      if (!confirmed) return;
 
       setState(() => _submitting = true);
 
       await widget.service.checkOut(
-        lat: position.latitude,
-        lng: position.longitude,
+        lat: position?.latitude,
+        lng: position?.longitude,
+        accuracyM: position?.accuracy,
       );
 
       await _loadToday();
@@ -543,420 +639,530 @@ class _DashboardPageState extends State<DashboardPage> {
                 key: const ValueKey('dashboard_content'),
                 children: [
                   RefreshIndicator(
-            onRefresh: _loadToday,
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                WorkHeader(
-                  title: widget.user.fullName,
-                  subtitle: widget.user.position.isNotEmpty
-                      ? widget.user.position
-                      : 'พนักงาน',
-                  bottomPadding: 72,
-                  child: Column(
-                    children: [
-                      Text(
-                        DateFormat('HH:mm:ss').format(_now),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 48,
-                          height: 1,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        DateFormat('EEEE d MMM yyyy').format(_now),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'เวลาทำงาน 09:00 - 18:00',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.72),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Transform.translate(
-                  offset: const Offset(0, -28),
-                  child: Center(
-                    child: FilledButton.icon(
-                      key: const ValueKey('clock_in_out_button'),
-                      onPressed: (_submitting || isCompleted)
-                          ? null
-                          : _handleClockInOut,
-                      icon: buttonIcon,
-                      label: Text(buttonText),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(210, 56),
-                        maximumSize: const Size(260, 56),
-                        backgroundColor: isCompleted
-                            ? const Color(0xFFF1F5F9)
-                            : Colors.white,
-                        foregroundColor: foregroundColor,
-                        disabledBackgroundColor: const Color(0xFFF1F5F9),
-                        disabledForegroundColor: workMuted,
-                        elevation: isCompleted ? 0 : 8,
-                        shadowColor: workBlue.withValues(alpha: 0.22),
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  child: Column(
-                    children: [
-                      if (_loading) const LinearProgressIndicator(minHeight: 3),
-                      if (_error != null) ...[
-                        _ErrorStrip(message: _error!, onRetry: _loadToday),
-                        const SizedBox(height: 14),
-                      ],
-                      _buildGeofenceStatusWidget(),
-                      const SizedBox(height: 14),
-                      WorkCard(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.login_rounded,
-                                        size: 14,
-                                        color: Color(0xFF22C55E),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      const Text(
-                                        'เวลาเข้างาน',
-                                        style: TextStyle(
-                                          color: workMuted,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      if (attendance?.checkInAt != null) ...[
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          width: 6,
-                                          height: 6,
-                                          decoration: BoxDecoration(
-                                            color: attendance!.status == 'late'
-                                                ? const Color(0xFFF59E0B)
-                                                : const Color(0xFF22C55E),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _timeText(attendance?.checkInAt),
-                                    style: TextStyle(
-                                      color: attendance?.checkInAt == null
-                                          ? workMuted
-                                          : workText,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 28,
-                              color: const Color(0xFFE2E8F0),
-                            ),
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.logout_rounded,
-                                        size: 14,
-                                        color: Color(0xFFEF4444),
-                                      ),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        'เวลาออกงาน',
-                                        style: TextStyle(
-                                          color: workMuted,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _timeText(attendance?.checkOutAt),
-                                    style: TextStyle(
-                                      color: attendance?.checkOutAt == null
-                                          ? workMuted
-                                          : workText,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      WorkCard(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const WorkCardTitle(
-                              icon: Icons.event_available_rounded,
-                              title: 'วันหยุดที่กำลังจะถึงที่เหลือในปีนี้',
-                              color: Color(0xFFEF4444),
-                            ),
-                            const SizedBox(height: 14),
-                            if (_upcomingHolidays.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                child: Center(
-                                  child: Text(
-                                    'ไม่มีวันหยุดที่กำลังจะถึงในช่วงนี้',
-                                    style: TextStyle(
-                                      color: workMuted,
-                                      fontSize: 13,
-                                    ),
-                                  ),
+                    onRefresh: _loadToday,
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: [
+                        WorkHeader(
+                          title: widget.user.fullName,
+                          subtitle: widget.user.position.isNotEmpty
+                              ? widget.user.position
+                              : 'พนักงาน',
+                          bottomPadding: 72,
+                          child: Column(
+                            children: [
+                              Text(
+                                DateFormat('HH:mm:ss').format(_now),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 48,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -1,
                                 ),
-                              )
-                            else
-                              ListView.separated(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: _upcomingHolidays.length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  final h = _upcomingHolidays[index];
-                                  final isCurrentMonth =
-                                      h.date.month == DateTime.now().month;
-
-                                  if (isCurrentMonth) {
-                                    return Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFEF2F2),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: const Color(0xFFFCA5A5),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFEF4444),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Text(
-                                                  DateFormat(
-                                                    'd',
-                                                  ).format(h.date),
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.w700,
-                                                    height: 1.1,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  DateFormat(
-                                                    'MMM',
-                                                  ).format(h.date),
-                                                  style: TextStyle(
-                                                    color: Colors.white
-                                                        .withValues(alpha: 0.9),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        h.name,
-                                                        style: const TextStyle(
-                                                          color: workText,
-                                                          fontSize: 14,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 6,
-                                                            vertical: 2,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(
-                                                          0xFFEF4444,
-                                                        ),
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              4,
-                                                            ),
-                                                      ),
-                                                      child: const Text(
-                                                        'เดือนนี้',
-                                                        style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 9,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  DateFormat(
-                                                    'EEEE',
-                                                  ).format(h.date),
-                                                  style: const TextStyle(
-                                                    color: workMuted,
-                                                    fontSize: 11,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  } else {
-                                    return Opacity(
-                                      opacity: 0.55,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.transparent,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 32,
-                                              height: 32,
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF1F5F9),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              alignment: Alignment.center,
-                                              child: Text(
-                                                '${h.date.day}/${h.date.month}',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF475569),
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
+                              ),
+                              const SizedBox(height: 7),
+                              Text(
+                                DateFormat('EEEE d MMM yyyy').format(_now),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'เวลาทำงาน ${attendance?.workStartTime ?? widget.user.workStartTime} - ${attendance?.workEndTime ?? widget.user.workEndTime}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.72),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Transform.translate(
+                          offset: const Offset(0, -28),
+                          child: Center(
+                            child: FilledButton.icon(
+                              key: const ValueKey('clock_in_out_button'),
+                              onPressed: (_submitting || isCompleted)
+                                  ? null
+                                  : _handleClockInOut,
+                              icon: buttonIcon,
+                              label: Text(buttonText),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(210, 56),
+                                maximumSize: const Size(260, 56),
+                                backgroundColor: isCompleted
+                                    ? const Color(0xFFF1F5F9)
+                                    : Colors.white,
+                                foregroundColor: foregroundColor,
+                                disabledBackgroundColor: const Color(
+                                  0xFFF1F5F9,
+                                ),
+                                disabledForegroundColor: workMuted,
+                                elevation: isCompleted ? 0 : 8,
+                                shadowColor: workBlue.withValues(alpha: 0.22),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                          child: Column(
+                            children: [
+                              if (_loading)
+                                const LinearProgressIndicator(minHeight: 3),
+                              if (_error != null) ...[
+                                _ErrorStrip(
+                                  message: _error!,
+                                  onRetry: _loadToday,
+                                ),
+                                const SizedBox(height: 14),
+                              ],
+                              _buildGeofenceStatusWidget(),
+                              const SizedBox(height: 14),
+                              WorkCard(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceAround,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
-                                                  Text(
-                                                    h.name,
-                                                    style: const TextStyle(
-                                                      color: workText,
-                                                      fontSize: 12,
+                                                  const Icon(
+                                                    Icons.login_rounded,
+                                                    size: 14,
+                                                    color: Color(0xFF22C55E),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  const Text(
+                                                    'เวลาเข้างาน',
+                                                    style: TextStyle(
+                                                      color: workMuted,
+                                                      fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.w500,
                                                     ),
                                                   ),
-                                                  const SizedBox(height: 2),
+                                                  if (attendance?.checkInAt !=
+                                                      null) ...[
+                                                    const SizedBox(width: 6),
+                                                    Container(
+                                                      width: 6,
+                                                      height: 6,
+                                                      decoration: BoxDecoration(
+                                                        color:
+                                                            attendance!
+                                                                    .status ==
+                                                                'late'
+                                                            ? const Color(
+                                                                0xFFF59E0B,
+                                                              )
+                                                            : const Color(
+                                                                0xFF22C55E,
+                                                              ),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                _timeText(
+                                                  attendance?.checkInAt,
+                                                ),
+                                                style: TextStyle(
+                                                  color:
+                                                      attendance?.checkInAt ==
+                                                          null
+                                                      ? workMuted
+                                                      : workText,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          width: 1,
+                                          height: 28,
+                                          color: const Color(0xFFE2E8F0),
+                                        ),
+                                        Expanded(
+                                          child: Column(
+                                            children: [
+                                              const Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    Icons.logout_rounded,
+                                                    size: 14,
+                                                    color: Color(0xFFEF4444),
+                                                  ),
+                                                  SizedBox(width: 6),
                                                   Text(
-                                                    DateFormat(
-                                                      'EEEE, d MMM',
-                                                    ).format(h.date),
-                                                    style: const TextStyle(
+                                                    'เวลาออกงาน',
+                                                    style: TextStyle(
                                                       color: workMuted,
-                                                      fontSize: 9,
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                                   ),
                                                 ],
                                               ),
-                                            ),
-                                          ],
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                _timeText(
+                                                  attendance?.checkOutAt,
+                                                ),
+                                                style: TextStyle(
+                                                  color:
+                                                      attendance?.checkOutAt ==
+                                                          null
+                                                      ? workMuted
+                                                      : workText,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
+                                      ],
+                                    ),
+                                    if (attendance != null &&
+                                        (attendance.locationName.isNotEmpty ||
+                                            attendance
+                                                .checkOutLocationName
+                                                .isNotEmpty)) ...[
+                                      const Divider(
+                                        height: 20,
+                                        color: Color(0xFFF1F5F9),
                                       ),
-                                    );
-                                  }
-                                },
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.location_on_outlined,
+                                            size: 14,
+                                            color: workMuted,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              'เข้า ${attendance.locationName.isEmpty ? '-' : attendance.locationName} · ออก ${attendance.checkOutLocationName.isEmpty ? '-' : attendance.checkOutLocationName}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: workMuted,
+                                                fontSize: 10.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
-                          ],
+                              const SizedBox(height: 15),
+                              WorkCard(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const WorkCardTitle(
+                                      icon: Icons.event_available_rounded,
+                                      title:
+                                          'วันหยุดที่กำลังจะถึงที่เหลือในปีนี้',
+                                      color: Color(0xFFEF4444),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    if (_upcomingHolidays.isEmpty)
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            'ไม่มีวันหยุดที่กำลังจะถึงในช่วงนี้',
+                                            style: TextStyle(
+                                              color: workMuted,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      ListView.separated(
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        itemCount: _upcomingHolidays.length,
+                                        separatorBuilder: (context, index) =>
+                                            const SizedBox(height: 8),
+                                        itemBuilder: (context, index) {
+                                          final h = _upcomingHolidays[index];
+                                          final isCurrentMonth =
+                                              h.date.month ==
+                                              DateTime.now().month;
+
+                                          if (isCurrentMonth) {
+                                            return Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFEF2F2),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: const Color(
+                                                    0xFFFCA5A5,
+                                                  ),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 6,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(
+                                                        0xFFEF4444,
+                                                      ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Text(
+                                                          DateFormat(
+                                                            'd',
+                                                          ).format(h.date),
+                                                          style:
+                                                              const TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontSize: 16,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                height: 1.1,
+                                                              ),
+                                                        ),
+                                                        Text(
+                                                          DateFormat(
+                                                            'MMM',
+                                                          ).format(h.date),
+                                                          style: TextStyle(
+                                                            color: Colors.white
+                                                                .withValues(
+                                                                  alpha: 0.9,
+                                                                ),
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Expanded(
+                                                              child: Text(
+                                                                h.name,
+                                                                style: const TextStyle(
+                                                                  color:
+                                                                      workText,
+                                                                  fontSize: 14,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        6,
+                                                                    vertical: 2,
+                                                                  ),
+                                                              decoration: BoxDecoration(
+                                                                color:
+                                                                    const Color(
+                                                                      0xFFEF4444,
+                                                                    ),
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      4,
+                                                                    ),
+                                                              ),
+                                                              child: const Text(
+                                                                'เดือนนี้',
+                                                                style: TextStyle(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  fontSize: 9,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 4,
+                                                        ),
+                                                        Text(
+                                                          DateFormat(
+                                                            'EEEE',
+                                                          ).format(h.date),
+                                                          style:
+                                                              const TextStyle(
+                                                                color:
+                                                                    workMuted,
+                                                                fontSize: 11,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          } else {
+                                            return Opacity(
+                                              opacity: 0.55,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 6,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.transparent,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 32,
+                                                      height: 32,
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(
+                                                          0xFFF1F5F9,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              6,
+                                                            ),
+                                                      ),
+                                                      alignment:
+                                                          Alignment.center,
+                                                      child: Text(
+                                                        '${h.date.day}/${h.date.month}',
+                                                        style: const TextStyle(
+                                                          color: Color(
+                                                            0xFF475569,
+                                                          ),
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            h.name,
+                                                            style:
+                                                                const TextStyle(
+                                                                  color:
+                                                                      workText,
+                                                                  fontSize: 12,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                          ),
+                                                          const SizedBox(
+                                                            height: 2,
+                                                          ),
+                                                          Text(
+                                                            DateFormat(
+                                                              'EEEE, d MMM',
+                                                            ).format(h.date),
+                                                            style:
+                                                                const TextStyle(
+                                                                  color:
+                                                                      workMuted,
+                                                                  fontSize: 9,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          if (_submitting)
-            const AppLoadingOverlay(message: 'กำลังบันทึกเวลา...'),
-        ],
-      ),
+                  if (_submitting)
+                    const AppLoadingOverlay(message: 'กำลังบันทึกเวลา...'),
+                ],
+              ),
       ),
     );
   }
@@ -1030,7 +1236,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 }
-
 
 class _ErrorStrip extends StatelessWidget {
   const _ErrorStrip({required this.message, required this.onRetry});

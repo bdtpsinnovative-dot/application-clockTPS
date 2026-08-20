@@ -26,29 +26,46 @@ class WorkHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        20,
-        MediaQuery.paddingOf(context).top + 12,
-        20,
-        bottomPadding,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [workBlue, workSky],
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          20,
+          MediaQuery.paddingOf(context).top + 12,
+          20,
+          bottomPadding,
         ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(36),
-          bottomRight: Radius.circular(36),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [workBlue, workSky],
+          ),
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(36),
+            bottomRight: Radius.circular(36),
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
+        child: Column(
+          children: [
+            Row(
+              children: [
+                if (Navigator.canPop(context)) ...[
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    behavior: HitTestBehavior.opaque,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                      child: Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,8 +98,9 @@ class WorkHeader extends StatelessWidget {
           if (child != null) ...[const SizedBox(height: 22), child!],
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class WorkCard extends StatelessWidget {

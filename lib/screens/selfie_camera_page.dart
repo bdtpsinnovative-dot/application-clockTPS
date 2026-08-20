@@ -51,7 +51,7 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
         frontCamera,
         ResolutionPreset.high,
         enableAudio: false,
-        imageFormatGroup: Platform.isIOS ? ImageFormatGroup.bgra8888 : ImageFormatGroup.jpeg,
+        imageFormatGroup: (!kIsWeb && Platform.isIOS) ? ImageFormatGroup.bgra8888 : ImageFormatGroup.jpeg,
       );
 
       await _controller!.initialize();

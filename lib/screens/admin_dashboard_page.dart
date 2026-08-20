@@ -24,6 +24,7 @@ class AdminDashboardPage extends StatefulWidget {
     required this.onMenu,
     required this.onSelectTab,
     required this.isActive,
+    this.onOpenProfile,
   });
 
   final AppUser user;
@@ -31,6 +32,7 @@ class AdminDashboardPage extends StatefulWidget {
   final VoidCallback onMenu;
   final ValueChanged<int> onSelectTab;
   final bool isActive;
+  final VoidCallback? onOpenProfile;
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
@@ -324,12 +326,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ),
                             const SizedBox(width: 12),
                             // Custom Bordered Avatar (Role-Based & Solid Color)
-                            Container(
-                              decoration: borderDecoration,
-                              child: UserAvatar(
-                                avatarUrl: widget.user.avatarUrl,
-                                name: widget.user.fullName,
-                                radius: 22,
+                            GestureDetector(
+                              onTap: widget.onOpenProfile,
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                decoration: borderDecoration,
+                                child: UserAvatar(
+                                  avatarUrl: widget.user.avatarUrl,
+                                  name: widget.user.fullName,
+                                  radius: 22,
+                                ),
                               ),
                             ),
                           ],

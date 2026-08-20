@@ -2,28 +2,52 @@ import 'dart:convert';
 
 class AttendanceRecord {
   const AttendanceRecord({
+    this.id = '',
     required this.date,
     required this.status,
     required this.userId,
     this.checkInAt,
     this.checkOutAt,
+    this.workStartTime = '09:00',
+    this.workEndTime = '18:00',
+    this.isWorkday = true,
+    this.isOffsite = false,
+    this.lateMinutes = 0,
+    this.locationName = '',
+    this.checkOutLocationName = '',
   });
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
     return AttendanceRecord(
+      id: json['id'] as String? ?? '',
       date: DateTime.parse(json['date'] as String),
       status: json['status'] as String? ?? 'no_record',
       userId: json['user_id'] as String? ?? '',
       checkInAt: _tryDate(json['check_in_at']),
       checkOutAt: _tryDate(json['check_out_at']),
+      workStartTime: json['work_start_time'] as String? ?? '09:00',
+      workEndTime: json['work_end_time'] as String? ?? '18:00',
+      isWorkday: json['is_workday'] as bool? ?? true,
+      isOffsite: json['is_offsite'] as bool? ?? false,
+      lateMinutes: (json['late_minutes'] as num?)?.toInt() ?? 0,
+      locationName: json['location_name'] as String? ?? '',
+      checkOutLocationName: json['check_out_location_name'] as String? ?? '',
     );
   }
 
+  final String id;
   final DateTime date;
   final String status;
   final String userId;
   final DateTime? checkInAt;
   final DateTime? checkOutAt;
+  final String workStartTime;
+  final String workEndTime;
+  final bool isWorkday;
+  final bool isOffsite;
+  final int lateMinutes;
+  final String locationName;
+  final String checkOutLocationName;
 }
 
 class WorkRequestRecord {
@@ -884,6 +908,7 @@ class TaskCategoryRecord {
 
 class AdminHistoryRecord {
   const AdminHistoryRecord({
+    this.attendanceId = '',
     required this.date,
     required this.userName,
     required this.email,
@@ -895,10 +920,17 @@ class AdminHistoryRecord {
     this.checkInAt,
     this.checkOutAt,
     required this.createdAt,
+    this.workStartTime = '09:00',
+    this.workEndTime = '18:00',
+    this.lateMinutes = 0,
+    this.locationName = '',
+    this.checkOutLocationName = '',
+    this.isOffsite = false,
   });
 
   factory AdminHistoryRecord.fromJson(Map<String, dynamic> json) {
     return AdminHistoryRecord(
+      attendanceId: json['attendance_id'] as String? ?? '',
       date: DateTime.parse(json['date'] as String),
       userName: json['user_name'] as String? ?? '',
       email: json['email'] as String? ?? '',
@@ -910,9 +942,16 @@ class AdminHistoryRecord {
       checkInAt: _tryDate(json['check_in_at']),
       checkOutAt: _tryDate(json['check_out_at']),
       createdAt: DateTime.parse(json['created_at'] as String),
+      workStartTime: json['work_start_time'] as String? ?? '09:00',
+      workEndTime: json['work_end_time'] as String? ?? '18:00',
+      lateMinutes: (json['late_minutes'] as num?)?.toInt() ?? 0,
+      locationName: json['location_name'] as String? ?? '',
+      checkOutLocationName: json['check_out_location_name'] as String? ?? '',
+      isOffsite: json['is_offsite'] as bool? ?? false,
     );
   }
 
+  final String attendanceId;
   final DateTime date;
   final String userName;
   final String email;
@@ -924,6 +963,12 @@ class AdminHistoryRecord {
   final DateTime? checkInAt;
   final DateTime? checkOutAt;
   final DateTime createdAt;
+  final String workStartTime;
+  final String workEndTime;
+  final int lateMinutes;
+  final String locationName;
+  final String checkOutLocationName;
+  final bool isOffsite;
 }
 
 class AttendanceSummary {

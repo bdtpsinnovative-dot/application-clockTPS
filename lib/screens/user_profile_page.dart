@@ -46,14 +46,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
       setState(() {
-        _leaveBalancesFuture = widget.service.getLeaveBalances(DateTime.now().year);
+        _leaveBalancesFuture = widget.service.getLeaveBalances(
+          DateTime.now().year,
+        );
       });
     }
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _leaveBalancesFuture = widget.service.getLeaveBalances(DateTime.now().year);
+      _leaveBalancesFuture = widget.service.getLeaveBalances(
+        DateTime.now().year,
+      );
     });
     await _leaveBalancesFuture;
   }
@@ -107,10 +111,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ),
                     const SizedBox(height: 24),
                     AvatarPicker(
-                      initialImageUrl: widget.user.avatarUrl != null && widget.user.avatarUrl!.trim().isNotEmpty
+                      initialImageUrl:
+                          widget.user.avatarUrl != null &&
+                              widget.user.avatarUrl!.trim().isNotEmpty
                           ? (widget.user.avatarUrl!.startsWith('r2://')
-                              ? widget.user.avatarUrl!.replaceFirst('r2://', 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/')
-                              : widget.user.avatarUrl!)
+                                ? widget.user.avatarUrl!.replaceFirst(
+                                    'r2://',
+                                    'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
+                                  )
+                                : widget.user.avatarUrl!)
                           : null,
                       onImagePicked: (file) {
                         setModalState(() {
@@ -119,7 +128,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       },
                       onError: (msg) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(msg), backgroundColor: Colors.red),
+                          SnackBar(
+                            content: Text(msg),
+                            backgroundColor: Colors.red,
+                          ),
                         );
                       },
                     ),
@@ -143,8 +155,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               });
 
                               try {
-                                final uploadedUrl = await widget.service.uploadImage(selectedFile!);
-                                
+                                final uploadedUrl = await widget.service
+                                    .uploadImage(selectedFile!);
+
                                 await widget.service.updateProfileInfo(
                                   firstName: widget.user.firstName,
                                   lastName: widget.user.lastName,
@@ -156,7 +169,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   widget.onProfileUpdated();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('อัปเดตรูปโปรไฟล์เรียบร้อยแล้ว'),
+                                      content: Text(
+                                        'อัปเดตรูปโปรไฟล์เรียบร้อยแล้ว',
+                                      ),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
@@ -166,7 +181,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('เกิดข้อผิดพลาด: ${e.toString()}'),
+                                      content: Text(
+                                        'เกิดข้อผิดพลาด: ${e.toString()}',
+                                      ),
                                       backgroundColor: Colors.red,
                                     ),
                                   );
@@ -183,17 +200,25 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         backgroundColor: workBlue,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: saving
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Text(
                               'บันทึกรูปโปรไฟล์',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                     ),
                   ],
@@ -247,26 +272,43 @@ class _UserProfilePageState extends State<UserProfilePage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final leaveType = Text(
                   b.leaveType,
                   style: const TextStyle(
                     color: workText,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
-                ),
-                Text(
+                );
+                final summary = Text(
                   'ใช้ $used / ทั้งหมด $total วัน (เหลือ $remaining)',
+                  textAlign: constraints.maxWidth < 320
+                      ? TextAlign.start
+                      : TextAlign.end,
                   style: const TextStyle(
                     color: workMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
-                ),
-              ],
+                );
+
+                if (constraints.maxWidth < 320) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [leaveType, const SizedBox(height: 2), summary],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: leaveType),
+                    const SizedBox(width: 12),
+                    Flexible(child: summary),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 6),
             ClipRRect(
@@ -298,7 +340,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
               subtitle: widget.user.email,
               bottomPadding: 56,
               action: IconButton(
-                icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
+                icon: const Icon(
+                  Icons.menu_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -329,7 +375,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             child: Column(
                               children: [
                                 GestureDetector(
-                                  onTap: () => _showEditProfileBottomSheet(context),
+                                  onTap: () =>
+                                      _showEditProfileBottomSheet(context),
                                   child: Stack(
                                     children: [
                                       Container(
@@ -337,10 +384,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                         height: 64,
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 2.5),
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 2.5,
+                                          ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.08),
+                                              color: Colors.black.withValues(
+                                                alpha: 0.08,
+                                              ),
                                               blurRadius: 8,
                                               offset: const Offset(0, 3),
                                             ),
@@ -362,7 +414,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                           decoration: BoxDecoration(
                                             color: workBlue,
                                             shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 1.5),
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 1.5,
+                                            ),
                                           ),
                                           child: const Icon(
                                             Icons.camera_alt_rounded,
@@ -385,7 +440,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  widget.user.position.isEmpty ? 'พนักงานทั่วไป' : widget.user.position,
+                                  widget.user.position.isEmpty
+                                      ? 'พนักงานทั่วไป'
+                                      : widget.user.position,
                                   style: const TextStyle(
                                     color: workMuted,
                                     fontSize: 12,
@@ -427,22 +484,34 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 : widget.user.position,
                           ),
                           _ProfileRow(
+                            icon: Icons.schedule_rounded,
+                            label: 'เวลาทำงาน',
+                            value:
+                                '${widget.user.workStartTime} - ${widget.user.workEndTime}',
+                          ),
+                          _ProfileRow(
                             icon: Icons.admin_panel_settings_outlined,
                             label: 'สิทธิ์การใช้งาน',
-                            value: widget.user.role == 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'พนักงาน (Employee)',
+                            value: widget.user.role == 'admin'
+                                ? 'ผู้ดูแลระบบ (Admin)'
+                                : 'พนักงาน (Employee)',
                           ),
                           _ProfileRow(
                             icon: Icons.face_retouching_natural_outlined,
                             label: 'ข้อมูลใบหน้า',
-                            value: widget.user.hasFaceEmbedding ? 'ลงทะเบียนแล้ว' : 'ยังไม่ได้ลงทะเบียน',
-                            valueColor: widget.user.hasFaceEmbedding ? Colors.green.shade700 : Colors.red.shade700,
+                            value: widget.user.hasFaceEmbedding
+                                ? 'ลงทะเบียนแล้ว'
+                                : 'ยังไม่ได้ลงทะเบียน',
+                            valueColor: widget.user.hasFaceEmbedding
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
                           ),
-                          
+
                           // Divide profile and leave quotas inside the same card!
                           const SizedBox(height: 16),
                           const Divider(height: 1, color: Color(0xFFF1F5F9)),
                           const SizedBox(height: 16),
-                          
+
                           Row(
                             children: [
                               Container(
@@ -458,12 +527,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Text(
-                                'สิทธิ์วันลาคงเหลือ',
-                                style: TextStyle(
-                                  color: workText,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
+                              const Expanded(
+                                child: Text(
+                                  'สิทธิ์วันลาคงเหลือ',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: workText,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ],
@@ -472,7 +545,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           FutureBuilder<List<LeaveBalanceRecord>>(
                             future: _leaveBalancesFuture,
                             builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                              if (snapshot.connectionState ==
+                                      ConnectionState.waiting &&
+                                  !snapshot.hasData) {
                                 return const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 24),
                                   child: Center(
@@ -493,12 +568,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   child: Center(
                                     child: Text(
                                       'ไม่สามารถโหลดข้อมูลสิทธิ์วันลาได้',
-                                      style: TextStyle(color: Colors.red, fontSize: 13),
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ),
                                 );
                               }
-                              return _buildLeaveBalancesList(snapshot.data ?? []);
+                              return _buildLeaveBalancesList(
+                                snapshot.data ?? [],
+                              );
                             },
                           ),
                           const SizedBox(height: 16),
@@ -532,10 +612,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ),
           ],
         ),
-       ),
-      );
-    }
+      ),
+    );
   }
+}
 
 class _ProfileRow extends StatelessWidget {
   const _ProfileRow({
@@ -560,13 +640,7 @@ class _ProfileRow extends StatelessWidget {
         children: [
           Icon(icon, color: workMuted, size: 18),
           const SizedBox(width: 10),
-          Text(
-            label,
-            style: const TextStyle(
-              color: workMuted,
-              fontSize: 13,
-            ),
-          ),
+          Text(label, style: const TextStyle(color: workMuted, fontSize: 13)),
           const SizedBox(width: 16),
           Expanded(
             child: Row(
@@ -588,12 +662,19 @@ class _ProfileRow extends StatelessWidget {
                 if (onEdit != null)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
-                    child: InkWell(
-                      onTap: onEdit,
-                      borderRadius: BorderRadius.circular(12),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4.0),
-                        child: Icon(Icons.edit_outlined, size: 14, color: workBlue),
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: InkWell(
+                        onTap: onEdit,
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Icon(
+                            Icons.edit_outlined,
+                            size: 14,
+                            color: workBlue,
+                          ),
+                        ),
                       ),
                     ),
                   ),

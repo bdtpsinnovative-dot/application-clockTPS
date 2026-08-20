@@ -88,6 +88,7 @@ class _AdminAttendanceHistoryPageState
         final ownRows = attendance
             .map(
               (record) => AdminHistoryRecord(
+                attendanceId: record.id,
                 date: record.date,
                 userName: currentUser?.fullName.isNotEmpty == true
                     ? currentUser!.fullName
@@ -101,6 +102,12 @@ class _AdminAttendanceHistoryPageState
                 checkInAt: record.checkInAt,
                 checkOutAt: record.checkOutAt,
                 createdAt: record.checkInAt ?? record.date,
+                workStartTime: record.workStartTime,
+                workEndTime: record.workEndTime,
+                lateMinutes: record.lateMinutes,
+                locationName: record.locationName,
+                checkOutLocationName: record.checkOutLocationName,
+                isOffsite: record.isOffsite,
               ),
             )
             .toList(growable: false);
@@ -235,6 +242,181 @@ class _AdminAttendanceHistoryPageState
     }).toList();
   }
 
+  Set<String> get _holidayDateSet {
+    final dates = <String>{};
+    for (final holiday in _holidays) {
+      final localDate = holiday.date.toLocal();
+      final start = DateTime(localDate.year, localDate.month, localDate.day);
+      for (var offset = 0; offset < holiday.numDays; offset++) {
+        dates.add(
+          DateFormat('yyyy-MM-dd').format(start.add(Duration(days: offset))),
+        );
+      }
+    }
+    return dates;
+  }
+
+  int _lateMinutesFor(AdminHistoryRecord row, {bool hasMorningLeave = false}) {
+    if (row.lateMinutes > 0) return row.lateMinutes;
+    if (row.status != 'late' || row.checkInAt == null) return 0;
+    final checkIn = row.checkInAt!.toLocal();
+    final scheduleParts = row.workStartTime.split(':');
+    final startHour = hasMorningLeave
+        ? 13
+        : int.tryParse(scheduleParts.isEmpty ? '' : scheduleParts[0]) ?? 9;
+    final startMinute = hasMorningLeave
+        ? 0
+        : int.tryParse(scheduleParts.length > 1 ? scheduleParts[1] : '') ?? 0;
+    final currentMinute = checkIn.hour * 60 + checkIn.minute;
+    final scheduledMinute = startHour * 60 + startMinute;
+    return currentMinute > scheduledMinute
+        ? currentMinute - scheduledMinute
+        : 0;
+  }
+
+  DateTime _combineDateAndTime(DateTime date, TimeOfDay time) {
+    final local = date.toLocal();
+    return DateTime(local.year, local.month, local.day, time.hour, time.minute);
+  }
+
+  Future<void> _editAttendance(AdminHistoryRecord row) async {
+    if (row.attendanceId.isEmpty || row.checkInAt == null) return;
+    var checkIn = TimeOfDay.fromDateTime(row.checkInAt!.toLocal());
+    TimeOfDay? checkOut = row.checkOutAt == null
+        ? null
+        : TimeOfDay.fromDateTime(row.checkOutAt!.toLocal());
+    var selectedStatus = '';
+    var saving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'แก้ไขบันทึกเวลา',
+                  style: TextStyle(
+                    color: workText,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${row.userName} · ${DateFormat('d MMM yyyy', 'th').format(row.date.toLocal())}\nเวลางาน ${row.workStartTime}–${row.workEndTime}',
+                  style: const TextStyle(color: workMuted, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.login_rounded, color: workBlue),
+                  title: const Text('เวลาเข้า'),
+                  trailing: Text(
+                    checkIn.format(context),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  onTap: () async {
+                    final value = await showTimePicker(
+                      context: context,
+                      initialTime: checkIn,
+                    );
+                    if (value != null) setSheetState(() => checkIn = value);
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.logout_rounded, color: workBlue),
+                  title: const Text('เวลาออก'),
+                  subtitle: checkOut == null
+                      ? const Text('ยังไม่ลงชื่อออก')
+                      : null,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (checkOut != null)
+                        IconButton(
+                          onPressed: () => setSheetState(() => checkOut = null),
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          tooltip: 'ล้างเวลาออก',
+                        ),
+                      Text(
+                        checkOut?.format(context) ?? 'เพิ่มเวลา',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  onTap: () async {
+                    final value = await showTimePicker(
+                      context: context,
+                      initialTime:
+                          checkOut ?? const TimeOfDay(hour: 18, minute: 0),
+                    );
+                    if (value != null) setSheetState(() => checkOut = value);
+                  },
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedStatus,
+                  decoration: const InputDecoration(labelText: 'สถานะ'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('คำนวณอัตโนมัติ')),
+                    DropdownMenuItem(value: 'on_time', child: Text('ตรงเวลา')),
+                    DropdownMenuItem(value: 'late', child: Text('สาย')),
+                  ],
+                  onChanged: (value) =>
+                      setSheetState(() => selectedStatus = value ?? ''),
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setSheetState(() => saving = true);
+                          try {
+                            await widget.service.updateAttendanceAdmin(
+                              attendanceId: row.attendanceId,
+                              checkInAt: _combineDateAndTime(row.date, checkIn),
+                              checkOutAt: checkOut == null
+                                  ? null
+                                  : _combineDateAndTime(row.date, checkOut!),
+                              status: selectedStatus.isEmpty
+                                  ? null
+                                  : selectedStatus,
+                            );
+                            if (!sheetContext.mounted) return;
+                            Navigator.pop(sheetContext);
+                            await _loadData();
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text('$error')));
+                              setSheetState(() => saving = false);
+                            }
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('บันทึกการแก้ไข'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ──── Calculate Monthly stats ────
   Map<String, int> get _scheduledDaysAndYMDs {
     final parts = _filterMonth.split('-');
@@ -244,9 +426,7 @@ class _AdminAttendanceHistoryPageState
     int count = 0;
     final ymds = <String>[];
 
-    final holidaySet = _holidays
-        .map((h) => DateFormat('yyyy-MM-dd').format(h.date.toLocal()))
-        .toSet();
+    final holidaySet = _holidayDateSet;
 
     for (int day = 1; day <= totalDays; day++) {
       final d = DateTime(y, m, day);
@@ -270,7 +450,6 @@ class _AdminAttendanceHistoryPageState
     final approvedLeaves =
         <String, double>{}; // user_ymd -> duration (1.0 or 0.5)
     final morningLeaves = <String, bool>{}; // user_ymd -> has morning leave
-    final approvedOffsites = <String, bool>{}; // user_ymd -> is offsite
 
     for (var r in _allRows) {
       final ymd = DateFormat('yyyy-MM-dd').format(r.date.toLocal());
@@ -285,8 +464,6 @@ class _AdminAttendanceHistoryPageState
         if (r.status.contains('ครึ่งเช้า') || r.status.contains('morning')) {
           morningLeaves[key] = true;
         }
-      } else if (r.type == 'offsite' && r.status.contains('approved')) {
-        approvedOffsites[key] = true;
       }
     }
 
@@ -309,7 +486,9 @@ class _AdminAttendanceHistoryPageState
         final ymd = DateFormat('yyyy-MM-dd').format(r.date.toLocal());
 
         if (r.type == 'attendance') {
-          if (r.status == 'on_time' || r.status == 'late') {
+          if (r.status == 'on_time' ||
+              r.status == 'late' ||
+              r.status == 'offsite') {
             final isWeekend =
                 r.date.toLocal().weekday == DateTime.saturday ||
                 r.date.toLocal().weekday == DateTime.sunday;
@@ -342,30 +521,18 @@ class _AdminAttendanceHistoryPageState
             }
           }
 
-          if (r.status == 'offsite') {
-            if (!approvedOffsites.containsKey(key)) {
-              offsiteCount++;
-            }
+          if (r.isOffsite || r.status == 'offsite') {
+            offsiteCount++;
             coveredDays.add(ymd);
           }
 
-          // Late calculation
-          if (r.checkInAt != null) {
-            final checkIn = r.checkInAt!.toLocal();
-            final isMorningLeave = morningLeaves['${r.userName}_$ymd'] == true;
-            final targetHour = isMorningLeave ? 13 : 9;
-            final target = DateTime(
-              checkIn.year,
-              checkIn.month,
-              checkIn.day,
-              targetHour,
-              0,
-            );
-            final diff = checkIn.difference(target).inMinutes;
-            if (diff > 0) {
-              lateCount++;
-              lateMinutes += diff;
-            }
+          final rowLateMinutes = _lateMinutesFor(
+            r,
+            hasMorningLeave: morningLeaves['${r.userName}_$ymd'] == true,
+          );
+          if (rowLateMinutes > 0) {
+            lateCount++;
+            lateMinutes += rowLateMinutes;
           }
 
           // Compute work hours
@@ -394,17 +561,12 @@ class _AdminAttendanceHistoryPageState
             annualLeave += val;
           }
           if (val == 1.0) coveredDays.add(ymd);
-        } else if (r.type == 'offsite' && r.status.contains('approved')) {
-          offsiteCount++;
-          coveredDays.add(ymd);
         }
       }
 
       // Calculate absent days
       int absentDays = 0;
-      final holidaySet = _holidays
-          .map((h) => DateFormat('yyyy-MM-dd').format(h.date.toLocal()))
-          .toSet();
+      final holidaySet = _holidayDateSet;
       final parts = _filterMonth.split('-');
       final y = int.parse(parts[0]);
       final m = int.parse(parts[1]);
@@ -1233,10 +1395,8 @@ class _AdminAttendanceHistoryPageState
                 60.0;
           }
 
-          // Calculate late minutes
-          int lateMin = 0;
-          if (row.checkInAt != null && row.type == 'attendance') {
-            final checkInLocal = row.checkInAt!.toLocal();
+          var lateMin = 0;
+          if (row.type == 'attendance') {
             // check morning leave
             final ymd = DateFormat('yyyy-MM-dd').format(row.date.toLocal());
             final isMorningLeave = _allRows.any(
@@ -1249,16 +1409,7 @@ class _AdminAttendanceHistoryPageState
                       r.status.contains('morning')),
             );
 
-            final targetHour = isMorningLeave ? 13 : 9;
-            final target = DateTime(
-              checkInLocal.year,
-              checkInLocal.month,
-              checkInLocal.day,
-              targetHour,
-              0,
-            );
-            final diff = checkInLocal.difference(target).inMinutes;
-            if (diff > 0) lateMin = diff;
+            lateMin = _lateMinutesFor(row, hasMorningLeave: isMorningLeave);
           }
 
           // Lookup matching active user to fetch their actual avatar URL
@@ -1328,6 +1479,20 @@ class _AdminAttendanceHistoryPageState
                           ),
                         ),
                         const SizedBox(width: 8),
+                        if (widget.service.currentUser?.role == 'admin' &&
+                            row.type == 'attendance' &&
+                            row.attendanceId.isNotEmpty)
+                          IconButton(
+                            onPressed: () => _editAttendance(row),
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            color: workBlue,
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(
+                              minWidth: 30,
+                              minHeight: 30,
+                            ),
+                            tooltip: 'แก้ไขเวลา',
+                          ),
                         // Type & Status Badge
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -1423,6 +1588,32 @@ class _AdminAttendanceHistoryPageState
                         ),
                       ],
                     ),
+                    if (row.type == 'attendance' &&
+                        (row.locationName.isNotEmpty ||
+                            row.checkOutLocationName.isNotEmpty)) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 14,
+                            color: workMuted,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              'เข้า ${row.locationName.isEmpty ? '-' : row.locationName} · ออก ${row.checkOutLocationName.isEmpty ? '-' : row.checkOutLocationName}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                color: workMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     if (row.reason.trim().isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(

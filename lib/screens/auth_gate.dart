@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
@@ -108,6 +109,10 @@ class _AuthGateState extends State<AuthGate> {
       return AuthFlowService.mockDeviceId!;
     }
     final deviceInfo = DeviceInfoPlugin();
+    if (kIsWeb) {
+      final webInfo = await deviceInfo.webBrowserInfo;
+      return webInfo.userAgent ?? 'web_browser_device';
+    }
     if (Platform.isIOS) {
       final iosInfo = await deviceInfo.iosInfo;
       return iosInfo.identifierForVendor ?? 'ios_unknown_device';

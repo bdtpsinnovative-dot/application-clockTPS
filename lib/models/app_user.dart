@@ -12,6 +12,8 @@ class AppUser {
     required this.status,
     required this.avatarUrl,
     required this.hasFaceEmbedding,
+    this.workStartTime = '09:00',
+    this.workEndTime = '18:00',
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -28,6 +30,8 @@ class AppUser {
       status: json['status'] as String? ?? 'pending',
       avatarUrl: json['avatar_url'] as String?,
       hasFaceEmbedding: json['has_face_embedding'] as bool? ?? false,
+      workStartTime: json['work_start_time'] as String? ?? '09:00',
+      workEndTime: json['work_end_time'] as String? ?? '18:00',
     );
   }
 
@@ -43,6 +47,8 @@ class AppUser {
   final String status;
   final String? avatarUrl;
   final bool hasFaceEmbedding;
+  final String workStartTime;
+  final String workEndTime;
 
   bool get isProfileComplete =>
       firstName.trim().isNotEmpty &&

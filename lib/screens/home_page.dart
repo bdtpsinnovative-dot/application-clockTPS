@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../models/app_user.dart';
@@ -149,7 +148,27 @@ class _HomePageState extends State<HomePage> {
 
   void _openMenu() => _scaffoldKey.currentState?.openDrawer();
 
+  void _openProfile() {
+    Navigator.maybePop(context);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => UserProfilePage(
+          user: _currentUser,
+          service: widget.service,
+          onMenu: _openMenu,
+          onSignOut: widget.onSignOut,
+          isActive: true,
+          onProfileUpdated: _refreshUser,
+        ),
+      ),
+    );
+  }
+
   void _selectPage(int index, {String? targetRequestId}) {
+    if (index == 5) {
+      _openProfile();
+      return;
+    }
     if (_animatingSelectedIndex == index) {
       if (targetRequestId != null) {
         setState(() {
@@ -177,146 +196,151 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget _buildGlassBottomBar() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        height: 62,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.65),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.25),
-            width: 1,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0A000000),
-              blurRadius: 15,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Stack(
-                children: [
-                  // 1. Sliding capsule background
-                  Positioned.fill(
-                    child: AnimatedAlign(
-                      alignment: Alignment(
-                        -1.0 + (_animatingSelectedIndex * (2.0 / 5.0)),
-                        0.0,
-                      ),
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOutCubic,
-                      child: FractionallySizedBox(
-                        widthFactor: 1.0 / 6.0,
-                        heightFactor:
-                            0.75, // Capsule height relative to nav bar height
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // 2. Clickable Tab items
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+  Widget _buildScoopedBottomBar() {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    const double barHeight = 64.0;
+    final double totalHeight = barHeight + bottomInset;
+
+    return SizedBox(
+      height: totalHeight + 18.0,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomCenter,
+        children: [
+          // 1. Full-width Canvas with Scooped Notch Cutout
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: totalHeight,
+            child: CustomPaint(
+              painter: const _ScoopedNotchPainter(
+                color: Colors.white,
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(bottom: bottomInset),
+                child: SizedBox(
+                  height: barHeight,
+                  child: Row(
                     children: [
-                      _buildGlassNavItem(
+                      // Left 2 items (Home, Requests)
+                      _buildModernNavItem(
                         0,
                         Icons.home_outlined,
                         Icons.home_rounded,
                         'หน้าหลัก',
                       ),
-                      _buildGlassNavItem(
-                        1,
-                        Icons.fingerprint_rounded,
-                        Icons.fingerprint_rounded,
-                        'ลงเวลา',
-                      ),
-                      _buildGlassNavItem(
+                      _buildModernNavItem(
                         2,
                         Icons.assignment_outlined,
                         Icons.assignment_rounded,
                         'คำขอ',
+                        badgeCount: _pendingCount,
                       ),
-                      _buildGlassNavItem(
+
+                      // Gap reserved for the scooped center cradle
+                      const SizedBox(width: 82),
+
+                      // Right 2 items (Calendar, Notifications)
+                      _buildModernNavItem(
                         3,
                         Icons.calendar_month_outlined,
                         Icons.calendar_month_rounded,
                         'ปฏิทิน',
                       ),
-                      _buildGlassNavItem(
+                      _buildModernNavItem(
                         4,
                         Icons.notifications_none_rounded,
                         Icons.notifications_rounded,
                         'แจ้งเตือน',
+                        badgeCount: _notificationCount,
                       ),
-                      _buildGlassProfileNavItem(5, 'โปรไฟล์'),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
+          ),
+
+          // 2. Center Floating Action Button (FAB) for Clock In inside the Scoop
+          Positioned(
+            top: 0,
+            child: _buildCenterClockFab(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCenterClockFab() {
+    final isSelected = _selectedIndex == 1;
+    return GestureDetector(
+      onTap: () => _selectPage(1),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutBack,
+        width: isSelected ? 58 : 54,
+        height: isSelected ? 58 : 54,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF2E7CFF),
+              Color(0xFF1450E0),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E7CFF).withValues(
+                alpha: isSelected ? 0.48 : 0.32,
+              ),
+              blurRadius: isSelected ? 16 : 10,
+              spreadRadius: isSelected ? 1 : 0,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Icon(
+            Icons.access_time_filled_rounded,
+            color: Colors.white,
+            size: isSelected ? 28 : 26,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildGlassNavItem(
+  Widget _buildModernNavItem(
     int index,
     IconData unselectedIcon,
     IconData selectedIcon,
-    String label,
-  ) {
-    final isSelected = _animatingSelectedIndex == index;
+    String label, {
+    int badgeCount = 0,
+  }) {
+    final isSelected = _selectedIndex == index;
 
-    final Widget iconWidget;
-    if (index == 0) {
-      iconWidget = FacebookHomeIcon(
-        color: isSelected ? workBlue : workMuted,
-        isFilled: isSelected,
-        size: 20,
-      );
-    } else if (index == 1) {
-      iconWidget = ClockInIcon(
-        color: isSelected ? workBlue : workMuted,
-        isFilled: isSelected,
-        size: 20,
-      );
-    } else {
-      iconWidget = Icon(
-        isSelected ? selectedIcon : unselectedIcon,
-        color: isSelected ? workBlue : workMuted,
-        size: 20,
-      );
-    }
+    final Widget iconWidget = Icon(
+      isSelected ? selectedIcon : unselectedIcon,
+      color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+      size: 24,
+    );
 
-    final badgeCount = index == 2 ? _pendingCount : _notificationCount;
-    final Widget badgeIcon = (index == 2 || index == 4) && badgeCount > 0
+    final Widget badgeIcon = badgeCount > 0
         ? Badge(
             label: Text(
               badgeCount > 99 ? '99+' : '$badgeCount',
               style: const TextStyle(
-                fontSize: 8,
+                fontSize: 8.5,
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
             backgroundColor: const Color(0xFFEF4444),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
             child: iconWidget,
           )
         : iconWidget;
@@ -325,90 +349,21 @@ class _HomePageState extends State<HomePage> {
       child: GestureDetector(
         onTap: () => _selectPage(index),
         behavior: HitTestBehavior.opaque,
-        child: Container(
-          alignment: Alignment.center,
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 1),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               badgeIcon,
-              const SizedBox(height: 1),
+              const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? workBlue : workMuted,
-                  fontSize: 8.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGlassProfileNavItem(int index, String label) {
-    final isSelected = _animatingSelectedIndex == index;
-    final avatarUrl = _currentUser.avatarUrl;
-    final hasAvatar = avatarUrl != null && avatarUrl.trim().isNotEmpty;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _selectPage(index),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          alignment: Alignment.center,
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 1),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 19,
-                height: 19,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? workBlue : Colors.grey.shade400,
-                    width: isSelected ? 1.5 : 1,
-                  ),
-                ),
-                child: ClipOval(
-                  child: hasAvatar
-                      ? Image.network(
-                          avatarUrl.startsWith('r2://')
-                              ? avatarUrl.replaceFirst(
-                                  'r2://',
-                                  'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-                                )
-                              : avatarUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(
-                                Icons.person_rounded,
-                                size: 11,
-                                color: workMuted,
-                              ),
-                        )
-                      : const Icon(
-                          Icons.person_rounded,
-                          size: 11,
-                          color: workMuted,
-                        ),
-                ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? workBlue : workMuted,
-                  fontSize: 8.5,
+                  color: isSelected
+                      ? const Color(0xFF2563EB)
+                      : const Color(0xFF94A3B8),
+                  fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
@@ -431,6 +386,7 @@ class _HomePageState extends State<HomePage> {
           user: _currentUser,
           selectedIndex: _selectedIndex,
           onSelect: _selectPage,
+          onOpenProfile: _openProfile,
           onSignOut: widget.onSignOut,
         ),
         body: IndexedStack(
@@ -445,6 +401,7 @@ class _HomePageState extends State<HomePage> {
                     onMenu: _openMenu,
                     onSelectTab: _selectPage,
                     isActive: _selectedIndex == 0,
+                    onOpenProfile: _openProfile,
                   )
                 : MainDashboardPage(
                     key: const PageStorageKey('main_dashboard'),
@@ -452,6 +409,7 @@ class _HomePageState extends State<HomePage> {
                     service: widget.service,
                     onSelectTab: _selectPage,
                     isActive: _selectedIndex == 0,
+                    onOpenProfile: _openProfile,
                   ),
             // Index 1: ลงเวลาเข้างาน
             DashboardPage(
@@ -490,7 +448,7 @@ class _HomePageState extends State<HomePage> {
               service: widget.service,
               onMenu: _openMenu,
               onOpenRequests: () =>
-                  _selectPage(2), // เปิดแท็บ 2 (คำขอ) แทนแท็บ 1 เดิม
+                  _selectPage(2),
               isActive: _selectedIndex == 3,
             ),
             // Index 4: แจ้งเตือน
@@ -507,19 +465,9 @@ class _HomePageState extends State<HomePage> {
                 }
               },
             ),
-            // Index 5: โปรไฟล์
-            UserProfilePage(
-              key: const PageStorageKey('profile'),
-              user: _currentUser,
-              service: widget.service,
-              onMenu: _openMenu,
-              onSignOut: widget.onSignOut,
-              isActive: _selectedIndex == 5,
-              onProfileUpdated: _refreshUser,
-            ),
           ],
         ),
-        bottomNavigationBar: _buildGlassBottomBar(),
+        bottomNavigationBar: _buildScoopedBottomBar(),
       );
     } catch (e, stack) {
       return Scaffold(
@@ -583,12 +531,14 @@ class _AppDrawer extends StatelessWidget {
     required this.user,
     required this.selectedIndex,
     required this.onSelect,
+    required this.onOpenProfile,
     required this.onSignOut,
   });
 
   final AppUser user;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+  final VoidCallback onOpenProfile;
   final Future<void> Function() onSignOut;
 
   @override
@@ -598,43 +548,57 @@ class _AppDrawer extends StatelessWidget {
     return Drawer(
       child: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(
-              24,
-              MediaQuery.paddingOf(context).top + 28,
-              24,
-              26,
-            ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [workBlue, workSky]),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                UserAvatar(
-                  avatarUrl: user.avatarUrl,
-                  name: user.fullName,
-                  radius: 31,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.45),
-                    width: 2,
+          InkWell(
+            onTap: onOpenProfile,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(
+                24,
+                MediaQuery.paddingOf(context).top + 28,
+                24,
+                26,
+              ),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [workBlue, workSky]),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  UserAvatar(
+                    avatarUrl: user.avatarUrl,
+                    name: user.fullName,
+                    radius: 31,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      width: 2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  user.fullName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          user.fullName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: Colors.white70,
+                        size: 14,
+                      ),
+                    ],
                   ),
-                ),
-                Text(
-                  user.position.isEmpty ? user.role : user.position,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.76)),
-                ),
-              ],
+                  Text(
+                    user.position.isEmpty ? user.role : user.position,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.76)),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -670,9 +634,9 @@ class _AppDrawer extends StatelessWidget {
           ),
           _DrawerItem(
             icon: Icons.person_outline_rounded,
-            label: 'โปรไฟล์',
-            selected: selectedIndex == 5,
-            onTap: () => onSelect(5),
+            label: 'โปรไฟล์ของฉัน',
+            selected: false,
+            onTap: onOpenProfile,
           ),
           const Spacer(),
           const Divider(),
@@ -886,4 +850,112 @@ class _ClockInPainter extends CustomPainter {
   bool shouldRepaint(covariant _ClockInPainter oldDelegate) {
     return oldDelegate.color != color || oldDelegate.isFilled != isFilled;
   }
+}
+
+class _ScoopedNotchPainter extends CustomPainter {
+  final Color color;
+
+  const _ScoopedNotchPainter({
+    required this.color,
+  });
+
+  static const double fabRadius = 28.0;
+  static const double notchMargin = 7.0;
+  static const double shoulderRadius = 16.0;
+  static const Color shadowColor = Color(0x18000000);
+
+  Path _createPath(Size size) {
+    final path = Path();
+    final w = size.width;
+    final h = size.height;
+    final cx = w / 2;
+    final r = fabRadius + notchMargin;
+    final s = shoulderRadius;
+
+    // Start at top-left
+    path.moveTo(0, 0);
+
+    // Straight line to start of left shoulder
+    path.lineTo(cx - r - s, 0);
+
+    // Left shoulder curve curving down into the notch
+    path.cubicTo(
+      cx - r - s * 0.45, 0,
+      cx - r, r * 0.28,
+      cx - r, r * 0.58,
+    );
+
+    // Center circular cradle arc under the FAB
+    path.arcToPoint(
+      Offset(cx + r, r * 0.58),
+      radius: Radius.circular(r),
+      clockwise: false,
+    );
+
+    // Right shoulder curve curving back up to flat top line
+    path.cubicTo(
+      cx + r, r * 0.28,
+      cx + r + s * 0.45, 0,
+      cx + r + s, 0,
+    );
+
+    // Straight line to top-right
+    path.lineTo(w, 0);
+
+    // Down to bottom-right
+    path.lineTo(w, h);
+
+    // Across to bottom-left
+    path.lineTo(0, h);
+
+    // Close shape
+    path.close();
+
+    return path;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = _createPath(size);
+
+    // 1. Draw smooth ambient shadow
+    canvas.drawShadow(path, shadowColor, 8.0, false);
+
+    // 2. Draw solid surface
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, fillPaint);
+
+    // 3. Draw top hairline border
+    final borderPath = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2 - (fabRadius + notchMargin + shoulderRadius), 0)
+      ..cubicTo(
+        size.width / 2 - (fabRadius + notchMargin + shoulderRadius * 0.45), 0,
+        size.width / 2 - (fabRadius + notchMargin), (fabRadius + notchMargin) * 0.28,
+        size.width / 2 - (fabRadius + notchMargin), (fabRadius + notchMargin) * 0.58,
+      )
+      ..arcToPoint(
+        Offset(size.width / 2 + (fabRadius + notchMargin), (fabRadius + notchMargin) * 0.58),
+        radius: Radius.circular(fabRadius + notchMargin),
+        clockwise: false,
+      )
+      ..cubicTo(
+        size.width / 2 + (fabRadius + notchMargin), (fabRadius + notchMargin) * 0.28,
+        size.width / 2 + (fabRadius + notchMargin + shoulderRadius * 0.45), 0,
+        size.width / 2 + (fabRadius + notchMargin + shoulderRadius), 0,
+      )
+      ..lineTo(size.width, 0);
+
+    final strokePaint = Paint()
+      ..color = const Color(0x10000000)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+    canvas.drawPath(borderPath, strokePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScoopedNotchPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

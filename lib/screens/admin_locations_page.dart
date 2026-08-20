@@ -55,9 +55,9 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ยืนยันการลบจุดทำงาน'),
+        title: const Text('ยืนยันการปิดใช้งานจุดทำงาน'),
         content: Text(
-          'ต้องการลบจุดทำงาน "${loc['name']}" หรือไม่? การลบจะทำให้พนักงานไม่สามารถบันทึกเวลาในจุดพิกัดนี้ได้อีก',
+          'ต้องการปิดใช้งาน "${loc['name']}" หรือไม่? ประวัติการลงเวลาเดิมจะยังคงอยู่',
         ),
         actions: [
           TextButton(
@@ -67,7 +67,7 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('ยืนยันการลบ'),
+            child: const Text('ปิดใช้งาน'),
           ),
         ],
       ),
@@ -81,7 +81,7 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('ลบจุดทำงาน "${loc['name']}" สำเร็จแล้ว'),
+            content: Text('ปิดใช้งาน "${loc['name']}" แล้ว'),
             backgroundColor: Colors.green,
           ),
         );
@@ -99,12 +99,13 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
     }
   }
 
-  void _showAddLocationDialog() {
+  void _showAddLocationDialog([Map<String, dynamic>? existing]) {
     final formKey = GlobalKey<FormState>();
-    String name = '';
-    double lat = 0.0;
-    double lng = 0.0;
-    double radius = 100.0;
+    final isEditing = existing != null;
+    String name = existing?['name']?.toString() ?? '';
+    double lat = double.tryParse('${existing?['latitude'] ?? ''}') ?? 0.0;
+    double lng = double.tryParse('${existing?['longitude'] ?? ''}') ?? 0.0;
+    double radius = double.tryParse('${existing?['radius_m'] ?? ''}') ?? 100.0;
 
     showModalBottomSheet(
       context: context,
@@ -129,9 +130,9 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'เพิ่มจุดพิกัดสาขา/สถานที่ทำงาน',
-                    style: TextStyle(
+                  Text(
+                    isEditing ? 'แก้ไขจุดทำงาน' : 'เพิ่มจุดทำงาน',
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: workText,
@@ -145,6 +146,7 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
               ),
               const SizedBox(height: 16),
               TextFormField(
+                initialValue: name,
                 decoration: const InputDecoration(
                   labelText: 'ชื่อสถานที่ / สาขา',
                   hintText: 'เช่น สำนักงานใหญ่, สาขาสาทร',
@@ -159,6 +161,7 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                 children: [
                   Expanded(
                     child: TextFormField(
+                      initialValue: isEditing ? '$lat' : null,
                       decoration: const InputDecoration(
                         labelText: 'พิกัด ละติจูด (Latitude)',
                         hintText: 'เช่น 13.7563',
@@ -176,6 +179,7 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
+                      initialValue: isEditing ? '$lng' : null,
                       decoration: const InputDecoration(
                         labelText: 'พิกัด ลองจิจูด (Longitude)',
                         hintText: 'เช่น 100.5018',
@@ -199,7 +203,7 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                   hintText: 'ปกติกำหนดเป็น 50 หรือ 100 เมตร',
                 ),
                 keyboardType: TextInputType.number,
-                initialValue: '100',
+                initialValue: radius.toStringAsFixed(0),
                 validator: (val) => val == null || double.tryParse(val) == null
                     ? 'กรุณาระบุตัวเลขรัศมี'
                     : null,
@@ -212,16 +216,30 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                     formKey.currentState!.save();
 
                     try {
-                      await widget.service.createLocation(
-                        name: name,
-                        lat: lat,
-                        lng: lng,
-                        radius: radius,
-                      );
+                      if (isEditing) {
+                        await widget.service.updateLocation(
+                          id: existing['id'].toString(),
+                          name: name,
+                          lat: lat,
+                          lng: lng,
+                          radius: radius,
+                        );
+                      } else {
+                        await widget.service.createLocation(
+                          name: name,
+                          lat: lat,
+                          lng: lng,
+                          radius: radius,
+                        );
+                      }
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('เพิ่มจุดพิกัดทำงานสำเร็จแล้ว 🎉'),
+                          SnackBar(
+                            content: Text(
+                              isEditing
+                                  ? 'แก้ไขจุดทำงานเรียบร้อย'
+                                  : 'เพิ่มจุดทำงานเรียบร้อย',
+                            ),
                             backgroundColor: Colors.green,
                           ),
                         );
@@ -247,9 +265,9 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'บันทึกจุดพิกัดใหม่',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                child: Text(
+                  isEditing ? 'บันทึกการแก้ไข' : 'บันทึกจุดทำงานใหม่',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -273,7 +291,7 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
         actions: [
           if (isAdmin)
             IconButton(
-              onPressed: _showAddLocationDialog,
+              onPressed: () => _showAddLocationDialog(),
               icon: const Icon(Icons.add_location_alt_rounded, color: workBlue),
               tooltip: 'เพิ่มจุดทำงานใหม่',
             ),
@@ -335,7 +353,7 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                     if (isAdmin) ...[
                       const SizedBox(height: 24),
                       FilledButton.icon(
-                        onPressed: _showAddLocationDialog,
+                        onPressed: () => _showAddLocationDialog(),
                         icon: const Icon(Icons.add_location_alt_rounded),
                         label: const Text('เพิ่มสาขาใหม่'),
                         style: FilledButton.styleFrom(
@@ -434,14 +452,28 @@ class _AdminLocationsPageState extends State<AdminLocationsPage> {
                             ),
                           ),
                           if (isAdmin)
-                            IconButton(
-                              onPressed: () => _deleteLocation(loc),
-                              icon: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: Colors.red,
-                                size: 22,
-                              ),
-                              tooltip: 'ลบสาขา',
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed: () => _showAddLocationDialog(loc),
+                                  icon: const Icon(
+                                    Icons.edit_location_alt_outlined,
+                                    color: workBlue,
+                                    size: 20,
+                                  ),
+                                  tooltip: 'แก้ไข',
+                                ),
+                                IconButton(
+                                  onPressed: () => _deleteLocation(loc),
+                                  icon: const Icon(
+                                    Icons.location_off_outlined,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
+                                  tooltip: 'ปิดใช้งาน',
+                                ),
+                              ],
                             )
                           else
                             const Icon(

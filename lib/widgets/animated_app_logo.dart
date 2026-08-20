@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class AnimatedAppLogo extends StatefulWidget {
   const AnimatedAppLogo({
@@ -120,13 +121,20 @@ class _LogoImage extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(size * 0.24),
         boxShadow: const [
-          BoxShadow(color: Color(0x5518C7B7), blurRadius: 28, spreadRadius: 2),
+          BoxShadow(
+            color: Color(0x302E7CFF),
+            blurRadius: 24,
+            spreadRadius: 2,
+            offset: Offset(0, 8),
+          ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/clock_in_tps_logo.png',
-        fit: BoxFit.cover,
+      child: SvgPicture.asset(
+        'assets/images/app_icon_v2.svg',
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
       ),
     );
   }

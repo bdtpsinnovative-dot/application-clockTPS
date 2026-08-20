@@ -224,6 +224,148 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     }
   }
 
+  TimeOfDay _parseTime(String value, TimeOfDay fallback) {
+    final parts = value.split(':');
+    if (parts.length != 2) return fallback;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return fallback;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _timeValue(TimeOfDay value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _editWorkSchedule(AppUser user) async {
+    var start = _parseTime(
+      user.workStartTime,
+      const TimeOfDay(hour: 9, minute: 0),
+    );
+    var end = _parseTime(
+      user.workEndTime,
+      const TimeOfDay(hour: 18, minute: 0),
+    );
+    var saving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'เวลาทำงาน · ${user.fullName}',
+                  style: const TextStyle(
+                    color: workText,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'ใช้วันจันทร์–ศุกร์ และมีผลกับการลงเวลาครั้งถัดไป',
+                  style: TextStyle(color: workMuted, fontSize: 12),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ScheduleTimeTile(
+                        label: 'เริ่มงาน',
+                        value: _timeValue(start),
+                        icon: Icons.login_rounded,
+                        onTap: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: start,
+                          );
+                          if (picked != null) {
+                            setSheetState(() => start = picked);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _ScheduleTimeTile(
+                        label: 'เลิกงาน',
+                        value: _timeValue(end),
+                        icon: Icons.logout_rounded,
+                        onTap: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: end,
+                          );
+                          if (picked != null) setSheetState(() => end = picked);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final startMinutes = start.hour * 60 + start.minute;
+                          final endMinutes = end.hour * 60 + end.minute;
+                          if (endMinutes <= startMinutes) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'เวลาเลิกงานต้องอยู่หลังเวลาเริ่มงาน',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          setSheetState(() => saving = true);
+                          try {
+                            await widget.service.updateUserWorkSchedule(
+                              userId: user.id,
+                              workStartTime: _timeValue(start),
+                              workEndTime: _timeValue(end),
+                            );
+                            if (!sheetContext.mounted) return;
+                            Navigator.pop(sheetContext);
+                            await _loadUsers();
+                            if (mounted) {
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('บันทึกเวลาทำงานแล้ว'),
+                                ),
+                              );
+                            }
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text('$error')));
+                              setSheetState(() => saving = false);
+                            }
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('บันทึกเวลาทำงาน'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdmin = _isAdmin;
@@ -406,13 +548,20 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 10, color: workMuted),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'เวลาทำงาน ${u.workStartTime}–${u.workEndTime}',
+                      style: const TextStyle(fontSize: 10, color: workMuted),
+                    ),
                   ],
                 ),
               ),
               if (_isAdmin)
                 PopupMenuButton<String>(
                   onSelected: (value) {
-                    if (value == 'unbind') {
+                    if (value == 'schedule') {
+                      _editWorkSchedule(u);
+                    } else if (value == 'unbind') {
                       _unbindDevice(u);
                     } else if (value == 'disable') {
                       _disableUser(u);
@@ -421,6 +570,23 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                     }
                   },
                   itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'schedule',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_rounded,
+                            color: workBlue,
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'แก้ไขเวลาทำงาน',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
                     const PopupMenuItem(
                       value: 'unbind',
                       child: Row(
@@ -623,6 +789,60 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ScheduleTimeTile extends StatelessWidget {
+  const _ScheduleTimeTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Ink(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 15, color: workBlue),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: const TextStyle(color: workMuted, fontSize: 11),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                color: workText,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

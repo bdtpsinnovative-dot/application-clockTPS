@@ -122,7 +122,7 @@ class FcmService {
   FcmService._privateConstructor();
   static final FcmService instance = FcmService._privateConstructor();
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging get _messaging => FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   final StreamController<FcmNotificationTarget> _notificationTapController =
@@ -146,7 +146,7 @@ class FcmService {
   }
 
   Future<void> init() async {
-    if (_initialized) return;
+    if (kIsWeb || _initialized) return;
 
     try {
       // 1. Register background handler
@@ -265,7 +265,7 @@ class FcmService {
   }
 
   Future<void> registerDevice(AuthFlowService authService) async {
-    if (_deviceRegistered || _registeringDevice) return;
+    if (kIsWeb || _deviceRegistered || _registeringDevice) return;
 
     _registeringDevice = true;
     try {

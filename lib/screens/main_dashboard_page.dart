@@ -21,12 +21,14 @@ class MainDashboardPage extends StatefulWidget {
     required this.service,
     required this.onSelectTab,
     required this.isActive,
+    this.onOpenProfile,
   });
 
   final AppUser user;
   final AuthFlowService service;
   final ValueChanged<int> onSelectTab;
   final bool isActive;
+  final VoidCallback? onOpenProfile;
 
   @override
   State<MainDashboardPage> createState() => _MainDashboardPageState();
@@ -465,16 +467,20 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                       Semantics(
                         label: 'รูปโปรไฟล์ของ ${widget.user.fullName}',
                         image: true,
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: borderDecoration,
-                          child: UserAvatar(
-                            avatarUrl: widget.user.avatarUrl,
-                            name: widget.user.nickname.isNotEmpty
-                                ? widget.user.nickname
-                                : widget.user.firstName,
-                            radius: 24,
+                        child: GestureDetector(
+                          onTap: widget.onOpenProfile,
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: borderDecoration,
+                            child: UserAvatar(
+                              avatarUrl: widget.user.avatarUrl,
+                              name: widget.user.nickname.isNotEmpty
+                                  ? widget.user.nickname
+                                  : widget.user.firstName,
+                              radius: 24,
+                            ),
                           ),
                         ),
                       ),
