@@ -17,18 +17,80 @@ class AnimatedAppLogo extends StatefulWidget {
   State<AnimatedAppLogo> createState() => _AnimatedAppLogoState();
 }
 
-class _AnimatedAppLogoState extends State<AnimatedAppLogo> {
+class _AnimatedAppLogoState extends State<AnimatedAppLogo>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      value: widget.isAnimating ? 0.0 : 0.5,
+      duration: const Duration(milliseconds: 2600),
+    );
+    if (widget.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+    _scale = Tween<double>(
+      begin: 0.97,
+      end: 1.03,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(AnimatedAppLogo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isAnimating != oldWidget.isAnimating) {
+      if (widget.isAnimating) {
+        _controller.repeat(reverse: true);
+      } else {
+        _controller.animateTo(0.5, duration: const Duration(milliseconds: 500), curve: Curves.easeOut);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final logoWidget = _LogoImage(size: widget.size);
+    final animatedLogo = ScaleTransition(
+      scale: _scale,
+      child: _LogoImage(size: widget.size),
+    );
 
     if (!widget.heroEnabled) {
-      return logoWidget;
+      return animatedLogo;
     }
 
     return Hero(
       tag: 'clock-in-tps-logo',
-      child: logoWidget,
+      flightShuttleBuilder:
+          (
+            flightContext,
+            animation,
+            flightDirection,
+            fromHeroContext,
+            toHeroContext,
+          ) {
+            final flightCurve = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
+            );
+            return ScaleTransition(
+              scale: Tween<double>(
+                begin: 0.9,
+                end: 1.05,
+              ).animate(flightCurve),
+              child: _LogoImage(size: widget.size),
+            );
+          },
+      child: animatedLogo,
     );
   }
 }

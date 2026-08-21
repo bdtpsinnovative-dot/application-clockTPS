@@ -15,23 +15,32 @@ import 'screens/auth_gate.dart';
 import 'services/fcm_service.dart';
 
 Future<void> main() async {
+  print('Starting main...');
   WidgetsFlutterBinding.ensureInitialized();
+  print('Widgets bound.');
   if (!kIsWeb && Platform.isAndroid) {
     CameraPlatform.instance = AndroidCamera();
   }
+  print('Loading dotenv...');
   await dotenv.load(fileName: '.env');
+  print('Loaded dotenv. Validating config...');
   AppConfig.validate();
+  print('Config validated. Setting locale...');
   Intl.defaultLocale = 'th_TH';
   await initializeDateFormatting('th_TH');
+  print('Locale set. Initializing Firebase...');
 
   // Initialize Firebase and FcmService
   try {
     await Firebase.initializeApp();
-    await FcmService.instance.init();
+    print('Firebase initialized. Init FCM...');
+    FcmService.instance.init();
+    print('FCM initialized.');
   } catch (e) {
     debugPrint('Firebase initialization failed: $e');
   }
 
+  print('Calling runApp...');
   runApp(const MyApp());
 }
 
