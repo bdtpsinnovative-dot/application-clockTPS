@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'animated_app_logo.dart';
+import 'worm_bump_loader.dart';
 
 class AppLoadingView extends StatelessWidget {
   const AppLoadingView({
@@ -17,26 +17,17 @@ class AppLoadingView extends StatelessWidget {
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AnimatedAppLogo(
-          size: compact ? 82 : 130, 
-          heroEnabled: false,
-          isAnimating: true,
+        WormBumpLoader(
+          size: compact ? 64 : 88,
         ),
         SizedBox(height: compact ? 16 : 24),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: const Color(0xFF637083),
             fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 18),
-        const SizedBox(
-          width: 150,
-          child: LinearProgressIndicator(
-            minHeight: 4,
-            borderRadius: BorderRadius.all(Radius.circular(99)),
+            fontSize: compact ? 14 : 15,
           ),
         ),
       ],
@@ -47,7 +38,7 @@ class AppLoadingView extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         elevation: 8,
-        child: Padding(padding: const EdgeInsets.all(24), child: content),
+        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24), child: content),
       );
     }
 

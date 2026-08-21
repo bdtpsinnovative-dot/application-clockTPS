@@ -328,9 +328,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: workBackground,
-      child: RefreshIndicator(
+    return Scaffold(
+      backgroundColor: workBackground,
+      body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
           padding: EdgeInsets.zero,
