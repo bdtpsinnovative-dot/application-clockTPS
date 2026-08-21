@@ -56,7 +56,9 @@ class _AuthGateState extends State<AuthGate> {
       return;
     }
 
-    _setState(_GateState.loading);
+    if (_state != _GateState.signedOut) {
+      _setState(_GateState.loading);
+    }
     try {
       final user = await _service.getMe();
       _user = user;
@@ -131,6 +133,9 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _signOut() async {
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
     await _service.signOut();
     _user = null;
     _setState(_GateState.signedOut);
