@@ -322,30 +322,55 @@ class _AdminHolidaysPageState extends State<AdminHolidaysPage> {
                     fontSize: 14,
                   ),
                 ),
-                DropdownButton<int>(
-                  value: _selectedYear,
-                  items: [
-                    DropdownMenuItem(
-                      value: DateTime.now().year - 1,
-                      child: Text('${DateTime.now().year - 1}'),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      value: _selectedYear,
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      items: [
+                        DropdownMenuItem(
+                          value: DateTime.now().year - 1,
+                          child: Text(
+                              'พ.ศ. ${DateTime.now().year - 1 + 543} (${DateTime.now().year - 1})'),
+                        ),
+                        DropdownMenuItem(
+                          value: DateTime.now().year,
+                          child: Text(
+                              'พ.ศ. ${DateTime.now().year + 543} (${DateTime.now().year})'),
+                        ),
+                        DropdownMenuItem(
+                          value: DateTime.now().year + 1,
+                          child: Text(
+                              'พ.ศ. ${DateTime.now().year + 1 + 543} (${DateTime.now().year + 1})'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedYear = val;
+                          });
+                          _loadHolidays();
+                        }
+                      },
                     ),
-                    DropdownMenuItem(
-                      value: DateTime.now().year,
-                      child: Text('${DateTime.now().year}'),
-                    ),
-                    DropdownMenuItem(
-                      value: DateTime.now().year + 1,
-                      child: Text('${DateTime.now().year + 1}'),
-                    ),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedYear = val;
-                      });
-                      _loadHolidays();
-                    }
-                  },
+                  ),
                 ),
               ],
             ),

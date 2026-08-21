@@ -196,8 +196,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           try {
             await widget.service.updateTaskStatus(task.id, status);
             if (!mounted) return;
-            _loadData();
             Navigator.pop(context);
+            await _loadData();
           } catch (e) {
             if (!mounted) return;
             ScaffoldMessenger.of(
@@ -206,30 +206,162 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
           }
         },
         onDelete: () async {
-          final confirmed = await showDialog<bool>(
+          final confirmed = await showModalBottomSheet<bool>(
             context: context,
-            builder: (dialogContext) => AlertDialog(
-              title: const Text('ยืนยันการลบงาน'),
-              content: Text('ต้องการลบงาน “${task.title}” หรือไม่?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('ยกเลิก'),
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Colors.transparent,
+            builder: (sheetContext) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 38,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFCBD5E1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF1F2),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.delete_forever_rounded,
+                              color: Color(0xFFE11D48),
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'ยืนยันการลบงาน',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'การดำเนินการนี้ไม่สามารถย้อนกลับได้',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(sheetContext, false),
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Text(
+                          'ต้องการลบงาน “${task.title}” หรือไม่?',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(sheetContext, false),
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF64748B),
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text(
+                                'ยกเลิก',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () => Navigator.pop(sheetContext, true),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFE11D48),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 0,
+                              ),
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                              label: const Text(
+                                'ลบงานนี้',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, true),
-                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                  child: const Text('ลบงาน'),
-                ),
-              ],
+              ),
             ),
           );
           if (confirmed != true) return;
           try {
             await widget.service.deleteTask(task.id);
             if (!mounted) return;
-            _loadData();
             Navigator.pop(context);
+            await _loadData();
           } catch (e) {
             if (!mounted) return;
             ScaffoldMessenger.of(
@@ -258,7 +390,6 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
         currentUser: widget.service.currentUser,
         onDelete: () async {
           await widget.service.deleteTask(task.id);
-          await _loadData();
         },
         onSave:
             ({
@@ -286,7 +417,6 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
       ),
     );
     if (saved == true && mounted) {
-      Navigator.of(context).pop();
       await _loadData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -300,8 +430,8 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
   }
 
   // ─── Create task modal sheet (โมดูล) ──────────────────────────────
-  void _showCreateTaskModal() {
-    showModalBottomSheet(
+  Future<void> _showCreateTaskModal() async {
+    final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -347,10 +477,12 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
                   assigneeIds: assignees,
                 );
               }
-              await _loadData();
             },
       ),
     );
+    if (saved == true && mounted) {
+      await _loadData();
+    }
   }
 
   void _showFilterBottomSheet() {

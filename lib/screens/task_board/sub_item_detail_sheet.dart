@@ -512,28 +512,154 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
   }
 
   Future<void> _confirmDeleteSubItem() async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showModalBottomSheet<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text(
-          'ลบรายการย่อย',
-          style: TextStyle(fontWeight: FontWeight.bold),
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        content: Text('คุณต้องการลบรายการย่อย "${widget.item.title}" หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก', style: TextStyle(color: workMuted)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'ลบ',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1F2),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.delete_forever_rounded,
+                        color: Color(0xFFE11D48),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'ลบรายการย่อย',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'การดำเนินการนี้ไม่สามารถย้อนกลับได้',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(sheetContext, false),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Text(
+                    'คุณต้องการลบรายการย่อย "${widget.item.title}" หรือไม่?',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(sheetContext, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF64748B),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'ยกเลิก',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.pop(sheetContext, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFE11D48),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                        label: const Text(
+                          'ลบรายการย่อย',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
 
@@ -914,6 +1040,8 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                         child: DropdownButton<String>(
                           value: _subItemPriority,
                           isExpanded: true,
+                          borderRadius: BorderRadius.circular(16),
+                          dropdownColor: Colors.white,
                           icon: const Icon(
                             Icons.keyboard_arrow_down_rounded,
                             size: 18,
@@ -922,19 +1050,19 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                           items: const [
                             DropdownMenuItem(
                               value: 'low',
-                              child: Text('⚡ ต่ำ (Low)'),
+                              child: Text('ต่ำ (Low)'),
                             ),
                             DropdownMenuItem(
                               value: 'medium',
-                              child: Text('⚡ ด่วนปานกลาง (Medium)'),
+                              child: Text('ด่วนปานกลาง (Medium)'),
                             ),
                             DropdownMenuItem(
                               value: 'high',
-                              child: Text('⚡ ด่วนมาก (High)'),
+                              child: Text('ด่วนมาก (High)'),
                             ),
                             DropdownMenuItem(
                               value: 'urgent',
-                              child: Text('⚡ ด่วนที่สุด (Urgent)'),
+                              child: Text('ด่วนที่สุด (Urgent)'),
                             ),
                           ],
                           onChanged: (val) {
@@ -976,6 +1104,8 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
               child: DropdownButton<String>(
                 value: _currentStatus,
                 isExpanded: true,
+                borderRadius: BorderRadius.circular(16),
+                dropdownColor: Colors.white,
                 icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
                 style: const TextStyle(fontSize: 12.5, color: workText),
                 items: const [
@@ -1218,56 +1348,18 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
                       final textController = TextEditingController(
                         text: _linkUrlController.text,
                       );
-                      final confirm = await showDialog<bool>(
+                      final linkUrl = await showModalBottomSheet<String>(
                         context: context,
-                        builder: (context) => AlertDialog(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          title: const Text(
-                            'แนบลิงก์อ้างอิง',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          content: TextField(
-                            controller: textController,
-                            autofocus: true,
-                            decoration: const InputDecoration(
-                              hintText: 'https://example.com...',
-                              filled: true,
-                              fillColor: Color(0xFFF8FAFC),
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide.none,
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(10),
-                                ),
-                              ),
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text(
-                                'ยกเลิก',
-                                style: TextStyle(color: workMuted),
-                              ),
-                            ),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: workBlue,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('ตกลง'),
-                            ),
-                          ],
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => _SubItemAttachLinkSheet(
+                          initialUrl: textController.text.trim(),
                         ),
                       );
-                      if (confirm == true) {
+                      if (linkUrl != null) {
                         setState(() {
-                          _linkUrlController.text = textController.text.trim();
+                          _linkUrlController.text = linkUrl;
                         });
                       }
                     },
@@ -1767,4 +1859,206 @@ String _formatThaiDate(DateTime? date) {
     'ธ.ค.',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year + 543}';
+}
+
+class _SubItemAttachLinkSheet extends StatefulWidget {
+  const _SubItemAttachLinkSheet({this.initialUrl = ''});
+
+  final String initialUrl;
+
+  @override
+  State<_SubItemAttachLinkSheet> createState() =>
+      _SubItemAttachLinkSheetState();
+}
+
+class _SubItemAttachLinkSheetState extends State<_SubItemAttachLinkSheet> {
+  late final TextEditingController urlController;
+
+  @override
+  void initState() {
+    super.initState();
+    urlController = TextEditingController(text: widget.initialUrl);
+  }
+
+  @override
+  void dispose() {
+    urlController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final url = urlController.text.trim();
+    if (url.isEmpty) return;
+    Navigator.pop(context, url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.link_rounded,
+                      color: Color(0xFF10B981),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'แนบลิงก์อ้างอิง',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'เพิ่ม URL ลิงก์อ้างอิงสำหรับงานย่อยนี้',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'URL ลิงก์อ้างอิง *',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: urlController,
+                autofocus: true,
+                keyboardType: TextInputType.url,
+                style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                decoration: InputDecoration(
+                  hintText: 'https://example.com...',
+                  hintStyle:
+                      const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.all(14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.add_link_rounded, size: 17),
+                      label: const Text(
+                        'บันทึกลิงก์',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

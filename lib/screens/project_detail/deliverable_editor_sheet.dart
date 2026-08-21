@@ -104,9 +104,12 @@ class _DeliverableEditorSheetState extends State<DeliverableEditorSheet> {
   }
 
   Future<void> _addLink() async {
-    final attachment = await showDialog<TaskListAttachment>(
+    final attachment = await showModalBottomSheet<TaskListAttachment>(
       context: context,
-      builder: (dialogContext) => const _AddLinkDialog(),
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _AddLinkSheet(),
     );
     if (attachment != null && mounted) {
       setState(() => _attachments.add(attachment));
@@ -637,14 +640,14 @@ class _AttachmentEditorRow extends StatelessWidget {
   }
 }
 
-class _AddLinkDialog extends StatefulWidget {
-  const _AddLinkDialog();
+class _AddLinkSheet extends StatefulWidget {
+  const _AddLinkSheet();
 
   @override
-  State<_AddLinkDialog> createState() => _AddLinkDialogState();
+  State<_AddLinkSheet> createState() => _AddLinkSheetState();
 }
 
-class _AddLinkDialogState extends State<_AddLinkDialog> {
+class _AddLinkSheetState extends State<_AddLinkSheet> {
   late final TextEditingController nameController;
   late final TextEditingController urlController;
 
@@ -662,55 +665,223 @@ class _AddLinkDialogState extends State<_AddLinkDialog> {
     super.dispose();
   }
 
+  void _submit() {
+    final url = urlController.text.trim();
+    if (url.isEmpty) return;
+    Navigator.pop(
+      context,
+      TaskListAttachment(
+        name: nameController.text.trim().isEmpty
+            ? url
+            : nameController.text.trim(),
+        url: url,
+        type: 'link',
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('แนบลิงก์'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: nameController,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'ชื่อลิงก์',
-              hintText: 'เช่น ไฟล์งานบน Google Drive',
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: urlController,
-            keyboardType: TextInputType.url,
-            decoration: const InputDecoration(
-              labelText: 'URL',
-              hintText: 'https://',
-            ),
-          ),
-        ],
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('ยกเลิก'),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        FilledButton(
-          onPressed: () {
-            final url = urlController.text.trim();
-            if (url.isEmpty) return;
-            Navigator.pop(
-              context,
-              TaskListAttachment(
-                name: nameController.text.trim().isEmpty
-                    ? url
-                    : nameController.text.trim(),
-                url: url,
-                type: 'link',
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
               ),
-            );
-          },
-          child: const Text('แนบลิงก์'),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.link_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'แนบลิงก์อ้างอิง',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'เพิ่มลิงก์หรือไฟล์แนบจากภายนอก',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'ชื่อลิงก์ / ชื่อเอกสาร',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                decoration: InputDecoration(
+                  hintText: 'เช่น ไฟล์บน Google Drive / Canva',
+                  hintStyle:
+                      const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.all(14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'URL ลิงก์ *',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: urlController,
+                keyboardType: TextInputType.url,
+                style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                decoration: InputDecoration(
+                  hintText: 'https://...',
+                  hintStyle:
+                      const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.all(14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.add_link_rounded, size: 17),
+                      label: const Text(
+                        'แนบลิงก์',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 }

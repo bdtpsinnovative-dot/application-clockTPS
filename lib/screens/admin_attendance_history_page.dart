@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -279,6 +280,90 @@ class _AdminAttendanceHistoryPageState
     return DateTime(local.year, local.month, local.day, time.hour, time.minute);
   }
 
+  Future<TimeOfDay?> _pickCupertinoTime(
+    BuildContext context, {
+    required TimeOfDay initialTime,
+  }) async {
+    var selectedTime = initialTime;
+    final now = DateTime.now();
+    var initialDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      initialTime.hour,
+      initialTime.minute,
+    );
+
+    final result = await showModalBottomSheet<TimeOfDay>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(color: Color(0xFF64748B)),
+                      ),
+                    ),
+                    const Text(
+                      'เลือกเวลา',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext, selectedTime),
+                      child: const Text(
+                        'ตกลง',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 200,
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  initialDateTime: initialDateTime,
+                  use24hFormat: true,
+                  onDateTimeChanged: (dateTime) {
+                    selectedTime = TimeOfDay(
+                      hour: dateTime.hour,
+                      minute: dateTime.minute,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return result;
+  }
+
   Future<void> _editAttendance(AdminHistoryRecord row) async {
     if (row.attendanceId.isEmpty || row.checkInAt == null) return;
     var checkIn = TimeOfDay.fromDateTime(row.checkInAt!.toLocal());
@@ -288,154 +373,368 @@ class _AdminAttendanceHistoryPageState
     var selectedStatus = '';
     var saving = false;
 
+    String formatTimeOfDay(TimeOfDay tod) {
+      return '${tod.hour.toString().padLeft(2, '0')}:${tod.minute.toString().padLeft(2, '0')}';
+    }
+
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'แก้ไขบันทึกเวลา',
-                  style: TextStyle(
-                    color: workText,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+        builder: (context, setSheetState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${row.userName} · ${DateFormat('d MMM yyyy', 'th').format(row.date.toLocal())}\nเวลางาน ${row.workStartTime}–${row.workEndTime}',
-                  style: const TextStyle(color: workMuted, fontSize: 12),
-                ),
-                if (row.locationName.isNotEmpty ||
-                    row.checkOutLocationName.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 14,
-                        color: workMuted,
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.access_time_filled_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 22,
+                        ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          row.checkOutAt != null
-                              ? 'เข้า: ${row.locationName.isEmpty ? '-' : row.locationName} · ออก: ${row.checkOutLocationName.isEmpty ? '-' : row.checkOutLocationName}'
-                              : 'เข้า: ${row.locationName.isEmpty ? '-' : row.locationName}',
-                          style: const TextStyle(
-                            color: workMuted,
-                            fontSize: 11,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'แก้ไขบันทึกเวลา',
+                              style: TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${row.userName} · ${DateFormat('d MMM yyyy', 'th').format(row.date.toLocal())}',
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (row.locationName.isNotEmpty ||
+                      row.checkOutLocationName.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 15,
+                            color: Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              row.checkOutAt != null
+                                  ? 'เข้า: ${row.locationName.isEmpty ? '-' : row.locationName} · ออก: ${row.checkOutLocationName.isEmpty ? '-' : row.checkOutLocationName}'
+                                  : 'เข้า: ${row.locationName.isEmpty ? '-' : row.locationName}',
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final picked = await _pickCupertinoTime(
+                              context,
+                              initialTime: checkIn,
+                            );
+                            if (picked != null) {
+                              setSheetState(() => checkIn = picked);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Ink(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(16),
+                              border:
+                                  Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF2563EB)
+                                            .withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.login_rounded,
+                                        size: 13,
+                                        color: Color(0xFF2563EB),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      'เวลาเข้า',
+                                      style: TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  formatTimeOfDay(checkIn),
+                                  style: const TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final picked = await _pickCupertinoTime(
+                              context,
+                              initialTime: checkOut ??
+                                  const TimeOfDay(hour: 18, minute: 0),
+                            );
+                            if (picked != null) {
+                              setSheetState(() => checkOut = picked);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Ink(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(16),
+                              border:
+                                  Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF7C3AED)
+                                                .withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.logout_rounded,
+                                            size: 13,
+                                            color: Color(0xFF7C3AED),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        const Text(
+                                          'เวลาออก',
+                                          style: TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (checkOut != null)
+                                      GestureDetector(
+                                        onTap: () => setSheetState(
+                                            () => checkOut = null),
+                                        child: const Icon(
+                                          Icons.cancel_rounded,
+                                          size: 16,
+                                          color: Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  checkOut == null
+                                      ? 'ยังไม่ออก'
+                                      : formatTimeOfDay(checkOut!),
+                                  style: TextStyle(
+                                    color: checkOut == null
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF0F172A),
+                                    fontSize: checkOut == null ? 15 : 20,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ],
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.login_rounded, color: workBlue),
-                  title: const Text('เวลาเข้า'),
-                  trailing: Text(
-                    checkIn.format(context),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  onTap: () async {
-                    final value = await showTimePicker(
-                      context: context,
-                      initialTime: checkIn,
-                    );
-                    if (value != null) setSheetState(() => checkIn = value);
-                  },
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.logout_rounded, color: workBlue),
-                  title: const Text('เวลาออก'),
-                  subtitle: checkOut == null
-                      ? const Text('ยังไม่ลงชื่อออก')
-                      : null,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (checkOut != null)
-                        IconButton(
-                          onPressed: () => setSheetState(() => checkOut = null),
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          tooltip: 'ล้างเวลาออก',
-                        ),
-                      Text(
-                        checkOut?.format(context) ?? 'เพิ่มเวลา',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedStatus,
+                    style: const TextStyle(
+                        fontSize: 13, color: Color(0xFF0F172A)),
+                    decoration: InputDecoration(
+                      labelText: 'การปรับคำนวณสถานะ',
+                      labelStyle: const TextStyle(
+                          fontSize: 12.5, color: Color(0xFF64748B)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                       ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                          value: '', child: Text('คำนวณอัตโนมัติตามเวลาจริง')),
+                      DropdownMenuItem(
+                          value: 'on_time', child: Text('ตรงเวลา')),
+                      DropdownMenuItem(value: 'late', child: Text('สาย')),
                     ],
+                    onChanged: (value) =>
+                        setSheetState(() => selectedStatus = value ?? ''),
                   ),
-                  onTap: () async {
-                    final value = await showTimePicker(
-                      context: context,
-                      initialTime:
-                          checkOut ?? const TimeOfDay(hour: 18, minute: 0),
-                    );
-                    if (value != null) setSheetState(() => checkOut = value);
-                  },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedStatus,
-                  decoration: const InputDecoration(labelText: 'สถานะ'),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('คำนวณอัตโนมัติ')),
-                    DropdownMenuItem(value: 'on_time', child: Text('ตรงเวลา')),
-                    DropdownMenuItem(value: 'late', child: Text('สาย')),
-                  ],
-                  onChanged: (value) =>
-                      setSheetState(() => selectedStatus = value ?? ''),
-                ),
-                const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: saving
-                      ? null
-                      : () async {
-                          setSheetState(() => saving = true);
-                          try {
-                            await widget.service.updateAttendanceAdmin(
-                              attendanceId: row.attendanceId,
-                              checkInAt: _combineDateAndTime(row.date, checkIn),
-                              checkOutAt: checkOut == null
-                                  ? null
-                                  : _combineDateAndTime(row.date, checkOut!),
-                              status: selectedStatus.isEmpty
-                                  ? null
-                                  : selectedStatus,
-                            );
-                            if (!sheetContext.mounted) return;
-                            Navigator.pop(sheetContext);
-                            await _loadData();
-                          } catch (error) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(SnackBar(content: Text('$error')));
-                              setSheetState(() => saving = false);
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            setSheetState(() => saving = true);
+                            try {
+                              await widget.service.updateAttendanceAdmin(
+                                attendanceId: row.attendanceId,
+                                checkInAt:
+                                    _combineDateAndTime(row.date, checkIn),
+                                checkOutAt: checkOut == null
+                                    ? null
+                                    : _combineDateAndTime(row.date, checkOut!),
+                                status: selectedStatus.isEmpty
+                                    ? null
+                                    : selectedStatus,
+                              );
+                              if (!sheetContext.mounted) return;
+                              Navigator.pop(sheetContext);
+                              await _loadData();
+                            } catch (error) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(
+                                    SnackBar(content: Text('$error')));
+                                setSheetState(() => saving = false);
+                              }
                             }
-                          }
-                        },
-                  child: saving
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('บันทึกการแก้ไข'),
-                ),
-              ],
+                          },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: saving
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'บันทึกการแก้ไข',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -934,6 +1233,12 @@ class _AdminAttendanceHistoryPageState
                           child: DropdownButton<String>(
                             value: _filterDay,
                             isExpanded: true,
+                            borderRadius: BorderRadius.circular(16),
+                            dropdownColor: Colors.white,
+                            icon: const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: Color(0xFF64748B),
+                            ),
                             items: _dayList.map((day) {
                               return DropdownMenuItem<String>(
                                 value: day,
@@ -974,6 +1279,12 @@ class _AdminAttendanceHistoryPageState
                           child: DropdownButton<String>(
                             value: _filterType,
                             isExpanded: true,
+                            borderRadius: BorderRadius.circular(16),
+                            dropdownColor: Colors.white,
+                            icon: const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: Color(0xFF64748B),
+                            ),
                             items: const [
                               DropdownMenuItem(
                                 value: 'All',

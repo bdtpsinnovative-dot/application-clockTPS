@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../models/app_user.dart';
@@ -236,6 +237,90 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   String _timeValue(TimeOfDay value) =>
       '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
+  Future<TimeOfDay?> _pickCupertinoTime(
+    BuildContext context, {
+    required TimeOfDay initialTime,
+  }) async {
+    var selectedTime = initialTime;
+    final now = DateTime.now();
+    var initialDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      initialTime.hour,
+      initialTime.minute,
+    );
+
+    final result = await showModalBottomSheet<TimeOfDay>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(color: Color(0xFF64748B)),
+                      ),
+                    ),
+                    const Text(
+                      'เลือกเวลา',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext, selectedTime),
+                      child: const Text(
+                        'ตกลง',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 200,
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  initialDateTime: initialDateTime,
+                  use24hFormat: true,
+                  onDateTimeChanged: (dateTime) {
+                    selectedTime = TimeOfDay(
+                      hour: dateTime.hour,
+                      minute: dateTime.minute,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return result;
+  }
+
   Future<void> _editWorkSchedule(AppUser user) async {
     var start = _parseTime(
       user.workStartTime,
@@ -251,115 +336,191 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'เวลาทำงาน · ${user.fullName}',
-                  style: const TextStyle(
-                    color: workText,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+        builder: (context, setSheetState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'ใช้วันจันทร์–ศุกร์ และมีผลกับการลงเวลาครั้งถัดไป',
-                  style: TextStyle(color: workMuted, fontSize: 12),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ScheduleTimeTile(
-                        label: 'เริ่มงาน',
-                        value: _timeValue(start),
-                        icon: Icons.login_rounded,
-                        onTap: () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime: start,
-                          );
-                          if (picked != null) {
-                            setSheetState(() => start = picked);
-                          }
-                        },
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.schedule_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 22,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _ScheduleTimeTile(
-                        label: 'เลิกงาน',
-                        value: _timeValue(end),
-                        icon: Icons.logout_rounded,
-                        onTap: () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime: end,
-                          );
-                          if (picked != null) setSheetState(() => end = picked);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: saving
-                      ? null
-                      : () async {
-                          final startMinutes = start.hour * 60 + start.minute;
-                          final endMinutes = end.hour * 60 + end.minute;
-                          if (endMinutes <= startMinutes) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'เวลาเลิกงานต้องอยู่หลังเวลาเริ่มงาน',
-                                ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'แก้ไขเวลาทำงาน',
+                              style: TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2,
                               ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${user.fullName} · ใช้วันจันทร์–ศุกร์',
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ScheduleTimeTile(
+                          label: 'เวลาเริ่มงาน',
+                          value: _timeValue(start),
+                          icon: Icons.login_rounded,
+                          accentColor: const Color(0xFF2563EB),
+                          onTap: () async {
+                            final picked = await _pickCupertinoTime(
+                              context,
+                              initialTime: start,
                             );
-                            return;
-                          }
-                          setSheetState(() => saving = true);
-                          try {
-                            await widget.service.updateUserWorkSchedule(
-                              userId: user.id,
-                              workStartTime: _timeValue(start),
-                              workEndTime: _timeValue(end),
+                            if (picked != null) {
+                              setSheetState(() => start = picked);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ScheduleTimeTile(
+                          label: 'เวลาเลิกงาน',
+                          value: _timeValue(end),
+                          icon: Icons.logout_rounded,
+                          accentColor: const Color(0xFF7C3AED),
+                          onTap: () async {
+                            final picked = await _pickCupertinoTime(
+                              context,
+                              initialTime: end,
                             );
-                            if (!sheetContext.mounted) return;
-                            Navigator.pop(sheetContext);
-                            await _loadUsers();
-                            if (mounted) {
-                              ScaffoldMessenger.of(this.context).showSnackBar(
+                            if (picked != null) {
+                              setSheetState(() => end = picked);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  FilledButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            final startMinutes = start.hour * 60 + start.minute;
+                            final endMinutes = end.hour * 60 + end.minute;
+                            if (endMinutes <= startMinutes) {
+                              ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('บันทึกเวลาทำงานแล้ว'),
+                                  content: Text(
+                                    'เวลาเลิกงานต้องอยู่หลังเวลาเริ่มงาน',
+                                  ),
                                 ),
                               );
+                              return;
                             }
-                          } catch (error) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(SnackBar(content: Text('$error')));
-                              setSheetState(() => saving = false);
+                            setSheetState(() => saving = true);
+                            try {
+                              await widget.service.updateUserWorkSchedule(
+                                userId: user.id,
+                                workStartTime: _timeValue(start),
+                                workEndTime: _timeValue(end),
+                              );
+                              if (!sheetContext.mounted) return;
+                              Navigator.pop(sheetContext);
+                              await _loadUsers();
+                              if (mounted) {
+                                ScaffoldMessenger.of(this.context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('บันทึกเวลาทำงานแล้ว'),
+                                  ),
+                                );
+                              }
+                            } catch (error) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(SnackBar(content: Text('$error')));
+                                setSheetState(() => saving = false);
+                              }
                             }
-                          }
-                        },
-                  child: saving
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('บันทึกเวลาทำงาน'),
-                ),
-              ],
+                          },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: saving
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'บันทึกเวลาทำงาน',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -801,23 +962,25 @@ class _ScheduleTimeTile extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.onTap,
+    this.accentColor = workBlue,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final VoidCallback onTap;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: Ink(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
@@ -825,22 +988,49 @@ class _ScheduleTimeTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, size: 15, color: workBlue),
-                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 14, color: accentColor),
+                ),
+                const SizedBox(width: 8),
                 Text(
                   label,
-                  style: const TextStyle(color: workMuted, fontSize: 11),
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                color: workText,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const Text(
+                  'น.',
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models/app_user.dart';
@@ -215,7 +216,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildScoopedBottomBar() {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final rawBottomPadding = math.max(
+      MediaQuery.paddingOf(context).bottom,
+      MediaQuery.viewPaddingOf(context).bottom,
+    );
+    // Enforce a minimum 14.0px bottom padding so navbar items are NEVER obscured by Android 3-button navigation bar (3 dots / soft keys)
+    final double bottomInset = math.max(rawBottomPadding, 14.0);
     const double barHeight = 64.0;
     final double totalHeight = barHeight + bottomInset;
 
@@ -337,14 +343,18 @@ class _HomePageState extends State<HomePage> {
             children: [
               badgeIcon,
               const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected
-                      ? const Color(0xFF2563EB)
-                      : const Color(0xFF94A3B8),
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: isSelected
+                        ? const Color(0xFF2563EB)
+                        : const Color(0xFF94A3B8),
+                    fontSize: 10,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
                 ),
               ),
             ],

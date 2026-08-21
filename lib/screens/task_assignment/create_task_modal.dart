@@ -98,69 +98,74 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
 
   @override
   Widget build(BuildContext context) {
-    return FractionallySizedBox(
-      heightFactor: 0.94,
-      child: Material(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _fieldLabel('ชื่องาน *'),
-                    const SizedBox(height: 6),
-                    TextField(
-                      key: Key(
-                        _isEditing ? 'edit-task-title' : 'create-task-title',
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: FractionallySizedBox(
+        heightFactor: 0.94,
+        child: Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _fieldLabel('ชื่องาน *'),
+                      const SizedBox(height: 6),
+                      TextField(
+                        key: Key(
+                          _isEditing ? 'edit-task-title' : 'create-task-title',
+                        ),
+                        controller: _titleController,
+                        decoration: _inputDecoration(
+                          'เช่น ทำรายงานสรุปยอดขายประจำสัปดาห์...',
+                        ),
+                        onChanged: (value) => _title = value,
                       ),
-                      controller: _titleController,
-                      decoration: _inputDecoration(
-                        'เช่น ทำรายงานสรุปยอดขายประจำสัปดาห์...',
+                      const SizedBox(height: 14),
+                      _fieldLabel(
+                        'รายละเอียดเพิ่มเติม',
+                        icon: Icons.notes_rounded,
                       ),
-                      onChanged: (value) => _title = value,
-                    ),
-                    const SizedBox(height: 14),
-                    _fieldLabel(
-                      'รายละเอียดเพิ่มเติม',
-                      icon: Icons.notes_rounded,
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      key: Key(
-                        _isEditing
-                            ? 'edit-task-description'
-                            : 'create-task-description',
+                      const SizedBox(height: 6),
+                      TextField(
+                        key: Key(
+                          _isEditing
+                              ? 'edit-task-description'
+                              : 'create-task-description',
+                        ),
+                        controller: _descriptionController,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: _inputDecoration(
+                          'รายละเอียดเพิ่มเติมของงาน...',
+                        ),
+                        onChanged: (value) => _description = value,
                       ),
-                      controller: _descriptionController,
-                      minLines: 2,
-                      maxLines: 3,
-                      decoration: _inputDecoration(
-                        'รายละเอียดเพิ่มเติมของงาน...',
-                      ),
-                      onChanged: (value) => _description = value,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildAssignees(),
-                    const SizedBox(height: 16),
-                    _buildTaskMetadata(),
-                    const SizedBox(height: 16),
-                    _buildPriorityAndStatus(),
-                    if (!_isEditing) ...[
                       const SizedBox(height: 16),
-                      _buildBoards(),
+                      _buildAssignees(),
+                      const SizedBox(height: 16),
+                      _buildTaskMetadata(),
+                      const SizedBox(height: 16),
+                      _buildPriorityAndStatus(),
+                      if (!_isEditing) ...[
+                        const SizedBox(height: 16),
+                        _buildBoards(),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            _buildFooter(),
-          ],
+              _buildFooter(),
+            ],
+          ),
         ),
       ),
     );
@@ -461,15 +466,15 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
             icon: Icons.local_fire_department_outlined,
             value: _priority,
             items: const [
-              DropdownMenuItem(value: 'low', child: Text('🌱 งานไม่รีบ (Low)')),
+              DropdownMenuItem(value: 'low', child: Text('ต่ำ (Low)')),
               DropdownMenuItem(
                 value: 'medium',
-                child: Text('⚡ ปานกลาง (Medium)'),
+                child: Text('ปานกลาง (Medium)'),
               ),
-              DropdownMenuItem(value: 'high', child: Text('🔥 สำคัญ (High)')),
+              DropdownMenuItem(value: 'high', child: Text('สูง (High)')),
               DropdownMenuItem(
                 value: 'urgent',
-                child: Text('🚨 ด่วนมาก (Urgent)'),
+                child: Text('เร่งด่วน (Urgent)'),
               ),
             ],
             onChanged: (value) => setState(() => _priority = value ?? 'low'),
@@ -729,6 +734,7 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
     }
 
     setState(() => _submitting = true);
+    bool popped = false;
     try {
       await widget.onSubmit(
         _title.trim(),
@@ -741,11 +747,14 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
         _status,
         validBoards,
       );
-      if (mounted) Navigator.pop(context, _isEditing ? true : null);
+      if (mounted) {
+        popped = true;
+        Navigator.pop(context, _isEditing ? true : null);
+      }
     } catch (error) {
       if (mounted) _showError('เกิดข้อผิดพลาด: $error');
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted && !popped) setState(() => _submitting = false);
     }
   }
 
@@ -777,13 +786,17 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
     if (confirmed != true || !mounted) return;
 
     setState(() => _submitting = true);
+    bool popped = false;
     try {
       await onDelete();
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        popped = true;
+        Navigator.pop(context);
+      }
     } catch (error) {
       if (mounted) _showError('ลบงานล้มเหลว: $error');
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted && !popped) setState(() => _submitting = false);
     }
   }
 
@@ -802,6 +815,8 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
         DropdownButtonFormField<T>(
           initialValue: value,
           isExpanded: true,
+          borderRadius: BorderRadius.circular(16),
+          dropdownColor: Colors.white,
           decoration: _compactDropdownDecoration(),
           items: items,
           onChanged: onChanged,
