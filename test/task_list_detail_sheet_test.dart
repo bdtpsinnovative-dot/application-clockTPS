@@ -18,7 +18,7 @@ void main() {
       title: 'บอร์ดทดสอบ',
       description: '',
       dueDate: now,
-      status: 'in_progress',
+      status: 'in_review',
       createdAt: now,
     );
 
@@ -94,7 +94,7 @@ void main() {
       title: 'บอร์ดทดสอบ',
       description: '',
       dueDate: now,
-      status: 'in_progress',
+      status: 'in_review',
       createdAt: now,
     );
 
@@ -142,7 +142,7 @@ void main() {
       title: 'งานของเด็กฝึกงาน',
       description: '',
       dueDate: now,
-      status: 'in_progress',
+      status: 'in_review',
       createdAt: now,
     );
 
@@ -201,7 +201,7 @@ class _TaskListService extends AuthFlowService {
         taskId: 'task-1',
         name: 'รายการทดสอบ',
         sortOrder: 0,
-        status: 'waiting',
+        status: 'in_review',
         cards: <TaskCardRecord>[],
       ),
     ];
