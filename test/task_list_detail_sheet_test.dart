@@ -78,12 +78,68 @@ void main() {
         avatarUrl: null,
         hasFaceEmbedding: false,
       ),
+      members: const [
+        UserSummary(
+          id: 'user-1',
+          firstName: 'ผู้ใช้งาน',
+          lastName: 'ทดสอบ',
+          position: 'Employee',
+        ),
+      ],
     );
     final now = DateTime(2026, 8, 4);
     final task = TaskRecord(
       id: 'task-1',
-      assignedTo: 'user-1',
+      assignedTo: 'other-user',
       title: 'บอร์ดทดสอบ',
+      description: '',
+      dueDate: now,
+      status: 'in_progress',
+      createdAt: now,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TaskBoardPage(
+          task: task,
+          service: service,
+          initialListId: 'list-1',
+          onRefreshNeeded: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final revisionButton = tester.widget<OutlinedButton>(
+      find.byKey(const Key('task-list-submit-revision-button')),
+    );
+    expect(revisionButton.onPressed, isNotNull);
+  });
+
+  testWidgets('shows the revision action for the task assigner', (
+    tester,
+  ) async {
+    final service = _TaskListService(
+      user: const AppUser(
+        id: 'manager-1',
+        authId: 'auth-manager-1',
+        email: 'manager@example.com',
+        firstName: 'ผู้มอบหมาย',
+        lastName: 'งาน',
+        department: 'IT',
+        position: 'Manager',
+        role: 'employee',
+        status: 'active',
+        avatarUrl: null,
+        hasFaceEmbedding: false,
+      ),
+    );
+    final now = DateTime(2026, 8, 4);
+    final task = TaskRecord(
+      id: 'task-1',
+      assignedTo: 'intern-1',
+      assignedBy: 'manager-1',
+      title: 'งานของเด็กฝึกงาน',
       description: '',
       dueDate: now,
       status: 'in_progress',
@@ -110,9 +166,13 @@ void main() {
 }
 
 class _TaskListService extends AuthFlowService {
-  _TaskListService({AppUser? user}) : _user = user, super(dio: Dio());
+  _TaskListService({AppUser? user, List<UserSummary> members = const []})
+    : _user = user,
+      _members = members,
+      super(dio: Dio());
 
   final AppUser? _user;
+  final List<UserSummary> _members;
 
   @override
   AppUser? get currentUser =>
@@ -148,7 +208,7 @@ class _TaskListService extends AuthFlowService {
   }
 
   @override
-  Future<List<UserSummary>> getTaskMembers(String taskId) async => const [];
+  Future<List<UserSummary>> getTaskMembers(String taskId) async => _members;
 
   @override
   Future<List<TaskEventRecord>> getTaskEvents(

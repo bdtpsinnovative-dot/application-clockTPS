@@ -5,6 +5,8 @@ extension _TaskListDetailSheetLauncher on _TaskBoardPageState {
     final user = widget.service.currentUser;
     final canEdit =
         user?.role == 'admin' ||
+        _members.any((member) => member.id == user?.id) ||
+        user?.id == widget.task.assignedBy ||
         user?.id == widget.task.assignedTo ||
         widget.task.assigneeIds.contains(user?.id);
 
