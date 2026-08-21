@@ -133,7 +133,7 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
   }
 
   Future<void> _submitRevision() async {
-    if (!widget.canEdit || !_canEditComment || _saving || _submittingRevision) {
+    if (!widget.canEdit || _saving || _submittingRevision) {
       return;
     }
 
@@ -822,25 +822,24 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
               ),
               child: Column(
                 children: [
-                  if (widget.canEdit && _canEditComment) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        key: const Key('task-list-submit-revision-button'),
-                        onPressed: !_saving && !_submittingRevision
-                            ? _submitRevision
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFE11D48),
-                          side: const BorderSide(color: Color(0xFFFDA4AF)),
-                          minimumSize: const Size(0, 44),
-                        ),
-                        icon: const Icon(Icons.replay_rounded, size: 18),
-                        label: const Text('ส่งแก้ไข'),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      key: const Key('task-list-submit-revision-button'),
+                      onPressed:
+                          widget.canEdit && !_saving && !_submittingRevision
+                          ? _submitRevision
+                          : null,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFE11D48),
+                        side: const BorderSide(color: Color(0xFFFDA4AF)),
+                        minimumSize: const Size(0, 44),
                       ),
+                      icon: const Icon(Icons.replay_rounded, size: 18),
+                      label: const Text('ส่งแก้ไข'),
                     ),
-                    const SizedBox(height: 10),
-                  ],
+                  ),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(

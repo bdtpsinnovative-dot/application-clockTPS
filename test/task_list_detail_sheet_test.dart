@@ -60,25 +60,76 @@ void main() {
     expect(service.requestedEventListId, 'list-1');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('shows the revision action for an assigned employee', (
+    tester,
+  ) async {
+    final service = _TaskListService(
+      user: const AppUser(
+        id: 'user-1',
+        authId: 'auth-user-1',
+        email: 'employee@example.com',
+        firstName: 'ผู้ใช้งาน',
+        lastName: 'ทดสอบ',
+        department: 'IT',
+        position: 'Employee',
+        role: 'employee',
+        status: 'active',
+        avatarUrl: null,
+        hasFaceEmbedding: false,
+      ),
+    );
+    final now = DateTime(2026, 8, 4);
+    final task = TaskRecord(
+      id: 'task-1',
+      assignedTo: 'user-1',
+      title: 'บอร์ดทดสอบ',
+      description: '',
+      dueDate: now,
+      status: 'in_progress',
+      createdAt: now,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TaskBoardPage(
+          task: task,
+          service: service,
+          initialListId: 'list-1',
+          onRefreshNeeded: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final revisionButton = tester.widget<OutlinedButton>(
+      find.byKey(const Key('task-list-submit-revision-button')),
+    );
+    expect(revisionButton.onPressed, isNotNull);
+  });
 }
 
 class _TaskListService extends AuthFlowService {
-  _TaskListService() : super(dio: Dio());
+  _TaskListService({AppUser? user}) : _user = user, super(dio: Dio());
+
+  final AppUser? _user;
 
   @override
-  AppUser? get currentUser => const AppUser(
-    id: 'admin-1',
-    authId: 'auth-admin-1',
-    email: 'admin@example.com',
-    firstName: 'ผู้ดูแล',
-    lastName: 'ระบบ',
-    department: 'IT',
-    position: 'Admin',
-    role: 'admin',
-    status: 'active',
-    avatarUrl: null,
-    hasFaceEmbedding: false,
-  );
+  AppUser? get currentUser =>
+      _user ??
+      const AppUser(
+        id: 'admin-1',
+        authId: 'auth-admin-1',
+        email: 'admin@example.com',
+        firstName: 'ผู้ดูแล',
+        lastName: 'ระบบ',
+        department: 'IT',
+        position: 'Admin',
+        role: 'admin',
+        status: 'active',
+        avatarUrl: null,
+        hasFaceEmbedding: false,
+      );
 
   String? requestedEventListId;
 
