@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -371,44 +372,45 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<Position> _determinePosition({bool requireAccurate = false}) async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    if (!kIsWeb) {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw const LocationServiceDisabledException();
+      }
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw const LocationServiceDisabledException();
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        throw Exception('กรุณาอนุญาตการเข้าถึงตำแหน่งที่ตั้ง');
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('กรุณาอนุญาตการเข้าถึงตำแหน่งที่ตั้ง');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception(
+          'คุณได้ปฏิเสธการเข้าถึงตำแหน่งอย่างถาวร กรุณาเปิดสิทธิ์ในตั้งค่าอุปกรณ์',
+        );
       }
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      throw Exception(
-        'คุณได้ปฏิเสธการเข้าถึงตำแหน่งอย่างถาวร กรุณาเปิดสิทธิ์ในตั้งค่าอุปกรณ์',
-      );
-    }
-
     Position? position;
-    for (var attempt = 0; attempt < (requireAccurate ? 3 : 1); attempt++) {
-      position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.best,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-      if (!requireAccurate || position.accuracy <= 100) break;
+    for (var attempt = 0; attempt < (requireAccurate && !kIsWeb ? 3 : 1); attempt++) {
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            timeLimit: Duration(seconds: 10),
+          ),
+        );
+      } catch (_) {}
+      if (!requireAccurate || kIsWeb || (position != null && position.accuracy <= 100)) break;
     }
 
-    if (position == null || (requireAccurate && position.accuracy > 100)) {
+    if (position == null || (!kIsWeb && requireAccurate && position.accuracy > 100)) {
       throw Exception('GPS ยังไม่แม่นยำ กรุณาออกไปยังบริเวณเปิดและลองอีกครั้ง');
     }
 
-    if (position.isMocked) {
+    if (!kIsWeb && position.isMocked) {
       throw Exception(
         'ระบบตรวจพบการจำลองพิกัด (Mock Location) ไม่สามารถลงเวลาได้',
       );
@@ -451,6 +453,56 @@ class _DashboardPageState extends State<DashboardPage> {
     return _attendance?.isOffsite == true || _attendance?.status == 'offsite'
         ? 'ออกหน้างาน'
         : 'นอกพื้นที่';
+  }
+
+  Future<String> _resolveAreaName(Position? position) async {
+    final base = _areaNameFor(position);
+    if (position == null ||
+        (!base.startsWith('นอกพื้นที่') && !base.startsWith('ออกหน้างาน'))) {
+      return base;
+    }
+    try {
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 2),
+          receiveTimeout: const Duration(seconds: 2),
+        ),
+      );
+      final res = await dio.get(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {
+          'lat': position.latitude,
+          'lon': position.longitude,
+          'format': 'json',
+          'accept-language': 'th',
+        },
+        options: Options(headers: {'User-Agent': 'HRManagementApp/1.0'}),
+      );
+      final addr = res.data?['address'] as Map<String, dynamic>?;
+      if (addr != null) {
+        final road = addr['road'] as String?;
+        final sub =
+            addr['quarter'] as String? ??
+            addr['suburb'] as String? ??
+            addr['neighbourhood'] as String?;
+        final dist =
+            addr['city_district'] as String? ?? addr['district'] as String?;
+        final prov = addr['province'] as String? ?? addr['city'] as String?;
+        final parts = [
+          if (road != null && road.isNotEmpty) road,
+          if (sub != null && sub.isNotEmpty) sub,
+          if (dist != null && dist.isNotEmpty) dist,
+          if (prov != null &&
+              prov.isNotEmpty &&
+              (dist == null || !prov.contains(dist)))
+            prov,
+        ];
+        if (parts.isNotEmpty) {
+          return '$base (${parts.join(', ')})';
+        }
+      }
+    } catch (_) {}
+    return base;
   }
 
   Future<bool> _confirmClockOut(String areaName) async {
@@ -502,45 +554,45 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() => _submitting = true);
       final mode = await widget.service.getCheckInMode();
 
-      final position = await _determinePosition(requireAccurate: true);
+      final position = await _determinePosition(requireAccurate: !kIsWeb);
       final deviceId = await _getDeviceId();
 
       File? imageFile;
       List<double> faceVector = const [];
 
-      if (mode == 'selfie') {
-        // โหมดเซลฟี่: เปิดหน้ากล้องที่สร้างเองเพื่อถ่ายรูป (ไม่ใช้ ImagePicker)
-        setState(
-          () => _submitting = false,
-        ); // ซ่อน loading ชั่วคราวระหว่างถ่ายรูป
-        if (!mounted) return;
-        final photoFile = await Navigator.of(context).push<File>(
-          MaterialPageRoute(builder: (_) => const SelfieCameraPage()),
-        );
-        if (!mounted) return;
-        setState(() => _submitting = true); // เปิด loading อีกครั้งเมื่อกลับมา
-        if (photoFile == null) {
+      if (!kIsWeb) {
+        if (mode == 'selfie') {
+          // โหมดเซลฟี่: เปิดหน้ากล้องที่สร้างเองเพื่อถ่ายรูป (ไม่ใช้ ImagePicker)
           setState(() => _submitting = false);
-          return;
+          if (!mounted) return;
+          final photoFile = await Navigator.of(context).push<File>(
+            MaterialPageRoute(builder: (_) => const SelfieCameraPage()),
+          );
+          if (!mounted) return;
+          setState(() => _submitting = true);
+          if (photoFile == null) {
+            setState(() => _submitting = false);
+            return;
+          }
+          imageFile = photoFile;
+        } else {
+          // โหมดสแกนใบหน้า: สแกนด้วย FaceScannerPage
+          if (!mounted) return;
+          setState(() => _submitting = false);
+          final result = await Navigator.of(context).push<FaceScannerResult>(
+            MaterialPageRoute(builder: (_) => const FaceScannerPage()),
+          );
+          if (result == null) return;
+          setState(() => _submitting = true);
+          imageFile = result.imageFile;
+          faceVector = result.faceVector;
         }
-
-        imageFile = photoFile;
-      } else {
-        // โหมดสแกนใบหน้า: สแกนด้วย FaceScannerPage
-        if (!mounted) return;
-        setState(
-          () => _submitting = false,
-        ); // ซ่อน loading ชั่วคราวเพื่อให้สแกนหน้าได้
-        final result = await Navigator.of(context).push<FaceScannerResult>(
-          MaterialPageRoute(builder: (_) => const FaceScannerPage()),
-        );
-        if (result == null) return;
-        setState(() => _submitting = true);
-        imageFile = result.imageFile;
-        faceVector = result.faceVector;
       }
 
-      final photoUrl = await widget.service.uploadImage(imageFile);
+      String? photoUrl;
+      if (imageFile != null) {
+        photoUrl = await widget.service.uploadImage(imageFile);
+      }
 
       await widget.service.checkIn(
         lat: position.latitude,
@@ -569,7 +621,8 @@ class _DashboardPageState extends State<DashboardPage> {
         // Checkout must remain available even when GPS is unavailable.
       }
 
-      final confirmed = await _confirmClockOut(_areaNameFor(position));
+      final areaName = await _resolveAreaName(position);
+      final confirmed = await _confirmClockOut(areaName);
       if (!confirmed) return;
 
       setState(() => _submitting = true);
@@ -793,6 +846,33 @@ class _DashboardPageState extends State<DashboardPage> {
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
+                                              if (attendance?.checkInAt != null &&
+                                                  attendance?.locationName.isNotEmpty == true) ...[
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.location_on_outlined,
+                                                      size: 12,
+                                                      color: workMuted,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Flexible(
+                                                      child: Text(
+                                                        attendance!.locationName,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(
+                                                          color: workMuted,
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ],
                                           ),
                                         ),
@@ -840,6 +920,33 @@ class _DashboardPageState extends State<DashboardPage> {
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
+                                              if (attendance?.checkOutAt != null &&
+                                                  attendance?.checkOutLocationName.isNotEmpty == true) ...[
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.location_on_outlined,
+                                                      size: 12,
+                                                      color: workMuted,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Flexible(
+                                                      child: Text(
+                                                        attendance!.checkOutLocationName,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(
+                                                          color: workMuted,
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ],
                                           ),
                                         ),
@@ -864,7 +971,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                           const SizedBox(width: 6),
                                           Expanded(
                                             child: Text(
-                                              'เข้า ${attendance.locationName.isEmpty ? '-' : attendance.locationName} · ออก ${attendance.checkOutLocationName.isEmpty ? '-' : attendance.checkOutLocationName}',
+                                              attendance.checkOutAt != null
+                                                  ? 'เข้า: ${attendance.locationName.isEmpty ? '-' : attendance.locationName} · ออก: ${attendance.checkOutLocationName.isEmpty ? '-' : attendance.checkOutLocationName}'
+                                                  : 'เข้า: ${attendance.locationName.isEmpty ? '-' : attendance.locationName}',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(

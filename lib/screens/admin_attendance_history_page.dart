@@ -313,6 +313,31 @@ class _AdminAttendanceHistoryPageState
                   '${row.userName} · ${DateFormat('d MMM yyyy', 'th').format(row.date.toLocal())}\nเวลางาน ${row.workStartTime}–${row.workEndTime}',
                   style: const TextStyle(color: workMuted, fontSize: 12),
                 ),
+                if (row.locationName.isNotEmpty ||
+                    row.checkOutLocationName.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: workMuted,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          row.checkOutAt != null
+                              ? 'เข้า: ${row.locationName.isEmpty ? '-' : row.locationName} · ออก: ${row.checkOutLocationName.isEmpty ? '-' : row.checkOutLocationName}'
+                              : 'เข้า: ${row.locationName.isEmpty ? '-' : row.locationName}',
+                          style: const TextStyle(
+                            color: workMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 12),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -1602,7 +1627,9 @@ class _AdminAttendanceHistoryPageState
                           const SizedBox(width: 5),
                           Expanded(
                             child: Text(
-                              'เข้า ${row.locationName.isEmpty ? '-' : row.locationName} · ออก ${row.checkOutLocationName.isEmpty ? '-' : row.checkOutLocationName}',
+                              row.checkOutAt != null
+                                  ? 'เข้า: ${row.locationName.isEmpty ? '-' : row.locationName} · ออก: ${row.checkOutLocationName.isEmpty ? '-' : row.checkOutLocationName}'
+                                  : 'เข้า: ${row.locationName.isEmpty ? '-' : row.locationName}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(

@@ -330,7 +330,7 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
                                     children: [
                                       const Row(
                                         children: [
-                                          Icon(Icons.login_rounded, size: 14, color: Color(0xFF22C55E)),
+                                          Icon(Icons.login_rounded, size: 14, color: Color(0xFF10B981)),
                                           SizedBox(width: 6),
                                           Text(
                                             'เวลาเข้างาน',
@@ -351,6 +351,32 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
+                                      if (selectedAttendance.checkInAt != null &&
+                                          selectedAttendance.locationName.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.location_on_outlined,
+                                              size: 12,
+                                              color: workMuted,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Flexible(
+                                              child: Text(
+                                                selectedAttendance.locationName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: workMuted,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -387,11 +413,68 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
+                                      if (selectedAttendance.checkOutAt != null &&
+                                          selectedAttendance.checkOutLocationName.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.location_on_outlined,
+                                              size: 12,
+                                              color: workMuted,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Flexible(
+                                              child: Text(
+                                                selectedAttendance.checkOutLocationName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: workMuted,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
                               ],
                             ),
+                            if (selectedAttendance.locationName.isNotEmpty ||
+                                selectedAttendance.checkOutLocationName.isNotEmpty) ...[
+                              const Divider(
+                                height: 20,
+                                color: Color(0xFFF1F5F9),
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    size: 14,
+                                    color: workMuted,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      selectedAttendance.checkOutAt != null
+                                          ? 'เข้า: ${selectedAttendance.locationName.isEmpty ? '-' : selectedAttendance.locationName} · ออก: ${selectedAttendance.checkOutLocationName.isEmpty ? '-' : selectedAttendance.checkOutLocationName}'
+                                          : 'เข้า: ${selectedAttendance.locationName.isEmpty ? '-' : selectedAttendance.locationName}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: workMuted,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ],
                       ),
