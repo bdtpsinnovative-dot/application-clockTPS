@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/work_models.dart';
+import '../../models/task_list_status.dart';
 import '../../widgets/priority_badge.dart';
 import '../../widgets/user_avatar.dart';
 import 'project_detail_style.dart';
@@ -279,28 +280,8 @@ class DeliverableStatusStyle {
 }
 
 DeliverableStatusStyle deliverableStatusStyle(String status) {
-  switch (status) {
-    case 'completed':
-      return const DeliverableStatusStyle(
-        'เสร็จสิ้น',
-        ProjectDetailStyle.success,
-      );
-    case 'in_review':
-      return const DeliverableStatusStyle(
-        'ส่งงานแล้ว',
-        ProjectDetailStyle.accent,
-      );
-    case 'pending':
-      return const DeliverableStatusStyle(
-        'ยังไม่เริ่ม',
-        ProjectDetailStyle.muted,
-      );
-    default:
-      return const DeliverableStatusStyle(
-        'กำลังทำ',
-        ProjectDetailStyle.secondary,
-      );
-  }
+  final style = taskListStatusStyle(status);
+  return DeliverableStatusStyle(style.label, style.textColor);
 }
 
 String deliverablePriorityLabel(String priority) {

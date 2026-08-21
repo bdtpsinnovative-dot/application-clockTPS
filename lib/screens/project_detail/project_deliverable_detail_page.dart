@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/work_models.dart';
+import '../../models/task_list_status.dart';
 import '../../widgets/priority_badge.dart';
 import '../../services/auth_flow_service.dart';
 import 'deliverable_editor_sheet.dart';
@@ -230,11 +231,7 @@ class _ProjectDeliverableDetailPageState
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.circle,
-                    size: 7,
-                    color: status.color,
-                  ),
+                  Icon(Icons.circle, size: 7, color: status.color),
                   const SizedBox(width: 6),
                   Text(
                     status.label,
@@ -385,7 +382,6 @@ class _ProjectDeliverableDetailPageState
               ),
             ),
           ],
-
         ],
       ),
       bottomNavigationBar: widget.canEdit
@@ -404,16 +400,14 @@ class _ProjectDeliverableDetailPageState
                     PopupMenuButton<String>(
                       tooltip: 'เปลี่ยนสถานะ',
                       onSelected: _setStatus,
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(
-                          value: 'in_progress',
-                          child: Text('กำลังทำ'),
-                        ),
-                        PopupMenuItem(
-                          value: 'completed',
-                          child: Text('เสร็จสิ้น'),
-                        ),
-                      ],
+                      itemBuilder: (context) => taskListStatusValues
+                          .map(
+                            (value) => PopupMenuItem(
+                              value: value,
+                              child: Text(taskListStatusStyle(value).label),
+                            ),
+                          )
+                          .toList(),
                       child: Container(
                         height: ProjectDetailStyle.actionHeight,
                         padding: const EdgeInsets.symmetric(horizontal: 12),

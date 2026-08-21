@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:hr_management/models/work_models.dart';
+import 'package:hr_management/models/task_list_status.dart';
 import 'package:hr_management/screens/task_board_page.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/widgets/work_ui.dart';
@@ -29,22 +30,6 @@ class _AdminDailyBoardPageState extends State<AdminDailyBoardPage> {
   final Map<String, String> _statusOverrides = <String, String>{};
   final Map<String, List<UserSummary>> _fallbackMembersByTaskId = {};
   int _memberLoadToken = 0;
-
-  final Map<String, String> _statusLabels = const {
-    'waiting': 'รอทำ',
-    'pending': 'รอทำ',
-    'in_progress': 'กำลังทำ',
-    'in_review': 'รอตรวจ',
-    'completed': 'เสร็จสิ้น',
-  };
-
-  final Map<String, Color> _statusTextColors = const {
-    'waiting': Color(0xFF2563EB),
-    'pending': Color(0xFF2563EB),
-    'in_progress': Color(0xFFEA580C),
-    'in_review': Color(0xFFEA580C),
-    'completed': Color(0xFF16A34A),
-  };
 
   @override
   void initState() {
@@ -484,19 +469,11 @@ class _AdminDailyBoardPageState extends State<AdminDailyBoardPage> {
   Widget _buildTaskCard(TaskListRecord list) {
     final status = _effectiveStatus(list);
     final isCompleted = status == 'completed';
-    final isInProgress = status == 'in_progress' || status == 'in_review';
-    final cardBackground = isCompleted
-        ? const Color(0xFFF0FDF4)
-        : isInProgress
-        ? const Color(0xFFFFF7ED)
-        : Colors.white;
-    final cardBorder = isCompleted
-        ? const Color(0xFFBBF7D0)
-        : isInProgress
-        ? const Color(0xFFFED7AA)
-        : const Color(0xFFE2E8F0);
-    final badgeColor = _statusTextColors[status] ?? workMuted;
-    final badgeLabel = _statusLabels[status] ?? 'รอทำ';
+    final statusStyle = taskListStatusStyle(status);
+    final cardBackground = statusStyle.backgroundColor;
+    final cardBorder = statusStyle.borderColor;
+    final badgeColor = statusStyle.textColor;
+    final badgeLabel = statusStyle.label;
     final dateLabel = _formatDateRange(list.startDate, list.dueDate);
     final overdueLabel = _overdueLabel(list.dueDate, isCompleted: isCompleted);
     final scheduleLabel = overdueLabel.isNotEmpty ? overdueLabel : dateLabel;
@@ -575,7 +552,8 @@ class _AdminDailyBoardPageState extends State<AdminDailyBoardPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (list.projectName != null && list.projectName!.trim().isNotEmpty) ...[
+                            if (list.projectName != null &&
+                                list.projectName!.trim().isNotEmpty) ...[
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [

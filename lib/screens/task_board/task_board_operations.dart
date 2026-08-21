@@ -172,8 +172,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
     final today = workDateOnly(DateTime.now());
     DateTime? selectedDueDate = today;
     String selectedPriority = 'medium';
-    // The API accepts pending/in_progress/completed. The UI label for
-    // pending is the "รอรับ" state, so keep the transport value consistent.
+    // Keep the task-list status transport values aligned with the web app.
     String selectedStatus = 'pending';
     List<UserSummary> selectedAssignees = [];
 
@@ -640,41 +639,23 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                               fontSize: 11,
                                               color: workText,
                                             ),
-                                            items: const [
-                                              DropdownMenuItem(
-                                                value: 'pending',
-                                                child: Text(
-                                                  'รอรับ',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
+                                            items: taskListStatusValues
+                                                .map(
+                                                  (value) => DropdownMenuItem(
+                                                    value: value,
+                                                    child: Text(
+                                                      taskListStatusStyle(
+                                                        value,
+                                                      ).label,
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                      ),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
                                                   ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              DropdownMenuItem(
-                                                value: 'in_progress',
-                                                child: Text(
-                                                  'กำลังทำ',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              DropdownMenuItem(
-                                                value: 'completed',
-                                                child: Text(
-                                                  'เสร็จสิ้น',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
+                                                )
+                                                .toList(),
                                             onChanged: (val) {
                                               if (val != null) {
                                                 setModalState(() {

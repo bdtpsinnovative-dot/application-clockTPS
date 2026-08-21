@@ -60,6 +60,7 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
   late List<String> _assigneeIds;
   List<UserSummary> _members = [];
   bool _saving = false;
+  bool _submittingRevision = false;
   bool _loadingMembers = true;
 
   bool get _canEditComment {
@@ -128,6 +129,98 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
       if (mounted) _message('บันทึกข้อมูลงานไม่สำเร็จ: $error');
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _submitRevision() async {
+    if (!widget.canEdit || !_canEditComment || _saving || _submittingRevision) {
+      return;
+    }
+
+    final reasonController = TextEditingController(
+      text: _commentController.text.trim(),
+    );
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.replay_rounded, color: Color(0xFFE11D48)),
+            SizedBox(width: 8),
+            Text('ส่งแก้ไขงานย่อย'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'งาน "${widget.list.name}" จะถูกเปลี่ยนสถานะเป็น "แก้ไข" และแจ้งเตือนผู้รับผิดชอบ',
+              style: const TextStyle(fontSize: 12, height: 1.45),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: reasonController,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: 'เหตุผล / รายละเอียดที่ต้องแก้ไข *',
+                hintText: 'ระบุจุดที่ต้องปรับปรุง...',
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              final value = reasonController.text.trim();
+              if (value.isEmpty) return;
+              Navigator.pop(dialogContext, value);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFE11D48),
+            ),
+            icon: const Icon(Icons.replay_rounded, size: 17),
+            label: const Text('ยืนยันส่งแก้ไข'),
+          ),
+        ],
+      ),
+    );
+    reasonController.dispose();
+
+    final reasonText = reason?.trim() ?? '';
+    if (reasonText.isEmpty || !mounted) return;
+
+    setState(() => _submittingRevision = true);
+    try {
+      await widget.service.updateTaskList(
+        widget.list.id,
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        dueDate: _dueDate,
+        priority: _priority,
+        status: 'revision',
+        adminComment: reasonText,
+        attachments: _attachments,
+        assigneeIds: _assigneeIds,
+      );
+      widget.onChanged();
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ส่งแก้ไขงานย่อยสำเร็จ')));
+    } catch (error) {
+      if (mounted) _message('ส่งแก้ไขงานย่อยไม่สำเร็จ: $error');
+    } finally {
+      if (mounted) setState(() => _submittingRevision = false);
     }
   }
 
@@ -422,8 +515,11 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
 
   List<DropdownMenuItem<String>> get _statusItems {
     final items = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(value: 'waiting', child: Text('รอรับ')),
       const DropdownMenuItem(value: 'pending', child: Text('รอดำเนินการ')),
       const DropdownMenuItem(value: 'in_progress', child: Text('กำลังทำ')),
+      const DropdownMenuItem(value: 'in_review', child: Text('รอตรวจ')),
+      const DropdownMenuItem(value: 'revision', child: Text('แก้ไข')),
       const DropdownMenuItem(value: 'completed', child: Text('เสร็จสิ้น')),
     ];
 
@@ -481,7 +577,7 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
                     items: const [
                       DropdownMenuItem(
                         value: 'low',
-                        child: Text('งานเบา (Low)'),
+                        child: Text('งานไม่รีบ (Low)'),
                       ),
                       DropdownMenuItem(
                         value: 'medium',
@@ -724,31 +820,54 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
                 color: Color(0xFFF8FAFC),
                 border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                      ),
-                      child: const Text('ยกเลิก'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: widget.canEdit && !_saving ? _save : null,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                      ),
-                      icon: const Icon(Icons.save_outlined),
-                      label: const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text('บันทึกข้อมูล'),
+                  if (widget.canEdit && _canEditComment) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const Key('task-list-submit-revision-button'),
+                        onPressed: !_saving && !_submittingRevision
+                            ? _submitRevision
+                            : null,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFE11D48),
+                          side: const BorderSide(color: Color(0xFFFDA4AF)),
+                          minimumSize: const Size(0, 44),
+                        ),
+                        icon: const Icon(Icons.replay_rounded, size: 18),
+                        label: const Text('ส่งแก้ไข'),
                       ),
                     ),
+                    const SizedBox(height: 10),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                          ),
+                          child: const Text('ยกเลิก'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          onPressed: widget.canEdit && !_saving ? _save : null,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                          ),
+                          icon: const Icon(Icons.save_outlined),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('บันทึกข้อมูล'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

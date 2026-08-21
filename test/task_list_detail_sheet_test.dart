@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hr_management/models/app_user.dart';
 import 'package:hr_management/models/work_models.dart';
 import 'package:hr_management/screens/task_board_page.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
@@ -42,6 +43,10 @@ void main() {
 
     expect(find.text('แก้ไขข้อมูลงาน'), findsOneWidget);
     expect(find.byKey(const Key('task-list-activity-button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('task-list-submit-revision-button')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('task-list-activity-button')));
     await tester.pumpAndSettle();
@@ -59,6 +64,21 @@ void main() {
 
 class _TaskListService extends AuthFlowService {
   _TaskListService() : super(dio: Dio());
+
+  @override
+  AppUser? get currentUser => const AppUser(
+    id: 'admin-1',
+    authId: 'auth-admin-1',
+    email: 'admin@example.com',
+    firstName: 'ผู้ดูแล',
+    lastName: 'ระบบ',
+    department: 'IT',
+    position: 'Admin',
+    role: 'admin',
+    status: 'active',
+    avatarUrl: null,
+    hasFaceEmbedding: false,
+  );
 
   String? requestedEventListId;
 

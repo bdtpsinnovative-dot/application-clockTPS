@@ -400,26 +400,15 @@ extension _TaskBoardRendering on _TaskBoardPageState {
 
   Widget _buildTaskBoardRow(TaskListRecord list, {required bool isLast}) {
     final isCompleted = list.status == 'completed';
-    final isInProgress = list.status == 'in_progress';
     final isUpdating = _updatingListIds.contains(list.id);
 
     final dateLabel = _formatDateRange(list.startDate, list.dueDate);
     final dateColor = _deadlineColor(list.dueDate, isCompleted: isCompleted);
-    final badgeText = _statusTextColors[list.status] ?? workMuted;
-    final badgeLabel = _statusLabels[list.status] ?? 'รอทำ';
-
-    Color cardBg;
-    Color cardBorder;
-    if (isCompleted) {
-      cardBg = const Color(0xFFF0FDF4); // Soft emerald green background
-      cardBorder = const Color(0xFFBBF7D0); // Soft emerald green border
-    } else if (isInProgress) {
-      cardBg = const Color(0xFFFFF7ED); // Soft orange background
-      cardBorder = const Color(0xFFFED7AA); // Soft orange border
-    } else {
-      cardBg = Colors.white; // Clean white background for pending
-      cardBorder = const Color(0xFFE2E8F0); // Light slate/grey border
-    }
+    final statusStyle = taskListStatusStyle(list.status);
+    final badgeText = statusStyle.textColor;
+    final badgeLabel = statusStyle.label;
+    final cardBg = statusStyle.backgroundColor;
+    final cardBorder = statusStyle.borderColor;
 
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
@@ -1181,24 +1170,13 @@ extension _TaskBoardRendering on _TaskBoardPageState {
     const pct = 0;
 
     final isCompleted = card.status == 'completed';
-    final isInProgress = card.status == 'in_progress';
     final dateLabel = _formatDateRange(card.startDate, card.dueDate);
     final dateColor = _deadlineColor(card.dueDate, isCompleted: isCompleted);
-    final badgeText = _statusTextColors[card.status] ?? workMuted;
-    final badgeLabel = _statusLabels[card.status] ?? 'รอทำ';
-
-    Color cardBg;
-    Color cardBorder;
-    if (isCompleted) {
-      cardBg = const Color(0xFFF0FDF4); // Soft emerald green background
-      cardBorder = const Color(0xFFBBF7D0); // Soft emerald green border
-    } else if (isInProgress) {
-      cardBg = const Color(0xFFFFF7ED); // Soft orange background
-      cardBorder = const Color(0xFFFED7AA); // Soft orange border
-    } else {
-      cardBg = Colors.white; // Clean white background for pending
-      cardBorder = const Color(0xFFE2E8F0); // Light slate/grey border
-    }
+    final statusStyle = taskListStatusStyle(card.status);
+    final badgeText = statusStyle.textColor;
+    final badgeLabel = statusStyle.label;
+    final cardBg = statusStyle.backgroundColor;
+    final cardBorder = statusStyle.borderColor;
 
     return InkWell(
       onTap: () => _showCardDetailSheet(card),

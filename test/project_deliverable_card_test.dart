@@ -60,7 +60,7 @@ void main() {
     );
 
     expect(find.text('ออกแบบหน้าโปรไฟล์'), findsOneWidget);
-    expect(find.text('ส่งงานแล้ว'), findsOneWidget);
+    expect(find.text('รอตรวจ'), findsOneWidget);
     expect(find.text('1 รายการ'), findsOneWidget);
     expect(find.text('1 คน'), findsOneWidget);
     expect(find.text('ส'), findsOneWidget);

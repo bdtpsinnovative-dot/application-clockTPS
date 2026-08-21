@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hr_management/services/auth_flow_service.dart';
 import 'package:hr_management/models/work_models.dart';
+import 'package:hr_management/models/task_list_status.dart';
 import 'package:hr_management/widgets/priority_selector.dart';
 import 'package:hr_management/widgets/priority_badge.dart';
 import 'package:hr_management/widgets/skeleton_loading.dart';
@@ -288,25 +289,6 @@ class _TaskBoardPageState extends State<TaskBoardPage> {
   List<String> _selectedListIds = [];
   String? _selectedCardStatus;
   final TextEditingController _cardSearchController = TextEditingController();
-
-  // Status mapping colors & labels for Card badges
-  final Map<String, String> _statusLabels = {
-    'pending': 'รอทำ',
-    'in_progress': 'กำลังทำ',
-    'completed': 'เสร็จสิ้น',
-  };
-
-  final Map<String, Color> _statusTextColors = {
-    'pending': const Color(0xFF2563EB),
-    'in_progress': const Color(0xFFEA580C),
-    'completed': const Color(0xFF16A34A),
-  };
-
-  final Map<String, Color> _statusBgColors = {
-    'pending': const Color(0xFFEFF6FF),
-    'in_progress': const Color(0xFFFFF7ED),
-    'completed': const Color(0xFFF0FDF4),
-  };
 
   Widget _buildUserAvatar(UserSummary user, {double radius = 10}) {
     final avatarUrl = _resolveAvatarUrl(user.avatarUrl);
