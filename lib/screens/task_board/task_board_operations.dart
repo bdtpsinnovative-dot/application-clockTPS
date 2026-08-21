@@ -746,6 +746,7 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                     await showModalBottomSheet<void>(
                                       context: context,
                                       isScrollControlled: true,
+                                      useSafeArea: true,
                                       backgroundColor: Colors.white,
                                       shape: const RoundedRectangleBorder(
                                         borderRadius: BorderRadius.vertical(
@@ -791,9 +792,14 @@ extension _TaskBoardOperations on _TaskBoardPageState {
                                               child: SingleChildScrollView(
                                                 child: Padding(
                                                   padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 20,
-                                                        vertical: 16,
+                                                      EdgeInsets.fromLTRB(
+                                                        20,
+                                                        16,
+                                                        20,
+                                                        16 +
+                                                            MediaQuery.paddingOf(
+                                                              context,
+                                                            ).bottom,
                                                       ),
                                                   child: Column(
                                                     mainAxisSize:
@@ -1114,9 +1120,11 @@ extension _TaskBoardOperations on _TaskBoardPageState {
 
                     // Footer Bar
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        12,
+                        20,
+                        12 + MediaQuery.paddingOf(context).bottom,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,

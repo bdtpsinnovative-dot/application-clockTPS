@@ -66,6 +66,7 @@ class _RequestsPageState extends State<RequestsPage> {
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,
+          useSafeArea: true,
           backgroundColor: Colors.transparent,
           builder: (_) => _RequestDetailSheet(
             request: target,
@@ -114,6 +115,7 @@ class _RequestsPageState extends State<RequestsPage> {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _CreateRequestSheet(service: widget.service),
     );
@@ -214,6 +216,7 @@ class _RequestRow extends StatelessWidget {
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,
+          useSafeArea: true,
           backgroundColor: Colors.transparent,
           builder: (_) => _RequestDetailSheet(
             request: request,
@@ -1170,85 +1173,32 @@ class _MiniWeekday extends StatelessWidget {
   }
 }
 
-class _CreateRequestButton extends StatefulWidget {
+class _CreateRequestButton extends StatelessWidget {
   const _CreateRequestButton({required this.onPressed});
 
   final VoidCallback onPressed;
 
   @override
-  State<_CreateRequestButton> createState() => _CreateRequestButtonState();
-}
-
-class _CreateRequestButtonState extends State<_CreateRequestButton> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _opacityAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.94).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.88).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapCancel: () => _controller.reverse(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onPressed();
-      },
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: FadeTransition(
-          opacity: _opacityAnimation,
-          child: Container(
-            width: 190,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: workBlue.withValues(alpha: 0.16),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.add_rounded, color: workBlue, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'ยื่นคำขอใหม่',
-                  style: TextStyle(
-                    color: workBlue,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return FilledButton.icon(
+      key: const ValueKey('create_request_button'),
+      onPressed: onPressed,
+      icon: const Icon(Icons.add_rounded, size: 20),
+      label: const Text(
+        'ยื่นคำขอใหม่',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(200, 56),
+        backgroundColor: Colors.white,
+        foregroundColor: workBlue,
+        elevation: 8,
+        shadowColor: workBlue.withValues(alpha: 0.22),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
         ),
       ),
     );
@@ -1319,6 +1269,7 @@ class _RequestDetailSheetState extends State<_RequestDetailSheet> {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _CreateRequestSheet(
         service: widget.service,
@@ -1344,7 +1295,12 @@ class _RequestDetailSheetState extends State<_RequestDetailSheet> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          24 + MediaQuery.paddingOf(context).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

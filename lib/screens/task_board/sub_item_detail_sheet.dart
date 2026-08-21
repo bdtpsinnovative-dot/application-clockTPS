@@ -563,12 +563,18 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.6,
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          20 + MediaQuery.paddingOf(context).bottom,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -728,10 +734,12 @@ class _SubItemDetailSheetState extends State<_SubItemDetailSheet> {
               // ─── Sticky Bottom Footer Bar ───
               Container(
                 padding: EdgeInsets.fromLTRB(
-                  16,
+                   16,
                   10,
                   16,
-                  MediaQuery.of(context).viewInsets.bottom + 10,
+                  MediaQuery.viewInsetsOf(context).bottom +
+                      MediaQuery.paddingOf(context).bottom +
+                      10,
                 ),
                 decoration: const BoxDecoration(
                   color: Colors.white,

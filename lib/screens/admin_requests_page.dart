@@ -254,6 +254,7 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -263,7 +264,9 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
         minChildSize: 0.4,
         maxChildSize: 0.85,
         expand: false,
-        builder: (context, scrollController) => Column(
+        builder: (context, scrollController) => SafeArea(
+          top: false,
+          child: Column(
           children: [
             Container(
               margin: const EdgeInsets.symmetric(vertical: 8),
@@ -458,7 +461,8 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildDetailRow(String label, String value, {bool isHighlight = false}) {

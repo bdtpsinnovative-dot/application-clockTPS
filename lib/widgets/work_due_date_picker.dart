@@ -100,7 +100,12 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+        padding: EdgeInsets.fromLTRB(
+          18,
+          12,
+          18,
+          24 + MediaQuery.paddingOf(context).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

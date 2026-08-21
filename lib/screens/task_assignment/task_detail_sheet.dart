@@ -45,7 +45,9 @@ class _TaskDetailSheet extends StatelessWidget {
         20,
         20,
         20,
-        MediaQuery.of(context).viewInsets.bottom + 24,
+        MediaQuery.viewInsetsOf(context).bottom +
+            MediaQuery.paddingOf(context).bottom +
+            24,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

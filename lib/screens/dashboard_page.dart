@@ -26,6 +26,7 @@ class DashboardPage extends StatefulWidget {
     required this.onMenu,
     required this.onSignOut,
     required this.isActive,
+    this.onAttendanceChanged,
   });
 
   final AppUser user;
@@ -33,6 +34,7 @@ class DashboardPage extends StatefulWidget {
   final VoidCallback onMenu;
   final Future<void> Function() onSignOut;
   final bool isActive;
+  final void Function(AttendanceRecord? attendance)? onAttendanceChanged;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -208,6 +210,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _currentPosition = currentPos;
           _calculateDistanceAndCheckArea();
         });
+        widget.onAttendanceChanged?.call(attendance);
       }
     } catch (error) {
       if (error is AccountSuspendedException ||
@@ -304,6 +307,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _calculateDistanceAndCheckArea();
           _error = null;
         });
+        widget.onAttendanceChanged?.call(attendance);
       }
     } catch (error) {
       if (error is AccountSuspendedException ||
@@ -507,24 +511,30 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<bool> _confirmClockOut(String areaName) async {
     if (!mounted) return false;
-    return await showDialog<bool>(
+    final now = DateTime.now();
+    final checkInAt = _attendance?.checkInAt;
+    String? workDurationText;
+    if (checkInAt != null) {
+      final diff = now.difference(checkInAt);
+      final hours = diff.inHours;
+      final minutes = diff.inMinutes % 60;
+      if (hours > 0) {
+        workDurationText = '$hours ชม. $minutes นาที';
+      } else {
+        workDurationText = '$minutes นาที';
+      }
+    }
+
+    return await showModalBottomSheet<bool>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('ยืนยันลงชื่อออก'),
-            content: Text(
-              'เวลา ${DateFormat('HH:mm').format(DateTime.now())} น. · $areaName\n'
-              'เมื่อลงชื่อออกแล้วจะบันทึกเวลานี้ทันที',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('ยกเลิก'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('ลงชื่อออก'),
-              ),
-            ],
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: Colors.transparent,
+          builder: (sheetContext) => _ClockOutConfirmSheet(
+            now: now,
+            areaName: areaName,
+            checkInAt: checkInAt,
+            workDurationText: workDurationText,
           ),
         ) ??
         false;
@@ -1462,3 +1472,311 @@ class _FaceScanPainter extends CustomPainter {
     return oldDelegate.color != color;
   }
 }
+
+class _ClockOutConfirmSheet extends StatelessWidget {
+  const _ClockOutConfirmSheet({
+    required this.now,
+    required this.areaName,
+    this.checkInAt,
+    this.workDurationText,
+  });
+
+  final DateTime now;
+  final String areaName;
+  final DateTime? checkInAt;
+  final String? workDurationText;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomSafe = MediaQuery.paddingOf(context).bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x1A0F172A),
+            blurRadius: 20,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + bottomSafe),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top drag handle
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Orange Clock-Out Icon Badge with Soft Glow
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFFFEDD5),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA580C).withValues(alpha: 0.12),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.logout_rounded,
+                      color: Color(0xFFEA580C),
+                      size: 32,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                const Text(
+                  'ยืนยันลงเวลาออกงาน',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: workText,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Subtitle
+                const Text(
+                  'คุณต้องการบันทึกเวลาออกงานสำหรับวันนี้ใช่หรือไม่?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: workMuted,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Details Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      // Clock Out Time Row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFEDD5),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.access_time_filled_rounded,
+                              color: Color(0xFFEA580C),
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'เวลาออกงาน',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: workMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${DateFormat('HH:mm').format(now)} น.',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFEA580C),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      ),
+
+                      // Location Row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.location_on_rounded,
+                              color: workBlue,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'สถานที่',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: workMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          Flexible(
+                            child: Text(
+                              areaName,
+                              textAlign: TextAlign.end,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: workText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      if (checkInAt != null && workDurationText != null) ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        ),
+                        // Work Duration Row
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFECFDF5),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.timelapse_rounded,
+                                color: Color(0xFF10B981),
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'ชั่วโมงทำงาน',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                color: workMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              workDurationText!,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF059669),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    // Cancel Button
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: workText,
+                          backgroundColor: const Color(0xFFF8FAFC),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'ยกเลิก',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Confirm Button
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFEA580C),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout_rounded, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'ยืนยันออกงาน',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

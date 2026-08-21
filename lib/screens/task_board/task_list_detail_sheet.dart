@@ -291,6 +291,7 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => SafeArea(
@@ -821,7 +822,12 @@ class _TaskListDetailSheetState extends State<_TaskListDetailSheet> {
             ),
             Expanded(child: TabBarView(children: [_generalTab(), _docsTab()])),
             Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                16 + MediaQuery.paddingOf(context).bottom,
+              ),
               decoration: const BoxDecoration(
                 color: Color(0xFFF8FAFC),
                 border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),

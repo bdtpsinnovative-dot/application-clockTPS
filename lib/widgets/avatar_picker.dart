@@ -36,14 +36,17 @@ class _AvatarPickerState extends State<AvatarPicker> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      useSafeArea: true,
+      builder: (context) => SafeArea(
+        top: false,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
           children: [
             Center(
               child: Container(
@@ -85,11 +88,12 @@ class _AvatarPickerState extends State<AvatarPicker> {
           ],
         ),
       ),
-    );
+    ),
+  );
 
-    if (source != null) {
-      await _pickImage(source);
-    }
+  if (source != null) {
+    await _pickImage(source);
+  }
   }
 
   Widget _buildSourceOption(

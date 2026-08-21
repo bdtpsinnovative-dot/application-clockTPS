@@ -661,41 +661,36 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
         child: Row(
           children: [
             if (_isEditing && widget.onDelete != null)
-              TextButton.icon(
+              IconButton(
+                key: const Key('delete-task-button'),
                 onPressed: _submitting ? null : _deleteTask,
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFDC2626),
-                  minimumSize: const Size(0, 44),
-                ),
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text(
-                  'ลบงาน',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
+                tooltip: 'ลบงาน',
+                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626)),
               )
             else
-              const Spacer(),
+              const SizedBox.shrink(),
             const Spacer(),
             TextButton(
               onPressed: _submitting ? null : () => Navigator.pop(context),
               style: TextButton.styleFrom(
                 foregroundColor: workText,
-                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 40),
               ),
               child: const Text(
                 'ยกเลิก',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             FilledButton(
               key: Key(_isEditing ? 'submit-edit-task' : 'submit-create-task'),
               onPressed: _submitting ? null : _submit,
               style: FilledButton.styleFrom(
                 backgroundColor: workBlue,
                 foregroundColor: Colors.white,
-                minimumSize: const Size(0, 44),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -711,7 +706,7 @@ class _CreateTaskModalState extends State<_CreateTaskModal> {
                     )
                   : Text(
                       _isEditing ? 'บันทึกข้อมูล' : 'สร้างงาน',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                     ),
             ),
           ],

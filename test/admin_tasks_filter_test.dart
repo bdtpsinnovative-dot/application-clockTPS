@@ -139,7 +139,21 @@ void main() {
 
   test('task list sorts nearest due date first and missing dates last', () {
     final viewModel = TaskAssignmentViewModel(
-      service: AuthFlowService(dio: Dio()),
+      service: _TaskFilterService(
+        user: const AppUser(
+          id: 'owner',
+          authId: 'owner',
+          email: 'owner@example.com',
+          firstName: 'Owner',
+          lastName: 'User',
+          department: '',
+          position: '',
+          role: 'admin',
+          status: 'active',
+          avatarUrl: null,
+          hasFaceEmbedding: false,
+        ),
+      ),
     );
     addTearDown(viewModel.dispose);
     viewModel.tasks = [
@@ -169,7 +183,21 @@ void main() {
 
   test('all view excludes completed tasks', () {
     final viewModel = TaskAssignmentViewModel(
-      service: AuthFlowService(dio: Dio()),
+      service: _TaskFilterService(
+        user: const AppUser(
+          id: 'owner',
+          authId: 'owner',
+          email: 'owner@example.com',
+          firstName: 'Owner',
+          lastName: 'User',
+          department: '',
+          position: '',
+          role: 'admin',
+          status: 'active',
+          avatarUrl: null,
+          hasFaceEmbedding: false,
+        ),
+      ),
     );
     addTearDown(viewModel.dispose);
     viewModel.tasks = [
@@ -190,4 +218,11 @@ void main() {
     viewModel.setQuickView('completed');
     expect(viewModel.filteredTasks.map((task) => task.id), ['completed']);
   });
+}
+
+class _TaskFilterService extends AuthFlowService {
+  _TaskFilterService({this.user}) : super(dio: Dio());
+  final AppUser? user;
+  @override
+  AppUser? get currentUser => user;
 }

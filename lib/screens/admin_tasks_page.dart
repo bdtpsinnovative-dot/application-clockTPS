@@ -114,6 +114,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) =>
           _TaskTrashSheet(service: widget.service, onRestored: _loadData),
@@ -138,6 +139,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _TaskNotificationsSheet(
         title: title,
@@ -178,6 +180,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -301,6 +304,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -323,7 +327,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
               boards,
             ) async {
               final task = await widget.service.createTask(
-                title: title,
+                 title: title,
                 description: desc,
                 assignedTo: assignees.isNotEmpty ? assignees.first : '',
                 brandId: brand,
@@ -353,6 +357,7 @@ class _AdminTasksPageState extends State<AdminTasksPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _FilterBottomSheetContent(
         brands: _brands,

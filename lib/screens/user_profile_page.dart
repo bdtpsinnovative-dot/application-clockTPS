@@ -8,6 +8,7 @@ import '../models/app_user.dart';
 import '../models/work_models.dart';
 import '../services/auth_flow_service.dart';
 import '../widgets/work_ui.dart';
+import '../widgets/sign_out_confirm_sheet.dart';
 import '../screens/account_settings_page.dart';
 
 class UserProfilePage extends StatefulWidget {
@@ -69,6 +70,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return StatefulBuilder(
@@ -82,7 +84,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 16,
                 16,
                 16,
-                MediaQuery.of(context).viewInsets.bottom + 24,
+                MediaQuery.viewInsetsOf(context).bottom +
+                    MediaQuery.paddingOf(context).bottom +
+                    24,
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -586,7 +590,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           const SizedBox(height: 16),
                           Center(
                             child: TextButton.icon(
-                              onPressed: widget.onSignOut,
+                              onPressed: () => showSignOutConfirmSheet(
+                                context,
+                                onConfirm: widget.onSignOut,
+                              ),
                               icon: const Icon(
                                 Icons.logout_rounded,
                                 color: Color(0xFFEF4444),

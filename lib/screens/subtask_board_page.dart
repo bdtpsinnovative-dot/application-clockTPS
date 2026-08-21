@@ -361,6 +361,7 @@ class _SubtaskBoardPageState extends State<SubtaskBoardPage> {
     final updated = await showModalBottomSheet<TaskSubItem>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -620,7 +621,12 @@ class _SubtaskDetailSheetState extends State<_SubtaskDetailSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          14,
+          20,
+          28 + MediaQuery.paddingOf(context).bottom,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

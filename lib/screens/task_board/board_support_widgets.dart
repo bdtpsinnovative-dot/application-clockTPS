@@ -109,7 +109,9 @@ class _BoardFilterBottomSheetContentState
         20,
         16,
         20,
-        MediaQuery.of(context).viewInsets.bottom + 24,
+        MediaQuery.viewInsetsOf(context).bottom +
+            MediaQuery.paddingOf(context).bottom +
+            24,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,

@@ -825,7 +825,9 @@ class _CardDetailSheetState extends State<_CardDetailSheet> {
         16,
         10,
         16,
-        MediaQuery.viewInsetsOf(context).bottom + 10,
+        MediaQuery.viewInsetsOf(context).bottom +
+            MediaQuery.paddingOf(context).bottom +
+            10,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,

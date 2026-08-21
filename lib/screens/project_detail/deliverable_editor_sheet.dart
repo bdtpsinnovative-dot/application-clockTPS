@@ -191,7 +191,9 @@ class _DeliverableEditorSheetState extends State<DeliverableEditorSheet> {
         20,
         12,
         20,
-        MediaQuery.viewInsetsOf(context).bottom + 24,
+        MediaQuery.viewInsetsOf(context).bottom +
+            MediaQuery.paddingOf(context).bottom +
+            24,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

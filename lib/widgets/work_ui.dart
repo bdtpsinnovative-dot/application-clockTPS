@@ -65,6 +65,20 @@ class WorkHeader extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
+                ] else if (onMenu != null) ...[
+                  GestureDetector(
+                    onTap: onMenu,
+                    behavior: HitTestBehavior.opaque,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                      child: Icon(
+                        Icons.menu_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                 ],
               Expanded(
                 child: Column(

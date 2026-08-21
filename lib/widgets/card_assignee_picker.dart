@@ -229,6 +229,7 @@ class _CardAssigneePickerState extends State<CardAssigneePicker> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -248,7 +249,9 @@ class _CardAssigneePickerState extends State<CardAssigneePicker> {
               minChildSize: 0.4,
               expand: false,
               builder: (context, scrollController) {
-                return Column(
+                return SafeArea(
+                  top: false,
+                  child: Column(
                   children: [
                     Container(
                       margin: const EdgeInsets.only(top: 12, bottom: 8),
@@ -338,11 +341,12 @@ class _CardAssigneePickerState extends State<CardAssigneePicker> {
                       ),
                     ),
                   ],
-                );
-              },
-            );
-          },
-        );
+                ),
+              );
+            },
+          );
+        },
+      );
       },
     ).whenComplete(() {
       setState(() {

@@ -30,6 +30,7 @@ extension _TaskBoardFilters on _TaskBoardPageState {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _BoardFilterBottomSheetContent(
         lists: _lists,

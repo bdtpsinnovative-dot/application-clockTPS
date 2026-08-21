@@ -14,7 +14,10 @@ import 'main_dashboard_page.dart';
 import 'admin_dashboard_page.dart';
 import 'notifications_page.dart';
 import 'task_board_page.dart';
+import '../models/work_models.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/sign_out_confirm_sheet.dart';
+import '../widgets/attendance_nav_fab.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -38,6 +41,7 @@ class _HomePageState extends State<HomePage> {
   int _animatingSelectedIndex = 0;
   int _pendingCount = 0;
   int _notificationCount = 0;
+  AttendanceRecord? _todayAttendance;
   late AppUser _currentUser;
   String? _targetRequestId;
   StreamSubscription<FcmNotificationTarget>? _notificationTapSubscription;
@@ -52,6 +56,7 @@ class _HomePageState extends State<HomePage> {
       _loadPendingCount();
     }
     _loadNotificationCount();
+    _loadTodayAttendance();
     _notificationTapSubscription = FcmService.instance.notificationTaps.listen(
       _openNotificationTarget,
     );
@@ -146,6 +151,17 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
   }
 
+  Future<void> _loadTodayAttendance() async {
+    try {
+      final att = await widget.service.getAttendance(DateTime.now());
+      if (mounted) {
+        setState(() {
+          _todayAttendance = att;
+        });
+      }
+    } catch (_) {}
+  }
+
   void _openMenu() => _scaffoldKey.currentState?.openDrawer();
 
   void _openProfile() {
@@ -187,6 +203,8 @@ class _HomePageState extends State<HomePage> {
         _targetRequestId = targetRequestId;
       }
     });
+
+    _loadTodayAttendance();
 
     if (widget.user.role == 'admin') {
       _loadPendingCount();
@@ -262,54 +280,16 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // 2. Center Floating Action Button (FAB) for Clock In inside the Scoop
+          // 2. Center Floating Action Button (FAB) with Live Animation States inside the Scoop
           Positioned(
             top: 0,
-            child: _buildCenterClockFab(),
+            child: AttendanceNavFab(
+              attendance: _todayAttendance,
+              isSelected: _selectedIndex == 1,
+              onTap: () => _selectPage(1),
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCenterClockFab() {
-    final isSelected = _selectedIndex == 1;
-    return GestureDetector(
-      onTap: () => _selectPage(1),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutBack,
-        width: isSelected ? 58 : 54,
-        height: isSelected ? 58 : 54,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF2E7CFF),
-              Color(0xFF1450E0),
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2E7CFF).withValues(
-                alpha: isSelected ? 0.48 : 0.32,
-              ),
-              blurRadius: isSelected ? 16 : 10,
-              spreadRadius: isSelected ? 1 : 0,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Icon(
-            Icons.access_time_filled_rounded,
-            color: Colors.white,
-            size: isSelected ? 28 : 26,
-          ),
-        ),
       ),
     );
   }
@@ -419,6 +399,13 @@ class _HomePageState extends State<HomePage> {
               onMenu: _openMenu,
               onSignOut: widget.onSignOut,
               isActive: _selectedIndex == 1,
+              onAttendanceChanged: (att) {
+                if (mounted) {
+                  setState(() {
+                    _todayAttendance = att;
+                  });
+                }
+              },
             ),
             // Index 2: คำขอ
             isAdmin
@@ -649,7 +636,13 @@ class _AppDrawer extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            onTap: onSignOut,
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              showSignOutConfirmSheet(
+                context,
+                onConfirm: onSignOut,
+              );
+            },
           ),
           const SizedBox(height: 16),
         ],
