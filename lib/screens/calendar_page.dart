@@ -105,7 +105,7 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
   @override
   Widget build(BuildContext context) {
     final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
-    final leading = DateTime(_month.year, _month.month, 1).weekday - 1;
+    final leading = DateTime(_month.year, _month.month, 1).weekday % 7;
     final cells = List<DateTime?>.generate(
       leading + daysInMonth,
       (index) => index < leading
@@ -163,13 +163,13 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
                           const SizedBox(height: 14),
                           const Row(
                             children: [
+                              _Weekday('Su', isWeekend: true),
                               _Weekday('Mo'),
                               _Weekday('Tu'),
                               _Weekday('We'),
                               _Weekday('Th'),
                               _Weekday('Fr'),
-                              _Weekday('Sa'),
-                              _Weekday('Su'),
+                              _Weekday('Sa', isWeekend: true),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -186,6 +186,7 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
                               final date = cells[index];
                               if (date == null) return const SizedBox.shrink();
                               final selected = _sameDate(date, _selected);
+                              final isWeekend = date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
                               final attendance = _attendanceAt(date);
                               final holiday = _holidayAt(date);
                               return InkWell(
@@ -209,8 +210,14 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
                                         style: TextStyle(
                                           color: selected
                                               ? Colors.white
-                                              : workText,
-                                          fontWeight: FontWeight.w500,
+                                              : (isWeekend
+                                                  ? const Color(0xFF94A3B8)
+                                                  : workText),
+                                          fontWeight: selected
+                                              ? FontWeight.w700
+                                              : (isWeekend
+                                                  ? FontWeight.normal
+                                                  : FontWeight.w500),
                                         ),
                                       ),
                                     ),
@@ -568,9 +575,10 @@ class _WorkCalendarPageState extends State<WorkCalendarPage> {
 }
 
 class _Weekday extends StatelessWidget {
-  const _Weekday(this.label);
+  const _Weekday(this.label, {this.isWeekend = false});
 
   final String label;
+  final bool isWeekend;
 
   @override
   Widget build(BuildContext context) {
@@ -578,7 +586,11 @@ class _Weekday extends StatelessWidget {
       child: Text(
         label,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: isWeekend ? const Color(0xFF94A3B8) : workText,
+        ),
       ),
     );
   }

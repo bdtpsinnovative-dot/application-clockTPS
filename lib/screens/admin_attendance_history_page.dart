@@ -521,7 +521,7 @@ class _AdminAttendanceHistoryPageState
                                       padding: const EdgeInsets.all(4),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF2563EB)
-                                            .withOpacity(0.1),
+                                            .withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: const Icon(
@@ -591,7 +591,7 @@ class _AdminAttendanceHistoryPageState
                                           padding: const EdgeInsets.all(4),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFF7C3AED)
-                                                .withOpacity(0.1),
+                                                .withValues(alpha: 0.1),
                                             borderRadius:
                                                 BorderRadius.circular(8),
                                           ),
@@ -773,21 +773,29 @@ class _AdminAttendanceHistoryPageState
 
     // Setup mappings
     final approvedLeaves =
-        <String, double>{}; // user_ymd -> duration (1.0 or 0.5)
-    final morningLeaves = <String, bool>{}; // user_ymd -> has morning leave
+        <String, double>{}; // key -> duration (1.0 or 0.5)
+    final morningLeaves = <String, bool>{}; // key -> has morning leave
 
     for (var r in _allRows) {
       final ymd = DateFormat('yyyy-MM-dd').format(r.date.toLocal());
-      final key = '${r.userName}_$ymd';
 
       if (r.type == 'leave' && r.status.contains('approved')) {
         final isHalf =
             r.status.contains('ครึ่ง') ||
             r.status.contains('morning') ||
             r.status.contains('afternoon');
-        approvedLeaves[key] = isHalf ? 0.5 : 1.0;
-        if (r.status.contains('ครึ่งเช้า') || r.status.contains('morning')) {
-          morningLeaves[key] = true;
+        final dur = isHalf ? 0.5 : 1.0;
+        final hasMorning = r.status.contains('ครึ่งเช้า') || r.status.contains('morning');
+
+        if (r.email.isNotEmpty) {
+          final key = '${r.email.toLowerCase()}_$ymd';
+          approvedLeaves[key] = dur;
+          if (hasMorning) morningLeaves[key] = true;
+        }
+        if (r.userName.isNotEmpty) {
+          final key = '${r.userName}_$ymd';
+          approvedLeaves[key] = dur;
+          if (hasMorning) morningLeaves[key] = true;
         }
       }
     }
@@ -805,10 +813,21 @@ class _AdminAttendanceHistoryPageState
       double totalWorkHours = 0.0;
       final coveredDays = <String>{};
 
+      final uEmail = u.email.trim().toLowerCase();
+      final uSimpleName = '${u.firstName} ${u.lastName}'.trim();
+      final uFullName = u.fullName.trim();
+
       for (var r in _allRows) {
-        if (r.userName != u.fullName) continue;
+        final rEmail = r.email.trim().toLowerCase();
+        final rName = r.userName.trim();
+
+        final bool isMatch = (uEmail.isNotEmpty && rEmail.isNotEmpty && rEmail == uEmail) ||
+            (rName.isNotEmpty && (rName == uFullName || rName == uSimpleName));
+        if (!isMatch) continue;
 
         final ymd = DateFormat('yyyy-MM-dd').format(r.date.toLocal());
+        final emailKey = '${uEmail}_$ymd';
+        final nameKey = '${rName}_$ymd';
 
         if (r.type == 'attendance') {
           if (r.status == 'on_time' ||
@@ -824,23 +843,22 @@ class _AdminAttendanceHistoryPageState
           }
 
           // Count manual leave registrations from attendance table
-          final key = '${r.userName}_$ymd';
-          if (!approvedLeaves.containsKey(key)) {
-            if (r.status.contains('sick_leave')) {
+          if (!approvedLeaves.containsKey(emailKey) && !approvedLeaves.containsKey(nameKey)) {
+            if (r.status.contains('sick_leave') || r.status.contains('ลาป่วย')) {
               final val =
-                  r.status.contains('morning') || r.status.contains('afternoon')
+                  r.status.contains('morning') || r.status.contains('afternoon') || r.status.contains('ครึ่ง')
                   ? 0.5
                   : 1.0;
               sickLeave += val;
               if (val == 1.0) coveredDays.add(ymd);
-            } else if (r.status.contains('personal_leave')) {
+            } else if (r.status.contains('personal_leave') || r.status.contains('ลากิจ')) {
               final val =
-                  r.status.contains('morning') || r.status.contains('afternoon')
+                  r.status.contains('morning') || r.status.contains('afternoon') || r.status.contains('ครึ่ง')
                   ? 0.5
                   : 1.0;
               personalLeave += val;
               if (val == 1.0) coveredDays.add(ymd);
-            } else if (r.status == 'annual_leave') {
+            } else if (r.status == 'annual_leave' || r.status.contains('พักร้อน')) {
               annualLeave += 1.0;
               coveredDays.add(ymd);
             }
@@ -851,9 +869,10 @@ class _AdminAttendanceHistoryPageState
             coveredDays.add(ymd);
           }
 
+          final hasMorningLeave = morningLeaves[emailKey] == true || morningLeaves[nameKey] == true;
           final rowLateMinutes = _lateMinutesFor(
             r,
-            hasMorningLeave: morningLeaves['${r.userName}_$ymd'] == true,
+            hasMorningLeave: hasMorningLeave,
           );
           if (rowLateMinutes > 0) {
             lateCount++;
@@ -889,16 +908,21 @@ class _AdminAttendanceHistoryPageState
         }
       }
 
-      // Calculate absent days
+      // Calculate absent days (skip future days in the current month)
       int absentDays = 0;
       final holidaySet = _holidayDateSet;
       final parts = _filterMonth.split('-');
       final y = int.parse(parts[0]);
       final m = int.parse(parts[1]);
       final totalDays = DateTime(y, m + 1, 0).day;
+      final now = DateTime.now();
+      final todayDate = DateTime(now.year, now.month, now.day);
 
       for (int day = 1; day <= totalDays; day++) {
         final d = DateTime(y, m, day);
+        if (d.isAfter(todayDate)) {
+          continue; // Don't count future days as absent
+        }
         final isWeekend =
             d.weekday == DateTime.saturday || d.weekday == DateTime.sunday;
         final ymdStr = DateFormat('yyyy-MM-dd').format(d);
@@ -1744,7 +1768,8 @@ class _AdminAttendanceHistoryPageState
             final ymd = DateFormat('yyyy-MM-dd').format(row.date.toLocal());
             final isMorningLeave = _allRows.any(
               (r) =>
-                  r.userName == row.userName &&
+                  ((r.email.isNotEmpty && row.email.isNotEmpty && r.email.toLowerCase() == row.email.toLowerCase()) ||
+                      r.userName == row.userName) &&
                   DateFormat('yyyy-MM-dd').format(r.date.toLocal()) == ymd &&
                   r.type == 'leave' &&
                   r.status.contains('approved') &&

@@ -133,7 +133,12 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _signOut() async {
     await _service.signOut();
     _user = null;
-    _setState(_GateState.signedOut);
+    if (mounted) {
+      try {
+        Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+      } catch (_) {}
+      _setState(_GateState.signedOut);
+    }
   }
 
   @override

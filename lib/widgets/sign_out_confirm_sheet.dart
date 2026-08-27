@@ -33,10 +33,13 @@ class _SignOutConfirmSheetContentState
     if (_isSigningOut) return;
     setState(() => _isSigningOut = true);
     try {
-      await widget.onConfirm();
       if (mounted) {
-        Navigator.of(context).pop(true);
+        try {
+          Navigator.of(context, rootNavigator: true).pop(true);
+          Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+        } catch (_) {}
       }
+      await widget.onConfirm();
     } catch (e) {
       if (mounted) {
         setState(() => _isSigningOut = false);

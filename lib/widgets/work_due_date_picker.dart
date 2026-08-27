@@ -55,7 +55,7 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
     'พฤศจิกายน',
     'ธันวาคม',
   ];
-  static const _weekdays = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
+  static const _weekdays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
   late DateTime _selected;
   late DateTime _visibleMonth;
@@ -80,11 +80,11 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
     final tomorrow = now.add(const Duration(days: 1));
     final monday = nextWorkMonday(now: now);
     final selectedIsPast = isWorkDatePast(_selected, now: now);
-    final firstWeekday = DateTime(
+    final leading = DateTime(
       _visibleMonth.year,
       _visibleMonth.month,
       1,
-    ).weekday;
+    ).weekday % 7;
     final daysInMonth = DateTime(
       _visibleMonth.year,
       _visibleMonth.month + 1,
@@ -120,16 +120,26 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            Text(
-              widget.title,
-              style: TextStyle(
-                color: workText,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
             const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: workText,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 _QuickDateButton(
@@ -151,11 +161,11 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  tooltip: 'เดือนก่อนหน้า',
                   onPressed: () => setState(() {
                     _visibleMonth = DateTime(
                       _visibleMonth.year,
@@ -164,19 +174,15 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
                   }),
                   icon: const Icon(Icons.chevron_left_rounded),
                 ),
-                Expanded(
-                  child: Text(
-                    '${_months[_visibleMonth.month - 1]} ${_visibleMonth.year + 543}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: workText,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
+                Text(
+                  '${_months[_visibleMonth.month - 1]} ${_visibleMonth.year}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: workText,
                   ),
                 ),
                 IconButton(
-                  tooltip: 'เดือนถัดไป',
                   onPressed: () => setState(() {
                     _visibleMonth = DateTime(
                       _visibleMonth.year,
@@ -189,21 +195,28 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
             ),
             Row(
               children: _weekdays
+                  .asMap()
+                  .entries
                   .map(
-                    (label) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 5),
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: workMuted,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
+                    (entry) {
+                      final idx = entry.key;
+                      final label = entry.value;
+                      final isWeekend = idx == 0 || idx == 6;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Text(
+                            label,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isWeekend ? const Color(0xFF94A3B8) : workMuted,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   )
                   .toList(growable: false),
             ),
@@ -214,9 +227,9 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
                 crossAxisCount: 7,
                 mainAxisExtent: 42,
               ),
-              itemCount: firstWeekday - 1 + daysInMonth,
+              itemCount: leading + daysInMonth,
               itemBuilder: (context, index) {
-                final day = index - (firstWeekday - 2);
+                final day = index - leading + 1;
                 if (day < 1) return const SizedBox.shrink();
                 final date = DateTime(
                   _visibleMonth.year,
@@ -226,6 +239,7 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
                 final isSelected = date == _selected;
                 final isToday = date == now;
                 final isPast = date.isBefore(now);
+                final isWeekend = date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
                 final selectedColor = isPast
                     ? const Color(0xFFDC2626)
                     : workBlue;
@@ -248,13 +262,13 @@ class _WorkDueDatePickerState extends State<_WorkDueDatePicker> {
                       style: TextStyle(
                         color: isSelected
                             ? Colors.white
-                            : isPast
-                            ? const Color(0xFF94A3B8)
-                            : workText,
+                            : (isPast || isWeekend
+                                ? const Color(0xFF94A3B8)
+                                : workText),
                         fontSize: 12,
                         fontWeight: isSelected
                             ? FontWeight.w700
-                            : FontWeight.w500,
+                            : (isWeekend ? FontWeight.normal : FontWeight.w500),
                       ),
                     ),
                   ),

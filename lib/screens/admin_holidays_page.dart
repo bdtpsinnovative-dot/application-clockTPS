@@ -166,6 +166,9 @@ class _AdminHolidaysPageState extends State<AdminHolidaysPage> {
                       initialDate: selectedDate ?? DateTime.now(),
                       firstDate: DateTime(DateTime.now().year - 1),
                       lastDate: DateTime(DateTime.now().year + 2),
+                      helpText: 'เลือกวันที่',
+                      cancelText: 'ยกเลิก',
+                      confirmText: 'ตกลง',
                     );
                     if (picked != null) {
                       setModalState(() {

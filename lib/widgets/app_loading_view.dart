@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'animated_app_logo.dart';
 import 'worm_bump_loader.dart';
 
 class AppLoadingView extends StatelessWidget {
@@ -45,18 +44,7 @@ class AppLoadingView extends StatelessWidget {
 
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const AnimatedAppLogo(
-              size: 100,
-              heroEnabled: false,
-              isAnimating: false,
-            ),
-            const SizedBox(height: 32),
-            content,
-          ],
-        ),
+        child: content,
       ),
     );
   }

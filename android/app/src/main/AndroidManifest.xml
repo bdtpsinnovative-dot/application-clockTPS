@@ -19,7 +19,8 @@
     <application
         android:label="Clock in TPS"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <!-- Explicit defaults keep background FCM notifications readable on
              Samsung, Xiaomi, Oppo and stock Android notification layouts. -->
         <meta-data

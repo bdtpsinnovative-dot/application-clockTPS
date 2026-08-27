@@ -138,30 +138,38 @@ class _RequestsPageState extends State<RequestsPage> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 100),
           children: [
-            WorkHeader(
-              title: 'ระบบคำขอ',
-              subtitle: 'ลา / ออกหน้างาน',
-              bottomPadding: 58,
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'ยื่นคำขอให้ผู้ดูแลอนุมัติ',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 23,
-                    fontWeight: FontWeight.w700,
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.bottomCenter,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 28),
+                  child: WorkHeader(
+                    title: 'ระบบคำขอ',
+                    subtitle: 'ลา / ออกหน้างาน',
+                    bottomPadding: 48,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'ยื่นคำขอให้ผู้ดูแลอนุมัติ',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 23,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Transform.translate(
-              offset: const Offset(0, -28),
-              child: Center(
-                child: _CreateRequestButton(
-                  onPressed: _openCreateRequestSheet,
+                Positioned(
+                  bottom: 0,
+                  child: _CreateRequestButton(
+                    onPressed: _openCreateRequestSheet,
+                  ),
                 ),
-              ),
+              ],
             ),
+            const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
               child: WorkCard(
@@ -470,17 +478,33 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
 
   Future<void> _pickSwapDate() async {
     final now = DateTime.now();
-    final firstDate = now.isBefore(_selectedDate) ? now : _selectedDate.subtract(const Duration(days: 30));
+    final firstDate = DateTime(now.year - 1, 1, 1);
     final lastDate = DateTime(now.year + 1, 12, 31);
     
     final picked = await showDatePicker(
       context: context,
-      initialDate: _swapDate ?? _selectedDate.add(const Duration(days: 1)),
+      initialDate: _swapDate ?? _selectedDate,
       firstDate: firstDate,
       lastDate: lastDate,
+      helpText: 'เลือกวันทำงานชดเชย',
+      cancelText: 'ยกเลิก',
+      confirmText: 'ตกลง',
       selectableDayPredicate: (date) {
         final holiday = _holidayAt(date);
         return holiday == null; // Cannot swap on a holiday
+      },
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: workBlue,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: workText,
+            ),
+          ),
+          child: child!,
+        );
       },
     );
     if (picked != null) {
@@ -626,15 +650,13 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
   @override
   Widget build(BuildContext context) {
     final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
-    final leading = DateTime(_month.year, _month.month, 1).weekday - 1;
+    final leading = DateTime(_month.year, _month.month, 1).weekday % 7;
     final cells = List<DateTime?>.generate(
       leading + daysInMonth,
       (index) => index < leading
           ? null
           : DateTime(_month.year, _month.month, index - leading + 1),
     );
-
-    final todayDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -687,114 +709,160 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'ประเภทคำขอ',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workMuted),
-                  ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _types.map((type) {
-                        final isSelected = _type == type;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(type),
-                            selected: isSelected,
-                            showCheckmark: false,
-                            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  _type = type;
-                                  if (type == 'ออกหน้างาน' || type == 'สลับวันหยุด') {
-                                    _duration = 'เต็มวัน';
-                                  }
-                                });
-                              }
-                            },
-                            selectedColor: workBlue.withValues(alpha: 0.12),
-                            checkmarkColor: workBlue,
-                            labelStyle: TextStyle(
-                              color: isSelected ? workBlue : const Color(0xFF475569),
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                              fontSize: 11,
-                            ),
-                            side: BorderSide(
-                              color: isSelected ? workBlue : const Color(0xFFCBD5E1),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'ระยะเวลา',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workMuted),
-                      ),
-                      if (_type == 'ออกหน้างาน' || _type == 'สลับวันหยุด') ...[
-                        const SizedBox(width: 8),
-                        const Text(
-                          '(ไม่ต้องระบุสำหรับประเภทนี้)',
-                          style: TextStyle(fontSize: 10, color: workMuted, fontWeight: FontWeight.normal),
+                      // ประเภทคำขอ
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'ประเภทคำขอ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: workMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              height: 48,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _type,
+                                  isExpanded: true,
+                                  icon: const Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    color: workBlue,
+                                    size: 20,
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: workText,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  dropdownColor: Colors.white,
+                                  items: _types.map((type) {
+                                    return DropdownMenuItem<String>(
+                                      value: type,
+                                      child: Text(
+                                        type,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: _type == type ? FontWeight.w700 : FontWeight.w500,
+                                          color: _type == type ? workBlue : workText,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _type = val;
+                                        if (val == 'ออกหน้างาน' || val == 'สลับวันหยุด') {
+                                          _duration = 'เต็มวัน';
+                                        }
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 12),
+                      // ระยะเวลา
+                      Expanded(
+                        child: Builder(
+                          builder: (context) {
+                            final isDurationDisabled = _type == 'ออกหน้างาน' || _type == 'สลับวันหยุด';
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'ระยะเวลา',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: workMuted,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: isDurationDisabled
+                                        ? const Color(0xFFF1F5F9)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: isDurationDisabled ? 'เต็มวัน' : _duration,
+                                      isExpanded: true,
+                                      icon: Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: isDurationDisabled ? workMuted : workBlue,
+                                        size: 20,
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDurationDisabled ? workMuted : workText,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      dropdownColor: Colors.white,
+                                      items: _durations.map((d) {
+                                        return DropdownMenuItem<String>(
+                                          value: d,
+                                          child: Text(
+                                            d,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: _duration == d ? FontWeight.w700 : FontWeight.w500,
+                                              color: _duration == d && !isDurationDisabled ? workBlue : workText,
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: isDurationDisabled
+                                          ? null
+                                          : (val) {
+                                              if (val != null) {
+                                                setState(() => _duration = val);
+                                              }
+                                            },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _durations.map((duration) {
-                        final isDurationEnabled = _type != 'ออกหน้างาน' && _type != 'สลับวันหยุด';
-                        final isSelected = _duration == duration;
-                        final isChipSelected = isDurationEnabled ? isSelected : (duration == 'เต็มวัน');
-
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(duration),
-                            selected: isChipSelected,
-                            showCheckmark: false,
-                            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            onSelected: !isDurationEnabled
-                                ? null
-                                : (selected) {
-                                    if (selected) setState(() => _duration = duration);
-                                  },
-                            selectedColor: isDurationEnabled
-                                ? workBlue.withValues(alpha: 0.12)
-                                : const Color(0xFFF1F5F9),
-                            checkmarkColor: isDurationEnabled ? workBlue : const Color(0xFF94A3B8),
-                            labelStyle: TextStyle(
-                              color: !isDurationEnabled
-                                  ? const Color(0xFF94A3B8)
-                                  : (isSelected ? workBlue : const Color(0xFF475569)),
-                              fontWeight: (isDurationEnabled && isSelected) || (!isDurationEnabled && duration == 'เต็มวัน')
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                              fontSize: 11,
-                            ),
-                            side: BorderSide(
-                              color: !isDurationEnabled
-                                  ? const Color(0xFFE2E8F0)
-                                  : (isSelected ? workBlue : const Color(0xFFCBD5E1)),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'เลือกวันที่ต้องการ',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workMuted),
+                  Text(
+                    _type == 'สลับวันหยุด'
+                        ? '1. เลือกวันที่ต้องการหยุด'
+                        : (_type == 'ออกหน้างาน'
+                            ? 'เลือกวันที่ออกหน้างาน'
+                            : 'เลือกวันที่ต้องการลา'),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workMuted),
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -830,13 +898,13 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
                         const SizedBox(height: 6),
                         const Row(
                           children: [
+                            _MiniWeekday('Su', isWeekend: true),
                             _MiniWeekday('Mo'),
                             _MiniWeekday('Tu'),
                             _MiniWeekday('We'),
                             _MiniWeekday('Th'),
                             _MiniWeekday('Fr'),
-                            _MiniWeekday('Sa'),
-                            _MiniWeekday('Su'),
+                            _MiniWeekday('Sa', isWeekend: true),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -854,8 +922,8 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
 
                             final holiday = _holidayAt(date);
                             final isHoliday = holiday != null;
-                            final isPast = date.isBefore(todayDate);
-                            final isClickable = !isPast && !isHoliday;
+                            final isWeekend = date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+                            final isClickable = !isHoliday;
                             final isSelected = _sameDate(date, _selectedDate);
                             final isToday = _sameDate(date, DateTime.now());
 
@@ -883,10 +951,14 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
                                             ? const Color(0xFFCBD5E1)
                                             : (isSelected
                                                 ? Colors.white
-                                                : (isToday ? workBlue : workText)),
+                                                : (isToday
+                                                    ? workBlue
+                                                    : (isWeekend
+                                                        ? const Color(0xFF94A3B8)
+                                                        : workText))),
                                         fontWeight: isSelected || isToday
                                             ? FontWeight.w700
-                                            : FontWeight.w500,
+                                            : (isWeekend ? FontWeight.normal : FontWeight.w500),
                                         fontSize: 11,
                                       ),
                                     ),
@@ -926,36 +998,85 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
                   if (_type == 'สลับวันหยุด') ...[
                     const SizedBox(height: 16),
                     const Text(
-                      'เลือกวันที่ต้องการทำงานชดเชย',
+                      '2. เลือกวันที่มาทำงานชดเชย',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: workMuted),
                     ),
                     const SizedBox(height: 8),
                     InkWell(
                       onTap: _pickSwapDate,
+                      borderRadius: BorderRadius.circular(14),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _swapDate != null ? workBlue.withValues(alpha: 0.5) : const Color(0xFFE2E8F0),
+                            width: _swapDate != null ? 1.5 : 1.0,
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              _swapDate == null
-                                  ? 'เลือกวันทำงานชดเชย'
-                                  : DateFormat('dd MMM yyyy').format(_swapDate!),
-                              style: TextStyle(
-                                color: _swapDate == null ? const Color(0xFF94A3B8) : workText,
-                                fontSize: 13,
-                              ),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.swap_horiz_rounded,
+                                  color: _swapDate == null ? workMuted : workBlue,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _swapDate == null
+                                      ? 'แตะเพื่อเลือกวันทำงานชดเชย'
+                                      : DateFormat('dd MMM yyyy').format(_swapDate!),
+                                  style: TextStyle(
+                                    color: _swapDate == null ? const Color(0xFF94A3B8) : workText,
+                                    fontSize: 14,
+                                    fontWeight: _swapDate == null ? FontWeight.normal : FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const Icon(Icons.calendar_month_rounded, color: workBlue, size: 20),
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: workBlue.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.calendar_month_rounded, color: workBlue, size: 18),
+                            ),
                           ],
                         ),
                       ),
                     ),
+                    if (_swapDate != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: workBlue.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: workBlue.withValues(alpha: 0.15)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, size: 18, color: workBlue),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'สรุป: หยุดวันที่ ${DateFormat('dd MMM yyyy').format(_selectedDate)} ➔ มาทำงานชดเชยวันที่ ${DateFormat('dd MMM yyyy').format(_swapDate!)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: workBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 16),
                   const Text(
@@ -1157,9 +1278,10 @@ class _CreateRequestSheetState extends State<_CreateRequestSheet> {
 }
 
 class _MiniWeekday extends StatelessWidget {
-  const _MiniWeekday(this.label);
+  const _MiniWeekday(this.label, {this.isWeekend = false});
 
   final String label;
+  final bool isWeekend;
 
   @override
   Widget build(BuildContext context) {
@@ -1167,7 +1289,11 @@ class _MiniWeekday extends StatelessWidget {
       child: Text(
         label,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: workMuted),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: isWeekend ? const Color(0xFF94A3B8) : workMuted,
+        ),
       ),
     );
   }
@@ -1180,25 +1306,52 @@ class _CreateRequestButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.icon(
-      key: const ValueKey('create_request_button'),
-      onPressed: onPressed,
-      icon: const Icon(Icons.add_rounded, size: 20),
-      label: const Text(
-        'ยื่นคำขอใหม่',
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: workBlue.withValues(alpha: 0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(200, 56),
-        backgroundColor: Colors.white,
-        foregroundColor: workBlue,
-        elevation: 8,
-        shadowColor: workBlue.withValues(alpha: 0.22),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(28),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const ValueKey('create_request_button'),
+          onTap: onPressed,
+          splashColor: workBlue.withValues(alpha: 0.12),
+          highlightColor: workBlue.withValues(alpha: 0.06),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 15),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add_rounded, color: workBlue, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'ยื่นคำขอใหม่',
+                  style: TextStyle(
+                    color: workBlue,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
