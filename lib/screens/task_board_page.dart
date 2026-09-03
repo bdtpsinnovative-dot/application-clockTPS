@@ -261,12 +261,14 @@ class TaskBoardPage extends StatefulWidget {
     required this.service,
     required this.onRefreshNeeded,
     this.initialListId,
+    this.initialCardId,
   });
 
   final TaskRecord task;
   final AuthFlowService service;
   final VoidCallback onRefreshNeeded;
   final String? initialListId;
+  final String? initialCardId;
 
   @override
   State<TaskBoardPage> createState() => _TaskBoardPageState();

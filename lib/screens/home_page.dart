@@ -318,7 +318,7 @@ class _HomePageState extends State<HomePage> {
     final Widget badgeIcon = badgeCount > 0
         ? Badge(
             label: Text(
-              badgeCount > 99 ? '99+' : '$badgeCount',
+              badgeCount > 9 ? '9+' : '$badgeCount',
               style: const TextStyle(
                 fontSize: 8.5,
                 color: Colors.white,
@@ -422,7 +422,6 @@ class _HomePageState extends State<HomePage> {
                 ? AdminRequestsPage(
                     key: const PageStorageKey('admin_requests'),
                     service: widget.service,
-                    onMenu: _openMenu,
                     isActive: _selectedIndex == 2,
                     targetRequestId: _targetRequestId,
                     onClearTargetRequest: () => setState(() {
@@ -451,11 +450,11 @@ class _HomePageState extends State<HomePage> {
             // Index 4: แจ้งเตือน
             NotificationsPage(
               key: const PageStorageKey('notifications'),
-              onMenu: _openMenu,
               isActive: _selectedIndex == 4,
               service: widget.service,
               onNavigateToRequests: (targetId) =>
                   _selectPage(2, targetRequestId: targetId),
+              onNavigateToCalendar: () => _selectPage(3),
               onUnreadCountChanged: (count) {
                 if (mounted && _notificationCount != count) {
                   setState(() => _notificationCount = count);

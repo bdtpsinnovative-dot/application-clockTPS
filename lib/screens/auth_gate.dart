@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -22,27 +23,78 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   late final AuthFlowService _service;
   _GateState _state = _GateState.loading;
   AppUser? _user;
   String _errorMessage = '';
   bool _resolving = false;
+  bool _refreshingOnResume = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _service = widget.service ?? AuthFlowService();
     WidgetsBinding.instance.addPostFrameCallback((_) => _restoreAndResolve());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _state != _GateState.signedOut) {
+      unawaited(_refreshSessionOnResume());
+    }
+  }
+
+  Future<void> _refreshSessionOnResume() async {
+    if (_refreshingOnResume) return;
+    _refreshingOnResume = true;
+    try {
+      await _service.restoreSession();
+    } on SessionExpiredException {
+      await _service.signOut();
+      _user = null;
+      _setState(_GateState.signedOut);
+    } catch (error) {
+      // Keep the current screen/session during a temporary network failure.
+      debugPrint('[AUTH GATE] Resume refresh deferred: $error');
+    } finally {
+      _refreshingOnResume = false;
+    }
   }
 
   Future<void> _restoreAndResolve() async {
     try {
       await _service.restoreSession();
       await _resolve();
-    } catch (_) {
+    } on SessionExpiredException {
       await _service.signOut();
       _setState(_GateState.signedOut);
+    } catch (e) {
+      debugPrint('[AUTH GATE] Restore failed with non-fatal error: $e');
+      if (_service.hasSession) {
+        _errorMessage =
+            'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต';
+        _setState(_GateState.error);
+      } else {
+        _setState(_GateState.signedOut);
+      }
+    }
+  }
+
+  Future<void> _bindDeviceAndFcmSafely() async {
+    try {
+      final deviceId = await _getDeviceId();
+      await _service.bindDevice(deviceId);
+      await FcmService.instance.registerDevice(_service);
+    } catch (e) {
+      debugPrint('[AUTH GATE] Device/FCM binding non-fatal error: $e');
     }
   }
 
@@ -66,20 +118,7 @@ class _AuthGateState extends State<AuthGate> {
         _setState(_GateState.profileRequired);
       } else {
         if (user.status == 'active') {
-          try {
-            final deviceId = await _getDeviceId();
-            await _service.bindDevice(deviceId);
-            // Register FCM device token
-            FcmService.instance.registerDevice(_service);
-          } catch (e) {
-            debugPrint('Device binding failed: $e');
-            _errorMessage = e.toString()
-                .replaceAll('Exception: ', '')
-                .replaceAll('AuthFlowException: ', '');
-            _setState(_GateState.error);
-            _resolving = false;
-            return;
-          }
+          unawaited(_bindDeviceAndFcmSafely());
         }
         _setState(
           user.status == 'active' ? _GateState.active : _GateState.pending,
@@ -140,7 +179,10 @@ class _AuthGateState extends State<AuthGate> {
     _user = null;
     if (mounted) {
       try {
-        Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).popUntil((route) => route.isFirst);
       } catch (_) {}
       _setState(_GateState.signedOut);
     }
@@ -151,9 +193,9 @@ class _AuthGateState extends State<AuthGate> {
     try {
       return switch (_state) {
         _GateState.loading => const Scaffold(
-            backgroundColor: Color(0xFFF5F5F5),
-            body: AppLoadingView(message: 'กำลังยืนยันสิทธิ์เข้าใช้...'),
-          ),
+          backgroundColor: Color(0xFFF5F5F5),
+          body: AppLoadingView(message: 'กำลังยืนยันสิทธิ์เข้าใช้...'),
+        ),
         _GateState.signedOut => LoginPage(
           service: _service,
           onAuthenticated: _resolve,
@@ -190,18 +232,42 @@ class _AuthGateState extends State<AuthGate> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.bug_report_rounded, size: 48, color: Colors.red),
+                  const Icon(
+                    Icons.bug_report_rounded,
+                    size: 48,
+                    color: Colors.red,
+                  ),
                   const SizedBox(height: 12),
                   const Text(
                     'เกิดข้อผิดพลาดในการสร้างหน้าจอ AuthGate',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  Text('ข้อผิดพลาด: $e', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text(
+                    'ข้อผิดพลาด: $e',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  const Text('ตำแหน่งที่ล่ม:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text(
+                    'ตำแหน่งที่ล่ม:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   const SizedBox(height: 4),
-                  Text('$stack', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.grey)),
+                  Text(
+                    '$stack',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                      color: Colors.grey,
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -223,13 +223,19 @@ class TaskRecord {
       assignedByName: json['assigned_by_name'] as String? ?? '',
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      dueDate: DateTime.parse(json['due_date'] as String),
+      dueDate: json['due_date'] == null
+          ? DateTime.now()
+          : (DateTime.tryParse(json['due_date'].toString())?.toLocal() ??
+              DateTime.now()),
       status: json['status'] as String? ?? 'pending',
       assignedBy: json['assigned_by'] as String?,
       brandId: json['brand_id'] as String?,
       categoryId: json['category_id'] as String?,
       subItems: subs,
-      createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      createdAt: json['created_at'] == null
+          ? DateTime.now()
+          : (DateTime.tryParse(json['created_at'].toString())?.toLocal() ??
+              DateTime.now()),
       cardTotal: (json['card_total'] as num?)?.toInt() ?? 0,
       cardDone: (json['card_done'] as num?)?.toInt() ?? 0,
       assigneeIds: assigneeList,

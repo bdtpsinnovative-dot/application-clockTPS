@@ -40,6 +40,20 @@ extension _TaskBoardOperations on _TaskBoardPageState {
 
   void _openInitialTaskList() {
     if (_openedInitialList) return;
+    final initialCardId = widget.initialCardId?.trim() ?? '';
+    if (initialCardId.isNotEmpty) {
+      for (final list in _lists) {
+        final card = list.cards.where((c) => c.id == initialCardId).firstOrNull;
+        if (card != null) {
+          _openedInitialList = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showCardDetailSheet(card);
+          });
+          return;
+        }
+      }
+    }
+
     final initialListId = widget.initialListId?.trim() ?? '';
     if (initialListId.isEmpty) return;
     final target = _lists.where((list) => list.id == initialListId).firstOrNull;

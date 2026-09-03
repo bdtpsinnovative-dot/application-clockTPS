@@ -25,20 +25,33 @@ class AuthFlowService {
               contentType: Headers.jsonContentType,
             ),
           ),
-      _storage = storage ?? const FlutterSecureStorage();
+      _storage = storage ?? const FlutterSecureStorage() {
+    _setupInterceptors();
+  }
 
   final Dio _dio;
   final FlutterSecureStorage _storage;
   String? _accessToken;
+  String? _refreshToken;
   String? _authId;
   String? _email;
   AppUser? _currentAppUser;
 
   static const _tokenKey = 'clock_in_tps_access_token';
+  static const _refreshTokenKey = 'clock_in_tps_refresh_token';
   static const _authIdKey = 'clock_in_tps_auth_id';
   static const _emailKey = 'clock_in_tps_email';
+  static const _savedPassKey = 'clock_in_tps_credential_p';
+  static const _rememberedAvatarKey = 'clock_in_tps_remembered_avatar';
+  static const _rememberedNameKey = 'clock_in_tps_remembered_name';
+  static const _rememberedNicknameKey = 'clock_in_tps_remembered_nickname';
+  static const _rememberedAccountsKey = 'clock_in_tps_remembered_accounts_v1';
+  static const _signedOutKey = 'clock_in_tps_explicitly_signed_out';
+  static const _authRetryKey = 'clock_in_tps_auth_retry';
 
-  bool get hasSession => _accessToken?.isNotEmpty ?? false;
+  bool get hasSession =>
+      (_accessToken?.isNotEmpty ?? false) ||
+      (_refreshToken?.isNotEmpty ?? false);
   String get currentUserEmail => _email ?? '';
   String get currentUserId => _authId ?? '';
   String get baseUrl => AppConfig.apiBaseUrl;
@@ -56,6 +69,8 @@ class AuthFlowService {
         fallbackEmail: email,
         tokenRequired: true,
       );
+      await _storage.write(key: _savedPassKey, value: password);
+      await _rememberCredential(email: email, password: password);
     } on DioException catch (error) {
       throw AuthApiException.fromDio(error);
     }
@@ -72,6 +87,10 @@ class AuthFlowService {
         data: {'email': email.trim(), 'password': password},
       );
       await _captureSession(response.data, fallbackEmail: email);
+      if (hasSession) {
+        await _storage.write(key: _savedPassKey, value: password);
+        await _rememberCredential(email: email, password: password);
+      }
       return SignUpResult(requiresEmailConfirmation: !hasSession);
     } on DioException catch (error) {
       throw AuthApiException.fromDio(error);
@@ -80,20 +99,92 @@ class AuthFlowService {
 
   Future<void> restoreSession() async {
     _accessToken = await _storage.read(key: _tokenKey);
+    _refreshToken = await _storage.read(key: _refreshTokenKey);
     _authId = await _storage.read(key: _authIdKey);
     _email = await _storage.read(key: _emailKey);
+
+    if (await _storage.read(key: _signedOutKey) == 'true') {
+      _accessToken = null;
+      _refreshToken = null;
+      _authId = null;
+      return;
+    }
+
+    if (_isJwtExpired(_accessToken)) {
+      final result = await _refreshSession();
+      if (result == _SessionRefreshResult.invalid) {
+        throw const SessionExpiredException(
+          'เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง',
+        );
+      }
+      if (result == _SessionRefreshResult.unavailable && hasSession) {
+        throw const ApiUnavailableException(
+          'ไม่สามารถต่ออายุเซสชันได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่',
+        );
+      }
+    }
   }
 
-  Future<void> signOut() async {
+  Future<void> signOut({bool forgetAccount = false}) async {
     _accessToken = null;
+    _refreshToken = null;
     _authId = null;
     _email = null;
     _currentAppUser = null;
     await Future.wait([
       _storage.delete(key: _tokenKey),
+      _storage.delete(key: _refreshTokenKey),
       _storage.delete(key: _authIdKey),
-      _storage.delete(key: _emailKey),
+      _storage.write(key: _signedOutKey, value: 'true'),
+      if (forgetAccount) _storage.delete(key: _emailKey),
+      if (forgetAccount) _storage.delete(key: _savedPassKey),
+      if (forgetAccount) _storage.delete(key: _rememberedAvatarKey),
+      if (forgetAccount) _storage.delete(key: _rememberedNameKey),
+      if (forgetAccount) _storage.delete(key: _rememberedNicknameKey),
+      if (forgetAccount) _storage.delete(key: _rememberedAccountsKey),
     ]);
+  }
+
+  Future<List<RememberedAccount>> loadRememberedAccounts() async {
+    final credentials = await _readRememberedCredentials();
+    return credentials.map((value) => value.account).toList(growable: false);
+  }
+
+  Future<void> signInRememberedAccount(RememberedAccount account) async {
+    final credentials = await _readRememberedCredentials();
+    final normalizedEmail = account.email.trim().toLowerCase();
+    _RememberedCredential? selected;
+    for (final credential in credentials) {
+      if (credential.email.toLowerCase() == normalizedEmail) {
+        selected = credential;
+        break;
+      }
+    }
+    if (selected == null || selected.password.isEmpty) {
+      throw const AuthApiException('ไม่พบบัญชีที่บันทึกไว้ในเครื่อง');
+    }
+    await signIn(email: selected.email, password: selected.password);
+  }
+
+  Future<void> forgetRememberedAccount(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    final credentials = await _readRememberedCredentials();
+    final remaining = credentials
+        .where((value) => value.email.toLowerCase() != normalizedEmail)
+        .toList(growable: false);
+    await _writeRememberedCredentials(remaining);
+
+    final currentRememberedEmail = await _storage.read(key: _emailKey);
+    if (currentRememberedEmail?.trim().toLowerCase() == normalizedEmail) {
+      await Future.wait([
+        _storage.delete(key: _emailKey),
+        _storage.delete(key: _savedPassKey),
+        _storage.delete(key: _rememberedAvatarKey),
+        _storage.delete(key: _rememberedNameKey),
+        _storage.delete(key: _rememberedNicknameKey),
+      ]);
+      _email = null;
+    }
   }
 
   Future<AppUser> getMe() async {
@@ -104,6 +195,23 @@ class AuthFlowService {
       );
       final user = _userFromResponse(response.data);
       _currentAppUser = user;
+      await Future.wait([
+        _storage.delete(key: _rememberedNameKey),
+        _storage.write(
+          key: _rememberedNicknameKey,
+          value: user.nickname.trim(),
+        ),
+        if (user.avatarUrl?.trim().isNotEmpty == true)
+          _storage.write(
+            key: _rememberedAvatarKey,
+            value: user.avatarUrl!.trim(),
+          ),
+      ]);
+      await _updateRememberedProfile(
+        email: user.email,
+        nickname: user.nickname,
+        avatarUrl: user.avatarUrl,
+      );
       return user;
     } on DioException catch (error) {
       final statusCode = error.response?.statusCode;
@@ -258,6 +366,11 @@ class AuthFlowService {
         data: {'old_password': oldPassword, 'new_password': newPassword},
         options: Options(headers: _authorizationHeaders()),
       );
+      await _storage.write(key: _savedPassKey, value: newPassword);
+      final email = _email ?? await _storage.read(key: _emailKey);
+      if (email != null && email.trim().isNotEmpty) {
+        await _rememberCredential(email: email, password: newPassword);
+      }
     } on DioException catch (error) {
       throw AuthFlowException(_apiMessage(error));
     }
@@ -645,6 +758,11 @@ class AuthFlowService {
     return data
         .map((json) => TaskRecord.fromJson(json as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<TaskRecord> getTask(String id) async {
+    final response = await _authorizedGet('/api/tasks/$id');
+    return TaskRecord.fromJson(response['data'] as Map<String, dynamic>);
   }
 
   Future<List<TaskListRecord>> getDailyTaskLists() async {
@@ -1086,6 +1204,10 @@ class AuthFlowService {
         data['token'] as String? ??
         root['access_token'] as String? ??
         root['token'] as String?;
+    _refreshToken =
+        data['refresh_token'] as String? ??
+        root['refresh_token'] as String? ??
+        _refreshToken;
     _authId =
         user['auth_id'] as String? ??
         user['id'] as String? ??
@@ -1099,18 +1221,209 @@ class AuthFlowService {
     _authId ??= claims['sub'] as String?;
     _email ??= claims['email'] as String?;
 
-    if (tokenRequired && !hasSession) {
+    if (tokenRequired && (_accessToken == null || _accessToken!.isEmpty)) {
       throw const AuthFlowException(
         'รูปแบบข้อมูลจาก /auth/login ไม่ถูกต้อง: ไม่พบ access_token',
       );
     }
     if (hasSession) {
-      await Future.wait([
-        _storage.write(key: _tokenKey, value: _accessToken),
-        _storage.write(key: _authIdKey, value: _authId),
-        _storage.write(key: _emailKey, value: _email),
-      ]);
+      final writes = <Future<void>>[
+        if (_accessToken != null && _accessToken!.isNotEmpty)
+          _storage.write(key: _tokenKey, value: _accessToken),
+        if (_authId != null && _authId!.isNotEmpty)
+          _storage.write(key: _authIdKey, value: _authId),
+        if (_email != null && _email!.isNotEmpty)
+          _storage.write(key: _emailKey, value: _email),
+      ];
+      if (_refreshToken != null && _refreshToken!.isNotEmpty) {
+        writes.add(_storage.write(key: _refreshTokenKey, value: _refreshToken));
+      }
+      writes.add(_storage.write(key: _signedOutKey, value: 'false'));
+      await Future.wait(writes);
     }
+  }
+
+  bool _isRefreshing = false;
+  Completer<_SessionRefreshResult>? _refreshCompleter;
+
+  bool _isJwtExpired(String? token) {
+    if (token == null || token.isEmpty) return true;
+    final claims = _decodeJwtClaims(token);
+    final exp = claims['exp'];
+    if (exp is int) {
+      final expiryTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      // หากเหลือเวลาไม่ถึง 5 วินาที หรือเลยเวลาแล้ว ให้ถือว่าหมดอายุเพื่อรีเฟรชล่วงหน้า
+      return DateTime.now().isAfter(
+        expiryTime.subtract(const Duration(seconds: 5)),
+      );
+    }
+    return true;
+  }
+
+  Future<_SessionRefreshResult> _silentReAuthenticate() async {
+    final email = _email ?? await _storage.read(key: _emailKey);
+    final pass = await _storage.read(key: _savedPassKey);
+    if (email == null || email.isEmpty || pass == null || pass.isEmpty) {
+      return _SessionRefreshResult.invalid;
+    }
+    try {
+      debugPrint(
+        '[AUTH] Attempting silent background re-authentication for $email...',
+      );
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/login',
+        data: {'email': email.trim(), 'password': pass},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+      await _captureSession(
+        response.data,
+        fallbackEmail: email,
+        tokenRequired: true,
+      );
+      debugPrint('[AUTH] Silent re-auth succeeded! Session is active.');
+      return hasSession
+          ? _SessionRefreshResult.refreshed
+          : _SessionRefreshResult.invalid;
+    } on DioException catch (error) {
+      debugPrint('[AUTH] Silent re-auth failed: $error');
+      final status = error.response?.statusCode;
+      if (status == 400 || status == 401 || status == 403) {
+        return _SessionRefreshResult.invalid;
+      }
+      return _SessionRefreshResult.unavailable;
+    } catch (error) {
+      debugPrint('[AUTH] Silent re-auth failed: $error');
+      return _SessionRefreshResult.unavailable;
+    }
+  }
+
+  Future<_SessionRefreshResult> _refreshSession() async {
+    if (_isRefreshing && _refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+
+    _isRefreshing = true;
+    final completer = Completer<_SessionRefreshResult>();
+    _refreshCompleter = completer;
+    var result = _SessionRefreshResult.unavailable;
+
+    try {
+      final tokenToRefresh =
+          _refreshToken ?? await _storage.read(key: _refreshTokenKey);
+      if (tokenToRefresh == null || tokenToRefresh.isEmpty) {
+        result = await _silentReAuthenticate();
+        return result;
+      }
+
+      for (var attempt = 1; attempt <= 3; attempt++) {
+        try {
+          final response = await _dio.post<Map<String, dynamic>>(
+            '/auth/refresh',
+            data: {'refresh_token': tokenToRefresh},
+            options: Options(
+              headers: {'Content-Type': 'application/json'},
+              sendTimeout: const Duration(seconds: 5),
+              receiveTimeout: const Duration(seconds: 5),
+            ),
+          );
+          final data = response.data;
+          if (data != null &&
+              (data['access_token'] != null ||
+                  data['data']?['access_token'] != null)) {
+            await _captureSession(
+              data,
+              fallbackEmail: _email ?? '',
+              tokenRequired: true,
+            );
+            result = _SessionRefreshResult.refreshed;
+            return result;
+          }
+        } on DioException catch (e) {
+          final statusCode = e.response?.statusCode;
+          final errorBody = e.response?.data;
+          final isInvalidGrant =
+              statusCode == 401 &&
+              errorBody is Map &&
+              errorBody['is_invalid_grant'] == true;
+
+          if (isInvalidGrant) {
+            debugPrint(
+              '[AUTH] Refresh token is invalid/expired, triggering silent re-auth...',
+            );
+            result = await _silentReAuthenticate();
+            return result;
+          }
+
+          debugPrint(
+            '[AUTH] Refresh attempt $attempt failed with network error: $e',
+          );
+          if (attempt < 3) {
+            await Future.delayed(
+              Duration(milliseconds: 250 * (1 << (attempt - 1))),
+            );
+          }
+        } catch (e) {
+          debugPrint('[AUTH] Refresh unexpected error: $e');
+          return result;
+        }
+      }
+
+      return result;
+    } finally {
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+      _isRefreshing = false;
+      if (identical(_refreshCompleter, completer)) {
+        _refreshCompleter = null;
+      }
+    }
+  }
+
+  void _setupInterceptors() {
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final path = options.path;
+          if (!path.contains('/auth/login') &&
+              !path.contains('/auth/refresh') &&
+              !path.contains('/auth/signup')) {
+            if (_isJwtExpired(_accessToken) && hasSession) {
+              final result = await _refreshSession();
+              if (result == _SessionRefreshResult.refreshed &&
+                  _accessToken != null) {
+                options.headers['Authorization'] = 'Bearer $_accessToken';
+              }
+            }
+          }
+          return handler.next(options);
+        },
+        onError: (DioException error, handler) async {
+          if (error.response?.statusCode == 401) {
+            final path = error.requestOptions.path;
+            if (!path.contains('/auth/login') &&
+                !path.contains('/auth/refresh') &&
+                !path.contains('/auth/signup') &&
+                error.requestOptions.extra[_authRetryKey] != true) {
+              final result = await _refreshSession();
+              if (result == _SessionRefreshResult.refreshed &&
+                  _accessToken != null) {
+                final options = error.requestOptions;
+                options.headers['Authorization'] = 'Bearer $_accessToken';
+                options.extra[_authRetryKey] = true;
+                try {
+                  final clonedResponse = await _dio.fetch(options);
+                  return handler.resolve(clonedResponse);
+                } catch (e) {
+                  return handler.next(error);
+                }
+              }
+            }
+          }
+          return handler.next(error);
+        },
+      ),
+    );
   }
 
   Map<String, dynamic> _decodeJwtClaims(String? token) {
@@ -1128,8 +1441,129 @@ class AuthFlowService {
     }
   }
 
+  Future<List<_RememberedCredential>> _readRememberedCredentials() async {
+    final raw = await _storage.read(key: _rememberedAccountsKey);
+    final result = <_RememberedCredential>[];
+    if (raw != null && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          for (final item in decoded) {
+            if (item is Map) {
+              final credential = _RememberedCredential.fromJson(
+                Map<String, dynamic>.from(item),
+              );
+              if (credential.email.isNotEmpty &&
+                  credential.password.isNotEmpty) {
+                result.add(credential);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        debugPrint('[AUTH] Could not decode remembered accounts: $error');
+      }
+    }
+
+    if (result.isEmpty) {
+      final legacyEmail = await _storage.read(key: _emailKey);
+      final legacyPassword = await _storage.read(key: _savedPassKey);
+      if (legacyEmail != null &&
+          legacyEmail.trim().isNotEmpty &&
+          legacyPassword != null &&
+          legacyPassword.isNotEmpty) {
+        result.add(
+          _RememberedCredential(
+            email: legacyEmail.trim(),
+            password: legacyPassword,
+            nickname:
+                await _storage.read(key: _rememberedNicknameKey) ??
+                _nicknameFromLegacyDisplayName(
+                  await _storage.read(key: _rememberedNameKey),
+                ),
+            avatarUrl: await _storage.read(key: _rememberedAvatarKey),
+          ),
+        );
+        await _writeRememberedCredentials(result);
+      }
+    }
+    return result;
+  }
+
+  Future<void> _writeRememberedCredentials(
+    List<_RememberedCredential> credentials,
+  ) async {
+    if (credentials.isEmpty) {
+      await _storage.delete(key: _rememberedAccountsKey);
+      return;
+    }
+    await _storage.write(
+      key: _rememberedAccountsKey,
+      value: jsonEncode(
+        credentials.map((value) => value.toJson()).toList(growable: false),
+      ),
+    );
+  }
+
+  Future<void> _rememberCredential({
+    required String email,
+    required String password,
+  }) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty || password.isEmpty) return;
+    final credentials = await _readRememberedCredentials();
+    _RememberedCredential? existing;
+    for (final credential in credentials) {
+      if (credential.email.toLowerCase() == normalizedEmail) {
+        existing = credential;
+        break;
+      }
+    }
+    final updated = _RememberedCredential(
+      email: email.trim(),
+      password: password,
+      nickname: existing?.nickname,
+      avatarUrl: existing?.avatarUrl,
+    );
+    final values = <_RememberedCredential>[
+      updated,
+      ...credentials.where(
+        (value) => value.email.toLowerCase() != normalizedEmail,
+      ),
+    ].take(5).toList(growable: false);
+    await _writeRememberedCredentials(values);
+  }
+
+  Future<void> _updateRememberedProfile({
+    required String email,
+    required String nickname,
+    String? avatarUrl,
+  }) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) return;
+    final credentials = await _readRememberedCredentials();
+    var changed = false;
+    final updated = credentials
+        .map((credential) {
+          if (credential.email.toLowerCase() != normalizedEmail) {
+            return credential;
+          }
+          changed = true;
+          return _RememberedCredential(
+            email: credential.email,
+            password: credential.password,
+            nickname: nickname.trim(),
+            avatarUrl: avatarUrl?.trim().isNotEmpty == true
+                ? avatarUrl!.trim()
+                : credential.avatarUrl,
+          );
+        })
+        .toList(growable: false);
+    if (changed) await _writeRememberedCredentials(updated);
+  }
+
   Map<String, String> _authorizationHeaders() {
-    if (!hasSession) {
+    if (_accessToken == null || _accessToken!.isEmpty) {
       throw const AuthFlowException('ไม่พบ access token กรุณาล็อกอินใหม่');
     }
     return {'Authorization': 'Bearer $_accessToken'};
@@ -1351,6 +1785,69 @@ class AuthFlowService {
     }
     return 'เกิดข้อผิดพลาดจาก API กรุณาลองใหม่';
   }
+}
+
+enum _SessionRefreshResult { refreshed, invalid, unavailable }
+
+String? _nicknameFromLegacyDisplayName(String? displayName) {
+  final value = displayName?.trim() ?? '';
+  if (value.isEmpty) return null;
+  final match = RegExp(r'\(([^()]*)\)\s*$').firstMatch(value);
+  final nickname = match?.group(1)?.trim() ?? '';
+  return nickname.isEmpty ? null : nickname;
+}
+
+class RememberedAccount {
+  const RememberedAccount({required this.email, this.nickname, this.avatarUrl});
+
+  final String email;
+  final String? nickname;
+  final String? avatarUrl;
+
+  String get label {
+    final value = nickname?.trim() ?? '';
+    return value.isEmpty ? email.split('@').first : value;
+  }
+
+  String get initial {
+    final value = label.trim();
+    return value.isEmpty ? '?' : value.substring(0, 1).toUpperCase();
+  }
+}
+
+class _RememberedCredential {
+  const _RememberedCredential({
+    required this.email,
+    required this.password,
+    this.nickname,
+    this.avatarUrl,
+  });
+
+  factory _RememberedCredential.fromJson(Map<String, dynamic> json) {
+    return _RememberedCredential(
+      email: json['email'] as String? ?? '',
+      password: json['password'] as String? ?? '',
+      nickname:
+          json['nickname'] as String? ??
+          _nicknameFromLegacyDisplayName(json['display_name'] as String?),
+      avatarUrl: json['avatar_url'] as String?,
+    );
+  }
+
+  final String email;
+  final String password;
+  final String? nickname;
+  final String? avatarUrl;
+
+  RememberedAccount get account =>
+      RememberedAccount(email: email, nickname: nickname, avatarUrl: avatarUrl);
+
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'password': password,
+    if (nickname?.trim().isNotEmpty == true) 'nickname': nickname!.trim(),
+    if (avatarUrl?.trim().isNotEmpty == true) 'avatar_url': avatarUrl!.trim(),
+  };
 }
 
 class SignUpResult {

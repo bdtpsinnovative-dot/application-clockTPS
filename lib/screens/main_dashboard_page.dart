@@ -581,7 +581,7 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                             shape: BoxShape.circle,
                           ),
                           child: Text(
-                            '$badgeCount',
+                            badgeCount > 9 ? '9+' : '$badgeCount',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,

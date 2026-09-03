@@ -13,14 +13,14 @@ class AdminRequestsPage extends StatefulWidget {
   const AdminRequestsPage({
     super.key,
     required this.service,
-    required this.onMenu,
+    this.onMenu,
     required this.isActive,
     this.targetRequestId,
     this.onClearTargetRequest,
   });
 
   final AuthFlowService service;
-  final VoidCallback onMenu;
+  final VoidCallback? onMenu;
   final bool isActive;
   final String? targetRequestId;
   final VoidCallback? onClearTargetRequest;
@@ -498,7 +498,6 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
             WorkHeader(
               title: 'จัดการคำขออนุมัติ',
               subtitle: 'คำขอการลาและปฏิบัติงานนอกสถานที่',
-              onMenu: widget.onMenu,
               bottomPadding: 58,
               child: const Align(
                 alignment: Alignment.centerLeft,

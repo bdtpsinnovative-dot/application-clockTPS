@@ -637,7 +637,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                           child: Center(
                             child: Text(
-                              '$badgeCount',
+                              badgeCount > 9 ? '9+' : '$badgeCount',
                               style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
                             ),
                           ),
