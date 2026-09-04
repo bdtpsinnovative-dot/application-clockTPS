@@ -77,11 +77,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       _showMessage('กรุณาเลือกรูปภาพโปรไฟล์');
       return;
     }
-    if (_faceVector == null &&
-        !(widget.initialUser?.hasFaceEmbedding ?? false)) {
-      _showMessage('กรุณาสแกนใบหน้าก่อนส่งข้อมูล');
-      return;
-    }
     setState(() => _busy = true);
     try {
       String? avatarUrl = widget.initialUser?.avatarUrl;

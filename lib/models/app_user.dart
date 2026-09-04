@@ -54,8 +54,7 @@ class AppUser {
       firstName.trim().isNotEmpty &&
       lastName.trim().isNotEmpty &&
       nickname.trim().isNotEmpty &&
-      (avatarUrl?.trim().isNotEmpty ?? false) &&
-      hasFaceEmbedding;
+      (avatarUrl?.trim().isNotEmpty ?? false);
 
   String get fullName {
     final name = '$firstName $lastName'.trim();
