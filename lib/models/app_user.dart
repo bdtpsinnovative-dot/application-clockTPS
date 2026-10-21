@@ -14,6 +14,8 @@ class AppUser {
     required this.hasFaceEmbedding,
     this.workStartTime = '09:00',
     this.workEndTime = '18:00',
+    this.branchId,
+    this.branchName = '',
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,8 @@ class AppUser {
       hasFaceEmbedding: json['has_face_embedding'] as bool? ?? false,
       workStartTime: json['work_start_time'] as String? ?? '09:00',
       workEndTime: json['work_end_time'] as String? ?? '18:00',
+      branchId: (json['branch_id'] as num?)?.toInt(),
+      branchName: json['branch_name'] as String? ?? '',
     );
   }
 
@@ -49,6 +53,10 @@ class AppUser {
   final bool hasFaceEmbedding;
   final String workStartTime;
   final String workEndTime;
+  final int? branchId;
+  final String branchName;
+
+  bool get hasBranch => (branchId != null && branchId! > 0) || role == 'admin';
 
   bool get isProfileComplete =>
       firstName.trim().isNotEmpty &&

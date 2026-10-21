@@ -36,8 +36,15 @@ migrate_working_dir/
 # Local backend worktree used by the New Assign branch.
 /.backend-new-assign/
 
-# Local app environment (copy from .env.example)
-/.env
+# Local app environment
+.env*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.key
+/*.plist
+simulator_logs.txt
 
 # Symbolication related
 app.*.symbols

@@ -52,6 +52,16 @@ class AuthFlowService {
   bool get hasSession =>
       (_accessToken?.isNotEmpty ?? false) ||
       (_refreshToken?.isNotEmpty ?? false);
+  String? get accessToken => _accessToken;
+
+  /// Returns a valid non-expired access token, refreshing if necessary.
+  Future<String?> getValidAccessToken() async {
+    if (_isJwtExpired(_accessToken) && hasSession) {
+      await _refreshSession();
+    }
+    return _accessToken;
+  }
+
   String get currentUserEmail => _email ?? '';
   String get currentUserId => _authId ?? '';
   String get baseUrl => AppConfig.apiBaseUrl;

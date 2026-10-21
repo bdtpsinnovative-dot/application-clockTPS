@@ -20,7 +20,12 @@
         android:label="Clock in TPS"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round">
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:enableOnBackInvokedCallback="true">
+        <!-- Disable Impeller on Android to use reliable Skia backend, preventing SurfaceSyncGroup/OpenGLES ANRs on emulators and older devices -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <!-- Explicit defaults keep background FCM notifications readable on
              Samsung, Xiaomi, Oppo and stock Android notification layouts. -->
         <meta-data

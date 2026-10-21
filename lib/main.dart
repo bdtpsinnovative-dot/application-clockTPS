@@ -30,18 +30,21 @@ Future<void> main() async {
   await initializeDateFormatting('th_TH');
   print('Locale set. Initializing Firebase...');
 
-  // Initialize Firebase and FcmService
-  try {
-    await Firebase.initializeApp();
-    print('Firebase initialized. Init FCM...');
-    FcmService.instance.init();
-    print('FCM initialized.');
-  } catch (e) {
-    debugPrint('Firebase initialization failed: $e');
-  }
-
   print('Calling runApp...');
   runApp(const MyApp());
+
+  // Initialize Firebase and FcmService in background so app starts instantly without ANR
+  Future.microtask(() async {
+    try {
+      print('Initializing Firebase in background...');
+      await Firebase.initializeApp();
+      print('Firebase initialized. Init FCM...');
+      await FcmService.instance.init();
+      print('FCM initialized.');
+    } catch (e) {
+      debugPrint('Firebase initialization failed: $e');
+    }
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -96,7 +99,7 @@ class MyApp extends StatelessWidget {
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
+            minimumSize: const Size(0, 48),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),

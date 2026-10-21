@@ -19,6 +19,8 @@ import '../models/work_models.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/sign_out_confirm_sheet.dart';
 import '../widgets/attendance_nav_fab.dart';
+import '../features/sales/sales_shell_screen.dart';
+import '../features/sales/sales_auth_adapter.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -374,6 +376,7 @@ class _HomePageState extends State<HomePage> {
         extendBody: true,
         drawer: _AppDrawer(
           user: _currentUser,
+          service: widget.service,
           selectedIndex: _selectedIndex,
           onSelect: _selectPage,
           onOpenProfile: _openProfile,
@@ -525,6 +528,7 @@ class _HomePageState extends State<HomePage> {
 class _AppDrawer extends StatelessWidget {
   const _AppDrawer({
     required this.user,
+    required this.service,
     required this.selectedIndex,
     required this.onSelect,
     required this.onOpenProfile,
@@ -532,6 +536,7 @@ class _AppDrawer extends StatelessWidget {
   });
 
   final AppUser user;
+  final AuthFlowService service;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
   final VoidCallback onOpenProfile;
@@ -633,6 +638,25 @@ class _AppDrawer extends StatelessWidget {
             label: 'โปรไฟล์ของฉัน',
             selected: false,
             onTap: onOpenProfile,
+          ),
+          if (user.hasBranch)
+            _DrawerItem(
+              icon: Icons.point_of_sale_rounded,
+              label: 'ระบบขาย & ขนส่ง (POS)',
+            selected: false,
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SalesShellScreen(
+                    user: AuthenticatedUser.fromAppUser(user),
+                    authService: AuthService(service),
+                    onSignOut: onSignOut,
+                  ),
+                ),
+              );
+            },
           ),
           const Spacer(),
           const Divider(),

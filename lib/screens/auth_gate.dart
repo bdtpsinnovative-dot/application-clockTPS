@@ -114,19 +114,32 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     try {
       final user = await _service.getMe();
       _user = user;
-      if (!user.isProfileComplete) {
-        _setState(_GateState.profileRequired);
-      } else {
-        if (user.status == 'active') {
-          unawaited(_bindDeviceAndFcmSafely());
-        }
-        _setState(
-          user.status == 'active' ? _GateState.active : _GateState.pending,
-        );
+      if (user.status == 'active') {
+        unawaited(_bindDeviceAndFcmSafely());
       }
+      _setState(
+        user.status == 'active' ? _GateState.active : _GateState.pending,
+      );
     } on ProfileRequiredException {
-      _user = null;
-      _setState(_GateState.profileRequired);
+      final email = _service.currentUserEmail.isNotEmpty
+          ? _service.currentUserEmail
+          : 'user@company.com';
+      final username = email.split('@').first;
+      _user = AppUser(
+        id: _service.currentUserId.isNotEmpty ? _service.currentUserId : 'user',
+        authId: _service.currentUserId.isNotEmpty ? _service.currentUserId : 'user',
+        email: email,
+        firstName: username,
+        lastName: '',
+        nickname: username,
+        department: 'ทั่วไป',
+        position: 'พนักงาน',
+        role: 'employee',
+        status: 'active',
+        avatarUrl: null,
+        hasFaceEmbedding: false,
+      );
+      _setState(_GateState.active);
     } on SessionExpiredException {
       await _service.signOut();
       _setState(_GateState.signedOut);
@@ -205,6 +218,23 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           initialUser: _user,
           onProfileSaved: _resolve,
           onSignOut: _signOut,
+          onSkip: () {
+            _user ??= AppUser(
+              id: _service.currentUserId.isNotEmpty ? _service.currentUserId : 'user',
+              authId: _service.currentUserId.isNotEmpty ? _service.currentUserId : 'user',
+              email: _service.currentUserEmail.isNotEmpty ? _service.currentUserEmail : 'user@company.com',
+              firstName: '',
+              lastName: '',
+              nickname: '',
+              department: 'ทั่วไป',
+              position: 'พนักงาน',
+              role: 'employee',
+              status: 'active',
+              avatarUrl: null,
+              hasFaceEmbedding: false,
+            );
+            _setState(_GateState.active);
+          },
         ),
         _GateState.pending => PendingApprovalPage(
           onCheckStatus: _resolve,

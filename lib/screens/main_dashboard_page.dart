@@ -13,6 +13,8 @@ import 'admin_locations_page.dart';
 import 'admin_attendance_history_page.dart';
 import 'admin_holidays_page.dart';
 import 'admin_daily_board_page.dart';
+import '../features/sales/sales_shell_screen.dart';
+import '../features/sales/sales_auth_adapter.dart';
 
 class MainDashboardPage extends StatefulWidget {
   const MainDashboardPage({
@@ -250,8 +252,119 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                 ),
               ),
             ),
-            _StaggeredFadeIn(
+            // Standalone Prominent POS & Dispatch Banner Card (Visible only to branch staff or Admin)
+            if (widget.user.hasBranch)
+              _StaggeredFadeIn(
               delayIndex: 2,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1D4ED8), workBlue],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: workBlue.withValues(alpha: 0.28),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SalesShellScreen(
+                            user: AuthenticatedUser.fromAppUser(widget.user),
+                            authService: AuthService(widget.service),
+                            onSignOut: () async {
+                              Navigator.pop(context);
+                            },
+                          ),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.point_of_sale_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        'ระบบขาย & ขนส่ง',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF59E0B),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Text(
+                                          'POS',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  const Text(
+                                    'ขายหน้าร้าน • ออกใบเสนอราคา • คลังจัดส่งสินค้า',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: Colors.white70,
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            _StaggeredFadeIn(
+              delayIndex: 3,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
@@ -355,44 +468,6 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                                           const CompanyWebsitesPage(),
                                     ),
                                   ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              width: itemWidth,
-                              child: Center(
-                                child: _buildCircularMenu(
-                                  label: 'มอบหมายงาน',
-                                  icon: Icons.task_alt_rounded,
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(16)),
-                                        title: const Row(
-                                          children: [
-                                            Icon(Icons.build_circle_rounded,
-                                                color: Colors.orange, size: 28),
-                                            SizedBox(width: 10),
-                                            Text('แจ้งเตือน',
-                                                style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                        content: const Text(
-                                          'กำลังปรับปรุงโมดูล\nกรุณาเข้าใช้งานผ่านเมนูใหม่ด้านบน',
-                                          style: TextStyle(fontSize: 14),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context),
-                                            child: const Text('ตกลง',
-                                                style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
                                 ),
                               ),
                             ),

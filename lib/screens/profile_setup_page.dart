@@ -15,12 +15,14 @@ class ProfileSetupPage extends StatefulWidget {
     this.initialUser,
     required this.onProfileSaved,
     required this.onSignOut,
+    this.onSkip,
   });
 
   final AuthFlowService service;
   final AppUser? initialUser;
   final Future<void> Function() onProfileSaved;
   final Future<void> Function() onSignOut;
+  final VoidCallback? onSkip;
 
   @override
   State<ProfileSetupPage> createState() => _ProfileSetupPageState();
@@ -131,7 +133,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         child: Stack(
           children: [
             ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.only(bottom: 48),
               children: [
                 WorkHeader(
                   title: 'ตั้งค่าโปรไฟล์',
@@ -290,6 +292,19 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                               icon: const Icon(Icons.save_outlined),
                               label: const Text('บันทึกและส่งอนุมัติ'),
                             ),
+                            if (widget.onSkip != null) ...[
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: _busy ? null : widget.onSkip,
+                                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                                label: const Text('ข้ามไปยังหน้าหลัก (ตั้งค่าภายหลัง)'),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(0, 48),
+                                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  foregroundColor: const Color(0xFF475569),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
