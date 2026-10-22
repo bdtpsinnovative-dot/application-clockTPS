@@ -81,6 +81,8 @@ class SalePosScreenState extends State<SalePosScreen>
   // Filter & Sort state
   int? _filterLocation; // null = ทุกสาขา (ALL), or branchId
   String _filterStockMode = 'ALL'; // 'ALL', 'OWN_IN_STOCK', 'ANY_IN_STOCK', 'OUT_OF_STOCK'
+  String _selectedBrand = 'ทุกแบรนด์';
+  List<String> _serverBrands = const [];
   bool _filterOnlyDiscount = false;
   String _sortBy = 'DEFAULT'; // 'DEFAULT', 'PRICE_ASC', 'PRICE_DESC', 'STOCK_DESC'
 
@@ -170,6 +172,7 @@ class SalePosScreenState extends State<SalePosScreen>
       if (mounted) {
         setState(() {
           _products = catalog.products;
+          _serverBrands = catalog.brands;
           _branches = catalog.branches;
           _currentBranchId = catalog.currentBranchId;
           _currentBranchName = catalog.currentBranchName;
@@ -250,8 +253,31 @@ class SalePosScreenState extends State<SalePosScreen>
     ...{for (final product in _activeProducts) _cleanCat(product.category)}.toList()..sort(),
   ];
 
+  List<String> get _brands {
+    final set = <String>{};
+    for (final p in _activeProducts) {
+      final b = p.brand.trim();
+      if (b.isNotEmpty && b != 'ทั่วไป' && b != 'ไม่มีแบรนด์') {
+        set.add(b);
+      }
+    }
+    for (final b in _serverBrands) {
+      final s = b.trim();
+      if (s.isNotEmpty && s != 'ทั่วไป' && s != 'ไม่มีแบรนด์') {
+        set.add(s);
+      }
+    }
+    final sorted = set.toList()..sort();
+    final hasGeneral = _activeProducts.any((p) => p.brand.trim() == 'ทั่วไป');
+    if (hasGeneral && _catalogType == 'PROP') {
+      sorted.add('ทั่วไป');
+    }
+    return ['ทุกแบรนด์', ...sorted];
+  }
+
   bool get _hasActiveFilters =>
       _category != 'ทั้งหมด' ||
+      _selectedBrand != 'ทุกแบรนด์' ||
       _filterLocation != null ||
       _filterStockMode != 'ALL' ||
       _filterOnlyDiscount ||
@@ -260,6 +286,7 @@ class SalePosScreenState extends State<SalePosScreen>
   int get _activeFilterCount {
     int count = 0;
     if (_category != 'ทั้งหมด') count++;
+    if (_selectedBrand != 'ทุกแบรนด์') count++;
     if (_filterLocation != null) count++;
     if (_filterStockMode != 'ALL') count++;
     if (_filterOnlyDiscount) count++;
@@ -270,6 +297,7 @@ class SalePosScreenState extends State<SalePosScreen>
   void _clearAllFilters() {
     setState(() {
       _category = 'ทั้งหมด';
+      _selectedBrand = 'ทุกแบรนด์';
       _filterLocation = null;
       _filterStockMode = 'ALL';
       _filterOnlyDiscount = false;
@@ -290,8 +318,11 @@ class SalePosScreenState extends State<SalePosScreen>
       if (_category != 'ทั้งหมด' && _cleanCat(product.category) != _category) {
         return false;
       }
+      if (_selectedBrand != 'ทุกแบรนด์' && product.brand.toLowerCase() != _selectedBrand.toLowerCase()) {
+        return false;
+      }
       if (query.isNotEmpty) {
-        final searchable = '${product.name} ${product.sku}'.toLowerCase();
+        final searchable = '${product.name} ${product.sku} ${product.brand}'.toLowerCase();
         if (!searchable.contains(query)) return false;
       }
       if (_filterLocation != null) {
@@ -2719,6 +2750,7 @@ class SalePosScreenState extends State<SalePosScreen>
                 setState(() {
                   _catalogType = 'PROP';
                   _category = 'ทั้งหมด';
+                  _selectedBrand = 'ทุกแบรนด์';
                 });
               }
               Navigator.pop(ctx);
@@ -2741,6 +2773,7 @@ class SalePosScreenState extends State<SalePosScreen>
                 setState(() {
                   _catalogType = 'FURNITURE';
                   _category = 'ทั้งหมด';
+                  _selectedBrand = 'ทุกแบรนด์';
                 });
                 if (_furnitureProducts.isEmpty && !_isLoadingFurniture) {
                   _loadFurnitureProducts();
@@ -2766,6 +2799,7 @@ class SalePosScreenState extends State<SalePosScreen>
                 setState(() {
                   _catalogType = 'SLAB';
                   _category = 'ทั้งหมด';
+                  _selectedBrand = 'ทุกแบรนด์';
                 });
                 if (_slabProducts.isEmpty && !_isLoadingSlabs) {
                   _loadSlabsProducts();
@@ -3052,6 +3086,58 @@ class SalePosScreenState extends State<SalePosScreen>
     );
   }
 
+  void _showBrandPickerModal() {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+    if (isDesktop) {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680, maxHeight: 600),
+            child: _BrandPickerSheet(
+              brands: _brands,
+              selectedBrand: _selectedBrand,
+              activeProducts: _activeProducts,
+              isDialog: true,
+              onSelect: (b) {
+                setState(() => _selectedBrand = b);
+                Navigator.pop(ctx);
+              },
+            ),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: _BrandPickerSheet(
+            brands: _brands,
+            selectedBrand: _selectedBrand,
+            activeProducts: _activeProducts,
+            isDialog: false,
+            onSelect: (b) {
+              setState(() => _selectedBrand = b);
+              Navigator.pop(ctx);
+            },
+          ),
+        ),
+      );
+    }
+  }
+
   void _showFilterSheet() {
     final isTablet = MediaQuery.sizeOf(context).width >= 600;
     if (isTablet) {
@@ -3236,6 +3322,60 @@ class SalePosScreenState extends State<SalePosScreen>
                           height: 36,
                           onTap: () {
                             setState(() => _category = cat);
+                            setModalState(() {});
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+
+              // 1.5 แบรนด์สินค้า (BRAND)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'แบรนด์สินค้า (BRAND)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: _ink),
+                  ),
+                  if (_selectedBrand != 'ทุกแบรนด์')
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => _selectedBrand = 'ทุกแบรนด์');
+                        setModalState(() {});
+                      },
+                      child: const Text(
+                        'ล้างแบรนด์',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final colCount = (constraints.maxWidth / 130).floor().clamp(2, 4);
+                  final itemWidth = (constraints.maxWidth - (colCount - 1) * 6) / colCount;
+                  return Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _brands.map((b) {
+                      final isSelected = _selectedBrand == b;
+                      final count = b == 'ทุกแบรนด์'
+                          ? _activeProducts.length
+                          : _activeProducts.where((p) => p.brand.toLowerCase() == b.toLowerCase()).length;
+                      return SizedBox(
+                        width: itemWidth,
+                        child: _gridOptionTile(
+                          label: '$b ($count)',
+                          isSelected: isSelected,
+                          selectedColor: Colors.black,
+                          fontSize: 11,
+                          height: 36,
+                          onTap: () {
+                            setState(() => _selectedBrand = b);
                             setModalState(() {});
                           },
                         ),
@@ -3515,6 +3655,7 @@ class SalePosScreenState extends State<SalePosScreen>
                 controller: _searchController,
                 focusNode: _searchFocusNode,
                 cursorColor: Colors.black,
+                textAlignVertical: TextAlignVertical.center,
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13.5,
@@ -3522,19 +3663,21 @@ class SalePosScreenState extends State<SalePosScreen>
                 ),
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.transparent,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   errorBorder: InputBorder.none,
                   disabledBorder: InputBorder.none,
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   hintText: _catalogType == 'FURNITURE'
                       ? 'ค้นหาเฟอร์นิเจอร์ หรือ SKU...'
                       : (_catalogType == 'SLAB'
                           ? 'ค้นหาแผ่นไม้ สแลป หรือ SKU...'
                           : 'ค้นหาสินค้า พรอพ หรือ SKU...'),
-                  hintStyle: TextStyle(
+                  hintStyle: const TextStyle(
                     color: Color(0xFFA8A29E),
                     fontWeight: FontWeight.w500,
                     fontSize: 13,
@@ -3565,7 +3708,7 @@ class SalePosScreenState extends State<SalePosScreen>
                   ),
                 ),
               ),
-            // ปุ่มกล้องสแกนบาร์โค้ด / QR Code (Camera square button in sleek black style)
+            // ปุ่มกล้องสแกนบาร์โค้ด / QR Code
             Padding(
               padding: const EdgeInsets.only(right: 6, left: 4),
               child: Tooltip(
@@ -3577,23 +3720,23 @@ class SalePosScreenState extends State<SalePosScreen>
                       HapticFeedback.selectionClick();
                       _openBarcodeScannerModal();
                     },
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      width: 38,
-                      height: 38,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: _line,
-                          width: 1.1,
+                          color: const Color(0xFFE2E8F0),
+                          width: 1.0,
                         ),
                       ),
                       child: const Center(
                         child: Icon(
                           Icons.camera_alt_rounded,
-                          color: Colors.black,
-                          size: 20,
+                          color: Color(0xFF1E293B),
+                          size: 19,
                         ),
                       ),
                     ),
@@ -3747,6 +3890,35 @@ class SalePosScreenState extends State<SalePosScreen>
               ),
               labelStyle: TextStyle(
                 color: _filterOnlyDiscount ? Colors.white : _ink,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              showCheckmark: false,
+            ),
+          ),
+
+          // ปุ่มลัด: แบรนด์สินค้า (Brand Filter)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              selected: _selectedBrand != 'ทุกแบรนด์',
+              label: Text(
+                _selectedBrand == 'ทุกแบรนด์' ? 'แบรนด์' : 'แบรนด์: $_selectedBrand',
+              ),
+              avatar: Icon(
+                Icons.sell_outlined,
+                size: 14,
+                color: _selectedBrand != 'ทุกแบรนด์' ? Colors.white : _muted,
+              ),
+              onSelected: (_) => _showBrandPickerModal(),
+              selectedColor: Colors.black,
+              backgroundColor: Colors.white,
+              side: BorderSide(
+                color: _selectedBrand != 'ทุกแบรนด์' ? Colors.black : _line,
+              ),
+              labelStyle: TextStyle(
+                color: _selectedBrand != 'ทุกแบรนด์' ? Colors.white : _ink,
                 fontWeight: FontWeight.w800,
                 fontSize: 11,
               ),
@@ -4536,32 +4708,34 @@ class _ProductCardState extends State<_ProductCard> {
                           ),
                           const SizedBox(height: 2),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
                             children: [
-                              Flexible(
-                                child: Text(
-                                  product.price > 0 ? _money(product.price) : 'ระบุราคาตอนขาย',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: product.price > 0 ? _ink : const Color(0xFF2563EB),
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: product.price > 0 ? 9.5 : 8.0,
-                                    height: 1,
-                                  ),
+                              Text(
+                                product.price > 0 ? _formatCardPrice(product.price) : 'ระบุราคาตอนขาย',
+                                maxLines: 1,
+                                style: TextStyle(
+                                  color: product.hasDiscount
+                                      ? const Color(0xFFE11D48)
+                                      : (product.price > 0 ? _ink : const Color(0xFF2563EB)),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: product.price > 0 ? 10.0 : 8.0,
+                                  letterSpacing: -0.2,
+                                  height: 1.1,
                                 ),
                               ),
                               if (product.hasDiscount) ...[
                                 const SizedBox(width: 3),
                                 Flexible(
                                   child: Text(
-                                    _money(product.effectiveOriginalPrice),
+                                    _formatCardPrice(product.effectiveOriginalPrice),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: _muted,
                                       fontSize: 7.5,
                                       decoration: TextDecoration.lineThrough,
-                                      height: 1,
+                                      height: 1.1,
                                     ),
                                   ),
                                 ),
@@ -4626,21 +4800,21 @@ class _ProductCardState extends State<_ProductCard> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        'ที่ร้าน: ${product.ownBranchQty}',
+                                        '${product.ownBranchQty}',
                                         style: const TextStyle(
                                           color: _green,
-                                          fontSize: 7.5,
-                                          fontWeight: FontWeight.w800,
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.w900,
                                           height: 1,
                                         ),
                                       ),
                                       if (hasOtherStock) ...[
-                                        const SizedBox(width: 2.5),
+                                        const SizedBox(width: 2),
                                         Text(
                                           '(+${product.otherBranchQty})',
                                           style: const TextStyle(
                                             color: _orange,
-                                            fontSize: 7,
+                                            fontSize: 7.5,
                                             fontWeight: FontWeight.w800,
                                             height: 1,
                                           ),
@@ -4649,17 +4823,17 @@ class _ProductCardState extends State<_ProductCard> {
                                     ],
                                   )
                                 : Text(
-                                    'ดึงสาขาอื่น: ${product.otherBranchQty}',
+                                    '+${product.otherBranchQty}',
                                     style: const TextStyle(
                                       color: _orange,
-                                      fontSize: 7.5,
-                                      fontWeight: FontWeight.w800,
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w900,
                                       height: 1,
                                     ),
                                   )),
                   ),
                 ),
-                // Top-Left Discount Tag Badge
+                // Top-Left Discount Tag Badge or Brand Badge
                 if (product.hasDiscount)
                   Positioned(
                     top: 5,
@@ -4687,7 +4861,7 @@ class _ProductCardState extends State<_ProductCard> {
                         ),
                       ),
                     ),
-                  ),
+                  )
               ],
             ),
           ),
@@ -4905,6 +5079,423 @@ class _CartItemWidget extends StatelessWidget {
       child: Icon(icon, size: 15, color: _muted),
     ),
   );
+}
+
+class _BrandPickerSheet extends StatefulWidget {
+  const _BrandPickerSheet({
+    required this.brands,
+    required this.selectedBrand,
+    required this.activeProducts,
+    required this.isDialog,
+    required this.onSelect,
+  });
+
+  final List<String> brands;
+  final String selectedBrand;
+  final List<PosProduct> activeProducts;
+  final bool isDialog;
+  final ValueChanged<String> onSelect;
+
+  @override
+  State<_BrandPickerSheet> createState() => _BrandPickerSheetState();
+}
+
+class _BrandPickerSheetState extends State<_BrandPickerSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  late final Map<String, int> _counts;
+
+  @override
+  void initState() {
+    super.initState();
+    _counts = {};
+    for (final b in widget.brands) {
+      if (b == 'ทุกแบรนด์') {
+        _counts[b] = widget.activeProducts.length;
+      } else {
+        _counts[b] = widget.activeProducts
+            .where((p) => p.brand.toLowerCase() == b.toLowerCase())
+            .length;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _searchQuery.trim().toLowerCase();
+    final specificBrands = widget.brands
+        .where((b) => b != 'ทุกแบรนด์')
+        .where((b) => query.isEmpty || b.toLowerCase().contains(query))
+        .toList(growable: false);
+
+    final isAllSelected = widget.selectedBrand == 'ทุกแบรนด์';
+    final allCount = _counts['ทุกแบรนด์'] ?? widget.activeProducts.length;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!widget.isDialog)
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 8, bottom: 8),
+              width: 44,
+              height: 4.5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+        // Header
+        Padding(
+          padding: EdgeInsets.fromLTRB(18, widget.isDialog ? 18 : 6, 18, 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.sell_rounded, color: _ink, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'เลือกแบรนด์สินค้า',
+                        style: TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w900,
+                          color: _ink,
+                          height: 1.1,
+                        ),
+                      ),
+                      Text(
+                        'มีทั้งหมด ${widget.brands.length - 1} แบรนด์ (${widget.activeProducts.length} ชิ้น)',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _muted,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!isAllSelected)
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: () => widget.onSelect('ทุกแบรนด์'),
+                      icon: const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFFDC2626)),
+                      label: const Text(
+                        'ล้างตัวกรอง',
+                        style: TextStyle(
+                          color: Color(0xFFDC2626),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  if (widget.isDialog)
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20, color: _muted),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Quick Search Bar (if brands > 6)
+        if (widget.brands.length > 6)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Container(
+              height: 42,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F172A),
+                ),
+                textAlignVertical: TextAlignVertical.center,
+                decoration: InputDecoration(
+                  filled: false,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    size: 19,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 38,
+                    minHeight: 42,
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                          icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF64748B)),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 42),
+                          splashRadius: 18,
+                        )
+                      : null,
+                  suffixIconConstraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 42,
+                  ),
+                  hintText: 'ค้นหาชื่อแบรนด์...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        const Divider(height: 1, color: _line),
+
+        // Content Area with LayoutBuilder
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              // Responsive column count based on available screen width!
+              final int crossAxisCount = (width / 165).floor().clamp(2, 5);
+
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                children: [
+                  // Full-width Hero Card for "ทุกแบรนด์ (ALL BRANDS)"
+                  if (query.isEmpty) ...[
+                    Material(
+                      color: isAllSelected ? _ink : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        onTap: () => widget.onSelect('ทุกแบรนด์'),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isAllSelected ? _ink : const Color(0xFFE2E8F0),
+                              width: isAllSelected ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: isAllSelected
+                                      ? Colors.white.withValues(alpha: 0.15)
+                                      : const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.grid_view_rounded,
+                                  size: 16,
+                                  color: isAllSelected ? Colors.white : _ink,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'ทุกแบรนด์ (แสดงทั้งหมด)',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: isAllSelected ? Colors.white : _ink,
+                                      ),
+                                    ),
+                                    Text(
+                                      'ดูสินค้าทุกรายการ ไม่จำกัดแบรนด์',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: isAllSelected
+                                            ? Colors.white.withValues(alpha: 0.75)
+                                            : _muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                decoration: BoxDecoration(
+                                  color: isAllSelected
+                                      ? Colors.white
+                                      : const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$allCount ชิ้น',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: isAllSelected ? _ink : const Color(0xFF334155),
+                                  ),
+                                ),
+                              ),
+                              if (isAllSelected) ...[
+                                const SizedBox(width: 8),
+                                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  if (specificBrands.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 36),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            const Icon(Icons.search_off_rounded, size: 40, color: Color(0xFFCBD5E1)),
+                            const SizedBox(height: 8),
+                            Text(
+                              'ไม่พบแบรนด์ที่ตรงกับ "$_searchQuery"',
+                              style: const TextStyle(
+                                color: _muted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else ...[
+                    // Responsive Grid for Brands
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        mainAxisExtent: 48,
+                      ),
+                      itemCount: specificBrands.length,
+                      itemBuilder: (context, index) {
+                        final b = specificBrands[index];
+                        final isSelected = widget.selectedBrand.toLowerCase() == b.toLowerCase();
+                        final count = _counts[b] ?? 0;
+
+                        return Material(
+                          color: isSelected ? _ink : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            onTap: () => widget.onSelect(b),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected ? _ink : const Color(0xFFE2E8F0),
+                                  width: isSelected ? 1.4 : 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      b,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? Colors.white.withValues(alpha: 0.22)
+                                          : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      '$count',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: isSelected ? Colors.white : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _BranchSelectSheet extends StatelessWidget {
@@ -5577,6 +6168,24 @@ BoxDecoration _panelDecoration({required double radius}) => BoxDecoration(
 );
 
 String _money(double value) => '฿${value.toStringAsFixed(2)}';
+
+String _formatCardPrice(double value) {
+  if (value <= 0) return '฿0';
+  if (value % 1 == 0) {
+    final intVal = value.toInt();
+    final str = intVal.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+    return '฿$str';
+  }
+  final parts = value.toStringAsFixed(2).split('.');
+  final intPart = parts[0].replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (Match m) => '${m[1]},',
+  );
+  return '฿$intPart.${parts[1]}';
+}
 
 class _BarcodeScannerDialog extends StatefulWidget {
   const _BarcodeScannerDialog();

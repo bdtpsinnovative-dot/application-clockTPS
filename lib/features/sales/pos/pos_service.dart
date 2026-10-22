@@ -54,6 +54,7 @@ class PosProduct {
     this.discountName,
     required this.imageUrl,
     required this.category,
+    this.brand = 'ทั่วไป',
     required this.availableQty,
     this.ownBranchQty = 0,
     this.otherBranchQty = 0,
@@ -74,6 +75,7 @@ class PosProduct {
   final String? discountName;
   final String? imageUrl;
   final String category;
+  final String brand;
   final int availableQty;
   final int ownBranchQty;
   final int otherBranchQty;
@@ -95,6 +97,7 @@ class PosProduct {
       discountName: null,
       imageUrl: imageUrl,
       category: category,
+      brand: brand,
       availableQty: availableQty,
       ownBranchQty: ownBranchQty,
       otherBranchQty: otherBranchQty,
@@ -145,6 +148,11 @@ class PosProduct {
     final isFurn = (json['is_furniture'] as bool? ?? false) || skuStr.startsWith('EMBER');
     final isSlab = (json['is_slab'] as bool? ?? false) || skuStr.startsWith('WOOD');
 
+    final rawBrand = (json['brand'] as String? ?? '').trim();
+    final brand = rawBrand.isNotEmpty
+        ? rawBrand
+        : (isFurn ? 'Ember & Ash' : (isSlab ? 'ZENSLABS' : 'ทั่วไป'));
+
     return PosProduct(
       id: (json['id'] as num).toInt(),
       name: cleanedName.isNotEmpty && cleanedName != '-' ? cleanedName : rawName,
@@ -156,6 +164,7 @@ class PosProduct {
       discountName: json['discount_name'] as String?,
       imageUrl: json['image_url'] as String?,
       category: cleanedCategory.isNotEmpty ? cleanedCategory : 'อื่น ๆ',
+      brand: brand,
       availableQty: ownQty,
       ownBranchQty: ownQty,
       otherBranchQty: otherQty,
@@ -172,6 +181,7 @@ class PosCatalogResult {
   const PosCatalogResult({
     required this.products,
     required this.categories,
+    this.brands = const [],
     required this.branches,
     required this.currentBranchId,
     required this.currentBranchName,
@@ -179,6 +189,7 @@ class PosCatalogResult {
 
   final List<PosProduct> products;
   final List<String> categories;
+  final List<String> brands;
   final List<BranchInfo> branches;
   final int currentBranchId;
   final String currentBranchName;
@@ -312,6 +323,10 @@ class PosService {
     final categories = (data['categories'] as List<dynamic>? ?? const [])
         .map((c) => c.toString())
         .toList(growable: false);
+    final brands = (data['brands'] as List<dynamic>? ?? const [])
+        .map((b) => b.toString().trim())
+        .where((b) => b.isNotEmpty)
+        .toList(growable: false);
     final branches = (data['branches'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(BranchInfo.fromJson)
@@ -320,6 +335,7 @@ class PosService {
     return PosCatalogResult(
       products: products,
       categories: categories,
+      brands: brands,
       branches: branches,
       currentBranchId: (data['branch_id'] as num?)?.toInt() ?? 1,
       currentBranchName: data['branch_name'] as String? ?? 'สาขาเรา',
@@ -346,6 +362,10 @@ class PosService {
     final categories = (data['categories'] as List<dynamic>? ?? const [])
         .map((c) => c.toString())
         .toList(growable: false);
+    final brands = (data['brands'] as List<dynamic>? ?? const [])
+        .map((b) => b.toString().trim())
+        .where((b) => b.isNotEmpty)
+        .toList(growable: false);
     final branches = (data['branches'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(BranchInfo.fromJson)
@@ -354,6 +374,7 @@ class PosService {
     return PosCatalogResult(
       products: products,
       categories: categories,
+      brands: brands.isNotEmpty ? brands : const ['Ember & Ash'],
       branches: branches,
       currentBranchId: (data['branch_id'] as num?)?.toInt() ?? 1,
       currentBranchName: data['branch_name'] as String? ?? 'สาขาเรา',
@@ -375,6 +396,10 @@ class PosService {
     final categories = (data['categories'] as List<dynamic>? ?? const [])
         .map((c) => c.toString())
         .toList(growable: false);
+    final brands = (data['brands'] as List<dynamic>? ?? const [])
+        .map((b) => b.toString().trim())
+        .where((b) => b.isNotEmpty)
+        .toList(growable: false);
     final branches = (data['branches'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(BranchInfo.fromJson)
@@ -383,6 +408,7 @@ class PosService {
     return PosCatalogResult(
       products: products,
       categories: categories,
+      brands: brands.isNotEmpty ? brands : const ['ZENSLABS'],
       branches: branches,
       currentBranchId: (data['branch_id'] as num?)?.toInt() ?? 1,
       currentBranchName: data['branch_name'] as String? ?? 'สาขาเรา',
