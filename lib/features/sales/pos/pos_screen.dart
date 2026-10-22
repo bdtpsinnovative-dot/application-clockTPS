@@ -377,6 +377,19 @@ class SalePosScreenState extends State<SalePosScreen>
     return list;
   }
 
+  bool get _hasSlabInCart => _cart.any((it) {
+    final sku = it.product.sku.toUpperCase();
+    final cat = it.product.category.toLowerCase();
+    final name = it.product.name.toLowerCase();
+    return it.product.isSlab ||
+        sku.startsWith('ZLB-') ||
+        sku.startsWith('WOOD-') ||
+        cat.contains('slab') ||
+        name.contains('slab') ||
+        name.contains('แผ่นไม้') ||
+        name.contains('ไม้แผ่น');
+  });
+
   int get _itemCount => _cart.fold(0, (sum, item) => sum + item.quantity);
 
   int get _localItemCount =>
@@ -2136,6 +2149,7 @@ class SalePosScreenState extends State<SalePosScreen>
                   customerName: _customerName,
                   saleModeLabel: saleModeLabel,
                   isDelivery: _saleMode == 'DELIVERY',
+                  hasSlab: _hasSlabInCart,
                   itemCount: _itemCount,
                   localItemCount: _localItemCount,
                   crossItemCount: _crossItemCount,
@@ -2166,6 +2180,7 @@ class SalePosScreenState extends State<SalePosScreen>
                   customerName: _customerName,
                   saleModeLabel: saleModeLabel,
                   isDelivery: _saleMode == 'DELIVERY',
+                  hasSlab: _hasSlabInCart,
                   itemCount: _itemCount,
                   localItemCount: _localItemCount,
                   crossItemCount: _crossItemCount,
@@ -6668,6 +6683,7 @@ class _QuotationConfirmModalContent extends StatelessWidget {
     required this.customerName,
     required this.saleModeLabel,
     required this.isDelivery,
+    this.hasSlab = false,
     required this.itemCount,
     required this.localItemCount,
     required this.crossItemCount,
@@ -6685,6 +6701,7 @@ class _QuotationConfirmModalContent extends StatelessWidget {
   final String customerName;
   final String saleModeLabel;
   final bool isDelivery;
+  final bool hasSlab;
   final int itemCount;
   final int localItemCount;
   final int crossItemCount;
@@ -6979,27 +6996,120 @@ class _QuotationConfirmModalContent extends StatelessWidget {
                           ],
                         ),
                       ],
-                      const Divider(height: 18, color: Color(0xFFE2E8F0)),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          const Text(
-                            'ยอดสุทธิใบเสนอราคา',
-                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: _ink),
+                      if (hasSlab) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('ค่าใบกำกับไม้ (Slab)', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                            Text(_money(5000.0), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _ink)),
+                          ],
+                        ),
+                        const Divider(height: 18, color: Color(0xFFE2E8F0)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF9C3),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFFACC15), width: 1.2),
                           ),
-                          Text(
-                            _money(netTotal),
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: _ink,
-                              letterSpacing: -0.5,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Grand Total (รวมใบกำกับไม้)',
+                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFF713F12)),
+                              ),
+                              Text(
+                                _money(netTotal + 5000.0),
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF713F12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDDD6FE).withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFC4B5FD)),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        'ยอดมัดจำ',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2E1065)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFB4A5D9),
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                        child: const Text(
+                                          '50%',
+                                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF2E1065)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    _money((netTotal + 5000.0) * 0.5),
+                                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: Color(0xFF2E1065)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'ยอดคงเหลือ (ก่อนส่งมอบ)',
+                                    style: TextStyle(fontSize: 11.5, color: Color(0xFF5B21B6)),
+                                  ),
+                                  Text(
+                                    _money((netTotal + 5000.0) * 0.5),
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF5B21B6)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        const Divider(height: 18, color: Color(0xFFE2E8F0)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            const Text(
+                              'ยอดสุทธิใบเสนอราคา',
+                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: _ink),
                             ),
-                          ),
-                        ],
-                      ),
+                            Text(
+                              _money(netTotal),
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: _ink,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -7009,19 +7119,21 @@ class _QuotationConfirmModalContent extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
+                    color: hasSlab ? const Color(0xFFFAF5FF) : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: hasSlab ? const Color(0xFFE9D5FF) : const Color(0xFFE2E8F0)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
-                      SizedBox(width: 8),
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 16, color: hasSlab ? const Color(0xFF7E22CE) : const Color(0xFF64748B)),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'ยังไม่ตัดสต็อกในขั้นตอนนี้ ระบบจะตัดสต็อกเมื่อกดยืนยันรับชำระเงินในหน้าสินค้ารอจัดส่ง',
-                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), height: 1.35),
+                          hasSlab
+                              ? 'บิลนี้มีสินค้าไม้แผ่น Slab: ยืนยันการจองสต็อกเมื่อลูกค้าชำระมัดจำ 50% เข้า บจก. ทีพีเอส การ์เด้น เฟอร์นิเจอร์ (กสิกรไทย 033-1-08813-7)'
+                              : 'ยังไม่ตัดสต็อกในขั้นตอนนี้ ระบบจะตัดสต็อกเมื่อกดยืนยันรับชำระเงินในหน้าสินค้ารอจัดส่ง',
+                          style: TextStyle(fontSize: 11.5, color: hasSlab ? const Color(0xFF6B21A8) : const Color(0xFF64748B), height: 1.35),
                         ),
                       ),
                     ],

@@ -2546,85 +2546,88 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                                                   // ─── FOOTER SECTION ───
                                                   if (hasFooter) ...[
                                                     if (pageItems.isNotEmpty) const SizedBox(height: 18),
-                                                    Container(
-                                                      padding: const EdgeInsets.only(top: 12),
-                                                      decoration: const BoxDecoration(
-                                                        border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
-                                                      ),
-                                                      child: Row(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                        children: [
-                                                          const Expanded(
-                                                            child: Padding(
-                                                              padding: EdgeInsets.only(right: 24),
-                                                              child: Column(
-                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                children: [
-                                                                  Text(
-                                                                    'TERMS & CONDITIONS',
-                                                                    style: TextStyle(
-                                                                      fontSize: 8,
-                                                                      fontWeight: FontWeight.bold,
-                                                                      letterSpacing: 1.2,
-                                                                      color: Color(0xFFA3A3A3),
+                                                    if (order.isSlabOrder)
+                                                      _buildSlabSummaryFooter(order)
+                                                    else
+                                                      Container(
+                                                        padding: const EdgeInsets.only(top: 12),
+                                                        decoration: const BoxDecoration(
+                                                          border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
+                                                        ),
+                                                        child: Row(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                          children: [
+                                                            const Expanded(
+                                                              child: Padding(
+                                                                padding: EdgeInsets.only(right: 24),
+                                                                child: Column(
+                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                                  children: [
+                                                                    Text(
+                                                                      'TERMS & CONDITIONS',
+                                                                      style: TextStyle(
+                                                                        fontSize: 8,
+                                                                        fontWeight: FontWeight.bold,
+                                                                        letterSpacing: 1.2,
+                                                                        color: Color(0xFFA3A3A3),
+                                                                      ),
                                                                     ),
-                                                                  ),
-                                                                  SizedBox(height: 4),
-                                                                  Text(
-                                                                    '1. ใบเสนอราคานี้มีผล 30 วันนับจากวันที่ออกเอกสาร\n2. กรุณาตรวจสอบรายการสินค้าให้ถูกต้องก่อนยืนยันการสั่งซื้อ\n3. สินค้าซื้อแล้วไม่รับเปลี่ยนหรือคืน ยกเว้นกรณีชำรุดจากการผลิต',
-                                                                    style: TextStyle(fontSize: 7.5, color: Color(0xFF737373), height: 1.45),
+                                                                    SizedBox(height: 4),
+                                                                    Text(
+                                                                      '1. ใบเสนอราคานี้มีผล 30 วันนับจากวันที่ออกเอกสาร\n2. กรุณาตรวจสอบรายการสินค้าให้ถูกต้องก่อนยืนยันการสั่งซื้อ\n3. สินค้าซื้อแล้วไม่รับเปลี่ยนหรือคืน ยกเว้นกรณีชำรุดจากการผลิต',
+                                                                      style: TextStyle(fontSize: 7.5, color: Color(0xFF737373), height: 1.45),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            SizedBox(
+                                                              width: 224,
+                                                              child: Column(
+                                                                children: [
+                                                                  _totalRow('Subtotal (Before VAT)', _money2(order.totalAmount / 1.07)),
+                                                                  if (order.discountAmount > 0) ...[
+                                                                    const SizedBox(height: 3),
+                                                                    _totalRow('Special Discount', '-${_money2(order.discountAmount)}', isDiscount: true),
+                                                                  ],
+                                                                  const SizedBox(height: 3),
+                                                                  _totalRow('VAT (7%)', _money2(order.totalAmount - (order.totalAmount / 1.07))),
+                                                                  const SizedBox(height: 6),
+                                                                  Container(
+                                                                    padding: const EdgeInsets.only(top: 6),
+                                                                    decoration: const BoxDecoration(
+                                                                      border: Border(top: BorderSide(color: Color(0xFF171717), width: 1.2)),
+                                                                    ),
+                                                                    child: Row(
+                                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                                      children: [
+                                                                        const Text(
+                                                                          'TOTAL (THB)',
+                                                                          style: TextStyle(
+                                                                            fontSize: 10,
+                                                                            fontWeight: FontWeight.bold,
+                                                                            letterSpacing: 1.5,
+                                                                            color: Color(0xFF171717),
+                                                                          ),
+                                                                        ),
+                                                                        Text(
+                                                                          _money2(order.totalAmount),
+                                                                          style: const TextStyle(
+                                                                            fontSize: 16,
+                                                                            fontWeight: FontWeight.bold,
+                                                                            color: Color(0xFF171717),
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
                                                                   ),
                                                                 ],
                                                               ),
                                                             ),
-                                                          ),
-                                                          SizedBox(
-                                                            width: 224,
-                                                            child: Column(
-                                                              children: [
-                                                                _totalRow('Subtotal (Before VAT)', _money2(order.totalAmount / 1.07)),
-                                                                if (order.discountAmount > 0) ...[
-                                                                  const SizedBox(height: 3),
-                                                                  _totalRow('Special Discount', '-${_money2(order.discountAmount)}', isDiscount: true),
-                                                                ],
-                                                                const SizedBox(height: 3),
-                                                                _totalRow('VAT (7%)', _money2(order.totalAmount - (order.totalAmount / 1.07))),
-                                                                const SizedBox(height: 6),
-                                                                Container(
-                                                                  padding: const EdgeInsets.only(top: 6),
-                                                                  decoration: const BoxDecoration(
-                                                                    border: Border(top: BorderSide(color: Color(0xFF171717), width: 1.2)),
-                                                                  ),
-                                                                  child: Row(
-                                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                                    children: [
-                                                                      const Text(
-                                                                        'TOTAL (THB)',
-                                                                        style: TextStyle(
-                                                                          fontSize: 10,
-                                                                          fontWeight: FontWeight.bold,
-                                                                          letterSpacing: 1.5,
-                                                                          color: Color(0xFF171717),
-                                                                        ),
-                                                                      ),
-                                                                      Text(
-                                                                        _money2(order.totalAmount),
-                                                                        style: const TextStyle(
-                                                                          fontSize: 16,
-                                                                          fontWeight: FontWeight.bold,
-                                                                          color: Color(0xFF171717),
-                                                                        ),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        ],
+                                                          ],
+                                                        ),
                                                       ),
-                                                    ),
                                                     const SizedBox(height: 18),
                                                     Row(
                                                       children: [
@@ -2940,6 +2943,167 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
             fontSize: 9.5,
             fontWeight: FontWeight.w600,
             color: isDiscount ? const Color(0xFFDC2626) : const Color(0xFF525252),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSlabSummaryFooter(DispatchOrder order) {
+    final preVat = order.totalAmount / 1.07;
+    final vat = order.totalAmount - preVat;
+    final goodsTotal = order.totalAmount;
+    final woodFee = order.woodPermitFee;
+    final grandTotal = order.grandTotalWithSlab;
+    final deposit = order.depositAmount;
+    final remaining = order.remainingBalance;
+
+    Widget cell(String label, String value, {bool isYellow = false, Widget? badge}) {
+      return Container(
+        decoration: BoxDecoration(
+          color: isYellow ? const Color(0xFFFDE047) : Colors.transparent,
+          border: const Border(bottom: BorderSide(color: Color(0xFFCBD5E1), width: 0.8)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: isYellow ? 8.5 : 8,
+                    fontWeight: isYellow ? FontWeight.bold : FontWeight.w600,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+                if (badge != null) ...[
+                  const SizedBox(width: 6),
+                  badge,
+                ],
+              ],
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: isYellow ? 9.5 : 8.5,
+                fontWeight: isYellow ? FontWeight.w900 : FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left: Terms & Conditions
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'TERMS & CONDITIONS',
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    color: Color(0xFFA3A3A3),
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '1. ใบเสนอราคานี้มีผล 30 วันนับจากวันที่ออกเอกสาร\n2. กรุณาตรวจสอบรายการสินค้าให้ถูกต้องก่อนยืนยันการสั่งซื้อ\n3. สินค้าซื้อแล้วไม่รับเปลี่ยนหรือคืน ยกเว้นกรณีชำรุดจากการผลิต\n4. สินค้าแผ่นไม้เป็นสินค้าเฉพาะตัว (One of a kind) ยืนยันการจองสต็อกเมื่อชำระมัดจำ 50% เรียบร้อยแล้ว',
+                  style: TextStyle(fontSize: 7.5, color: Color(0xFF737373), height: 1.45),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Right: Slab Summary Table + Bank Card
+        SizedBox(
+          width: 280,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFF94A3B8), width: 0.8),
+                ),
+                child: Column(
+                  children: [
+                    cell('Total (ราคารวมก่อน VAT)', _money2(preVat)),
+                    Container(height: 6, color: const Color(0xFFB4A5D9).withValues(alpha: 0.5)),
+                    cell('Total (ราคารวมก่อน VAT)', _money2(preVat)),
+                    cell('ภาษีมูลค่าเพิ่ม VAT 7%', _money2(vat)),
+                    cell('ราคา(สินค้า)ทั้งหมด รวมภาษี', _money2(goodsTotal)),
+                    cell('ค่าขนส่งสินค้า', '-'),
+                    cell('ค่าใบกำกับไม้', _money2(woodFee)),
+                    Container(
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1), width: 0.8)),
+                      ),
+                    ),
+                    cell('Grand Total', _money2(grandTotal), isYellow: true),
+                    cell(
+                      'ยอดเปอร์เซ็นการมัดจำ',
+                      _money2(deposit),
+                      badge: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB4A5D9),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: Text(
+                          '${order.depositPercent.toInt()}%',
+                          style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Color(0xFF2E1065)),
+                        ),
+                      ),
+                    ),
+                    cell('ยอดส่วนต่างที่เหลือ', _money2(remaining)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB4A5D9).withValues(alpha: 0.55),
+                  border: Border.all(color: const Color(0xFF9884C6), width: 0.8),
+                ),
+                child: Column(
+                  children: const [
+                    Text(
+                      'กรุณาโอนเข้าบัญชี:',
+                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF2E1065)),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'ชื่อบัญชี : ทีพีเอส การ์เด้น เฟอร์นิเจอร์ จำกัด',
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF2E1065)),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'ธนาคารกสิกรไทย  สาขา บางโพ',
+                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: Color(0xFF2E1065)),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'เลขที่บัญชี : 033 1 08813 7 (กระแสรายวัน)',
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF2E1065)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ],

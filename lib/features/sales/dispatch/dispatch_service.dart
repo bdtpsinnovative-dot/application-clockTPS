@@ -112,7 +112,20 @@ class DispatchOrder {
   bool get hasCoordinates => latitude != null && longitude != null;
   int get totalItemQty => items.fold(0, (sum, it) => sum + it.qty);
 
-  bool get isZenslabOrder => items.any((it) {
+  bool get isSlabOrder => items.any((it) {
+    final sku = it.product.sku.toUpperCase();
+    final name = it.product.name.toLowerCase();
+    final sup = (it.product.productSup ?? '').toLowerCase();
+    return sku.startsWith('ZLB-') ||
+        sku.startsWith('WOOD-') ||
+        sup.contains('slab') ||
+        sup.contains('แผ่นไม้') ||
+        name.contains('slab') ||
+        name.contains('สแลป') ||
+        name.contains('แผ่นไม้');
+  });
+
+  bool get isZenslabOrder => isSlabOrder || items.any((it) {
     final sku = it.product.sku.toUpperCase();
     final name = it.product.name.toLowerCase();
     final sup = (it.product.productSup ?? '').toLowerCase();
@@ -126,6 +139,12 @@ class DispatchOrder {
         name.contains('แผ่นไม้') ||
         name.contains('ไม้');
   });
+
+  double get woodPermitFee => isSlabOrder ? 5000.0 : 0.0;
+  double get depositPercent => isSlabOrder ? 50.0 : 100.0;
+  double get grandTotalWithSlab => isSlabOrder ? (totalAmount + woodPermitFee) : totalAmount;
+  double get depositAmount => isSlabOrder ? (grandTotalWithSlab * (depositPercent / 100)) : grandTotalWithSlab;
+  double get remainingBalance => isSlabOrder ? (grandTotalWithSlab - depositAmount) : 0.0;
 
   factory DispatchOrder.fromJson(Map<String, dynamic> json) => DispatchOrder(
     id: (json['id'] as num?)?.toInt() ?? 0,
