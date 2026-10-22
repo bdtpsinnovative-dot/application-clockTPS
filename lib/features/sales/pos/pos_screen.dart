@@ -65,10 +65,19 @@ class SalePosScreenState extends State<SalePosScreen>
   final _specialDiscountPercentController = TextEditingController();
 
   final List<CartLineItem> _cart = [];
+  StateSetter? _mobileCartSheetStateSetter;
+
+  void _syncState([VoidCallback? fn]) {
+    if (fn != null) fn();
+    if (mounted) {
+      setState(() {});
+      _mobileCartSheetStateSetter?.call(() {});
+    }
+  }
 
   void switchToTab(PosTab tab) {
     if (mounted) {
-      setState(() {});
+      _syncState();
     }
   }
   String _saleMode = 'TAKE_AWAY'; // 'TAKE_AWAY' | 'DELIVERY'
@@ -749,9 +758,9 @@ class SalePosScreenState extends State<SalePosScreen>
     final next = item.quantity + change;
 
     if (next <= 0) {
-      setState(() => _cart.remove(item));
+      _syncState(() => _cart.remove(item));
     } else if (next <= maxStock) {
-      setState(() => item.quantity = next);
+      _syncState(() => item.quantity = next);
     } else {
       _showMessage(
         'สต็อกในสาขา ${item.fulfillBranchName} มีจำกัดเพียง $maxStock ชิ้น',
@@ -1037,7 +1046,7 @@ class SalePosScreenState extends State<SalePosScreen>
         ),
       );
     }
-    if (mounted) setState(() {});
+    if (mounted) _syncState();
   }
 
   Widget _discountSummaryBar() {
@@ -1368,7 +1377,7 @@ class SalePosScreenState extends State<SalePosScreen>
                           controller: _specialDiscountBahtController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                           onChanged: (_) {
-                            setState(() {});
+                            _syncState();
                             setModalState(() {});
                           },
                           style: const TextStyle(
@@ -1438,7 +1447,7 @@ class SalePosScreenState extends State<SalePosScreen>
                           controller: _specialDiscountPercentController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                           onChanged: (_) {
-                            setState(() {});
+                            _syncState();
                             setModalState(() {});
                           },
                           style: const TextStyle(
@@ -1503,7 +1512,7 @@ class SalePosScreenState extends State<SalePosScreen>
                     padding: const EdgeInsets.only(right: 6),
                     child: InkWell(
                       onTap: () {
-                        setState(() {
+                        _syncState(() {
                           if (isSel) {
                             _specialDiscountPercentController.clear();
                           } else {
@@ -1524,7 +1533,7 @@ class SalePosScreenState extends State<SalePosScreen>
                           ),
                         ),
                         child: Text(
-                          '%',
+                          '$pct%',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
@@ -1590,7 +1599,7 @@ class SalePosScreenState extends State<SalePosScreen>
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      setState(() {
+                      _syncState(() {
                         _appliedCoupon = null;
                         _couponController.clear();
                         _specialDiscountBahtController.clear();
@@ -1627,7 +1636,10 @@ class SalePosScreenState extends State<SalePosScreen>
                 const SizedBox(width: 10),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      _syncState();
+                      Navigator.pop(context);
+                    },
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.black,
                       minimumSize: const Size.fromHeight(46),
@@ -1683,7 +1695,7 @@ class SalePosScreenState extends State<SalePosScreen>
         ),
       );
     }
-    if (mounted) setState(() {});
+    if (mounted) _syncState();
   }
 
   Future<void> _openRoundingAssistantModal() async {
@@ -2108,83 +2120,68 @@ class SalePosScreenState extends State<SalePosScreen>
 
   Future<void> _checkout() async {
     final saleModeLabel = _saleMode == 'DELIVERY' ? 'ให้ร้านส่งให้' : 'รับหน้าร้าน';
+    final isTablet = MediaQuery.sizeOf(context).width >= 600;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.description_outlined, color: Color(0xFF1E293B), size: 36),
-        title: const Text('ยืนยันสร้างใบเสนอราคา', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('ลูกค้า: ${_customerName.isEmpty ? "ลูกค้าทั่วไป (Walk-in)" : _customerName}'),
-            const SizedBox(height: 4),
-            Text('การรับสินค้า: $saleModeLabel'),
-            const SizedBox(height: 4),
-            Text('จำนวนสินค้า: $_itemCount ชิ้น (ที่ร้าน: $_localItemCount, ข้ามสาขา: $_crossItemCount)'),
-            if (_crossItemCount > 0) ...[
-              const SizedBox(height: 4),
-              const Text(
-                '⚡ ระบบจะสร้างใบเบิกแพ็คข้ามสาขาให้อัตโนมัติ',
-                style: TextStyle(color: _orange, fontWeight: FontWeight.bold, fontSize: 11),
-              ),
-            ],
-            if (_couponDiscount > 0) ...[
-              const SizedBox(height: 4),
-              Text(
-                'ส่วนลดคูปอง: -${_money(_couponDiscount)}',
-                style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.bold),
-              ),
-            ],
-            if (_totalSpecialDiscountAmount != 0) ...[
-              const SizedBox(height: 4),
-              Text(
-                '${_totalSpecialDiscountAmount > 0 ? "ส่วนลดพิเศษ" : "ปัดเศษเพิ่ม"}: ${_totalSpecialDiscountAmount > 0 ? "-" : "+"}${_money(_totalSpecialDiscountAmount.abs())}',
-                style: TextStyle(
-                  color: _totalSpecialDiscountAmount > 0
-                      ? const Color(0xFFDC2626)
-                      : _green,
-                  fontWeight: FontWeight.bold,
+    final confirmed = await (isTablet
+        ? showDialog<bool>(
+            context: context,
+            builder: (ctx) => Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              clipBehavior: Clip.antiAlias,
+              backgroundColor: Colors.white,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: _QuotationConfirmModalContent(
+                  customerName: _customerName,
+                  saleModeLabel: saleModeLabel,
+                  isDelivery: _saleMode == 'DELIVERY',
+                  itemCount: _itemCount,
+                  localItemCount: _localItemCount,
+                  crossItemCount: _crossItemCount,
+                  subtotal: _subtotal,
+                  couponCode: _appliedCoupon?.code,
+                  couponDiscount: _couponDiscount,
+                  specialDiscountAmount: _totalSpecialDiscountAmount,
+                  vatAmount: _vatAmount,
+                  netTotal: _netTotal,
+                  isDialog: true,
+                  onConfirm: () => Navigator.pop(ctx, true),
+                  onCancel: () => Navigator.pop(ctx, false),
                 ),
               ),
-            ],
-            const Divider(height: 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('ยอดสุทธิใบเสนอราคา:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  _money(_netTotal),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFB45309),
-                  ),
+            ),
+          )
+        : showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            builder: (ctx) => SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+                child: _QuotationConfirmModalContent(
+                  customerName: _customerName,
+                  saleModeLabel: saleModeLabel,
+                  isDelivery: _saleMode == 'DELIVERY',
+                  itemCount: _itemCount,
+                  localItemCount: _localItemCount,
+                  crossItemCount: _crossItemCount,
+                  subtotal: _subtotal,
+                  couponCode: _appliedCoupon?.code,
+                  couponDiscount: _couponDiscount,
+                  specialDiscountAmount: _totalSpecialDiscountAmount,
+                  vatAmount: _vatAmount,
+                  netTotal: _netTotal,
+                  isDialog: false,
+                  onConfirm: () => Navigator.pop(ctx, true),
+                  onCancel: () => Navigator.pop(ctx, false),
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              '💡 ยังไม่ตัดสต็อกในขั้นตอนนี้ (ตัดสต็อกเมื่อกดยืนยันรับชำระเงินในหน้ามอนิเตอร์ค้างส่ง)',
-              style: TextStyle(fontSize: 11, color: _muted),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1E293B)),
-            icon: const Icon(Icons.save_outlined, size: 16),
-            label: const Text('สร้างใบเสนอราคา'),
-          ),
-        ],
-      ),
-    );
+          ));
 
     if (confirmed != true || !mounted) return;
 
@@ -2218,44 +2215,41 @@ class SalePosScreenState extends State<SalePosScreen>
         _specialDiscountPercentController.clear();
       });
 
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          icon: const Icon(
-            Icons.check_circle_rounded,
-            color: Color(0xFF16A34A),
-            size: 48,
-          ),
-          title: const Text('สร้างใบเสนอราคาสำเร็จ!'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'เลขที่บิล: ${result.orderCode}',
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+      await (isTablet
+          ? showDialog<void>(
+              context: context,
+              builder: (ctx) => Dialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                clipBehavior: Clip.antiAlias,
+                backgroundColor: Colors.white,
+                insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: _QuotationSuccessModalContent(
+                    orderCode: result.orderCode,
+                    totalAmount: result.totalAmount,
+                    isDialog: true,
+                    onClose: () => Navigator.pop(ctx),
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'ยอดรวมสุทธิ ${_money(result.totalAmount)}',
-                style: const TextStyle(color: _muted),
+            )
+          : showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.white,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'บิลถูกส่งเข้าหน้า "ระบบจัดการสินค้ารอจัดส่ง" เรียบร้อยแล้ว สามารถพิมพ์ใบเสนอราคา หรือกดยืนยันรับชำระเงิน & ตัดสต็อกได้ในหน้านั้นครับ',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12),
+              builder: (ctx) => SafeArea(
+                child: _QuotationSuccessModalContent(
+                  orderCode: result.orderCode,
+                  totalAmount: result.totalAmount,
+                  isDialog: false,
+                  onClose: () => Navigator.pop(ctx),
+                ),
               ),
-            ],
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1E293B)),
-              child: const Text('ตกลง'),
-            ),
-          ],
-        ),
-      );
+            ));
     } on AuthApiException catch (error) {
       if (mounted) _showMessage(error.message);
     } catch (_) {
@@ -4083,7 +4077,7 @@ class SalePosScreenState extends State<SalePosScreen>
                   _showMessage('มีรายการขายข้ามสาขา ต้องจัดส่งสินค้าเท่านั้นครับ');
                   return;
                 }
-                setState(() => _saleMode = 'TAKE_AWAY');
+                _syncState(() => _saleMode = 'TAKE_AWAY');
               },
             ),
           ),
@@ -4093,7 +4087,7 @@ class SalePosScreenState extends State<SalePosScreen>
               label: 'ให้ร้านส่งให้',
               icon: Icons.local_shipping_rounded,
               selected: _saleMode == 'DELIVERY',
-              onTap: () => setState(() => _saleMode = 'DELIVERY'),
+              onTap: () => _syncState(() => _saleMode = 'DELIVERY'),
             ),
           ),
         ],
@@ -4132,7 +4126,7 @@ class SalePosScreenState extends State<SalePosScreen>
           ),
           if (_cart.isNotEmpty)
             IconButton(
-              onPressed: () => setState(() {
+              onPressed: () => _syncState(() {
                 _cart.clear();
                 _appliedCoupon = null;
                 _couponController.clear();
@@ -4410,17 +4404,26 @@ class SalePosScreenState extends State<SalePosScreen>
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => DraggableScrollableSheet(
-                initialChildSize: .82,
-                minChildSize: .45,
-                maxChildSize: .95,
-                builder: (_, controller) => _mobileCartSheet(controller),
-              ),
-            ),
+            onTap: () async {
+              await showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (sheetContext) => StatefulBuilder(
+                  builder: (context, setSheetState) {
+                    _mobileCartSheetStateSetter = setSheetState;
+                    return DraggableScrollableSheet(
+                      initialChildSize: .82,
+                      minChildSize: .45,
+                      maxChildSize: .95,
+                      builder: (_, controller) => _mobileCartSheet(controller),
+                    );
+                  },
+                ),
+              );
+              _mobileCartSheetStateSetter = null;
+              if (mounted) setState(() {});
+            },
             child: Container(
               height: 44,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -6167,7 +6170,12 @@ BoxDecoration _panelDecoration({required double radius}) => BoxDecoration(
   ],
 );
 
-String _money(double value) => '฿${value.toStringAsFixed(2)}';
+String _money(double value) {
+  final isNeg = value < 0;
+  final parts = value.abs().toStringAsFixed(2).split('.');
+  final intPart = parts[0].replaceAll(RegExp(r'\B(?=(\d{3})+(?!\d))'), ',');
+  return '${isNeg ? "-" : ""}฿$intPart.${parts[1]}';
+}
 
 String _formatCardPrice(double value) {
   if (value <= 0) return '฿0';
@@ -6650,3 +6658,595 @@ class _BarcodeScannerDialogState extends State<_BarcodeScannerDialog> {
   }
 }
 
+
+// =========================================================================
+// 10. QUOTATION CONFIRMATION & SUCCESS BOTTOM SHEETS / DIALOGS
+// =========================================================================
+
+class _QuotationConfirmModalContent extends StatelessWidget {
+  const _QuotationConfirmModalContent({
+    required this.customerName,
+    required this.saleModeLabel,
+    required this.isDelivery,
+    required this.itemCount,
+    required this.localItemCount,
+    required this.crossItemCount,
+    required this.subtotal,
+    required this.couponCode,
+    required this.couponDiscount,
+    required this.specialDiscountAmount,
+    required this.vatAmount,
+    required this.netTotal,
+    required this.isDialog,
+    required this.onConfirm,
+    required this.onCancel,
+  });
+
+  final String customerName;
+  final String saleModeLabel;
+  final bool isDelivery;
+  final int itemCount;
+  final int localItemCount;
+  final int crossItemCount;
+  final double subtotal;
+  final String? couponCode;
+  final double couponDiscount;
+  final double specialDiscountAmount;
+  final double vatAmount;
+  final double netTotal;
+  final bool isDialog;
+  final VoidCallback onConfirm;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!isDialog)
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 12, 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.receipt_long_rounded, color: _ink, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'ยืนยันสร้างใบเสนอราคา',
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w900,
+                        color: _ink,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'ตรวจสอบข้อมูลรายการและยอดสุทธิก่อนบันทึก',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: _muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onCancel,
+                icon: const Icon(Icons.close_rounded, size: 20, color: _muted),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: _line),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // การ์ดข้อมูลลูกค้าและการจัดส่ง
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.person_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'ลูกค้า:',
+                            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          ),
+                          const Spacer(),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              customerName.isEmpty ? 'ลูกค้าทั่วไป (Walk-in)' : customerName,
+                              textAlign: TextAlign.end,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _ink),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                      Row(
+                        children: [
+                          Icon(
+                            isDelivery ? Icons.local_shipping_outlined : Icons.storefront_outlined,
+                            size: 16,
+                            color: const Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'การรับสินค้า:',
+                            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isDelivery ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isDelivery ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Text(
+                              saleModeLabel,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: isDelivery ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                      Row(
+                        children: [
+                          const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF64748B)),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'จำนวนสินค้า:',
+                            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          ),
+                          const Spacer(),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$itemCount ชิ้น',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _ink),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'ที่ร้าน: $localItemCount',
+                                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                                ),
+                              ),
+                              if (crossItemCount > 0) ...[
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'ข้ามสาขา: $crossItemCount',
+                                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (crossItemCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.bolt_rounded, size: 16, color: Color(0xFFD97706)),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'มีสินค้าข้ามสาขา ระบบจะสร้างใบเบิกแพ็คให้อัตโนมัติ',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // การ์ดสรุปยอดเงิน
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('ยอดรวมสินค้า', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                          Text(_money(subtotal), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _ink)),
+                        ],
+                      ),
+                      if (couponDiscount > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'ส่วนลดคูปอง ${couponCode != null && couponCode!.isNotEmpty ? "($couponCode)" : ""}',
+                              style: const TextStyle(fontSize: 12.5, color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              '-${_money(couponDiscount)}',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFFDC2626)),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (specialDiscountAmount != 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              specialDiscountAmount > 0 ? 'ส่วนลดพิเศษท้ายบิล' : 'ปัดเศษเพิ่ม',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: specialDiscountAmount > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '${specialDiscountAmount > 0 ? "-" : "+"}${_money(specialDiscountAmount.abs())}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: specialDiscountAmount > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (vatAmount > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('VAT 7% (รวมในยอดแล้ว)', style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
+                            Text(_money(vatAmount), style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ],
+                      const Divider(height: 18, color: Color(0xFFE2E8F0)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          const Text(
+                            'ยอดสุทธิใบเสนอราคา',
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: _ink),
+                          ),
+                          Text(
+                            _money(netTotal),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: _ink,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ข้อความแจ้งเตือนสต็อก
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'ยังไม่ตัดสต็อกในขั้นตอนนี้ ระบบจะตัดสต็อกเมื่อกดยืนยันรับชำระเงินในหน้าสินค้ารอจัดส่ง',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), height: 1.35),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 1,
+                child: SizedBox(
+                  height: 46,
+                  child: OutlinedButton(
+                    onPressed: onCancel,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF475569),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text(
+                      'ยกเลิก',
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 46,
+                  child: FilledButton.icon(
+                    onPressed: onConfirm,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _ink,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                    label: const Text(
+                      'ยืนยันสร้างใบเสนอราคา',
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuotationSuccessModalContent extends StatelessWidget {
+  const _QuotationSuccessModalContent({
+    required this.orderCode,
+    required this.totalAmount,
+    required this.isDialog,
+    required this.onClose,
+  });
+
+  final String orderCode;
+  final double totalAmount;
+  final bool isDialog;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!isDialog)
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+          child: Column(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDCFCE7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_rounded, color: Color(0xFF16A34A), size: 36),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'สร้างใบเสนอราคาสำเร็จ!',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'เอกสารถูกบันทึกเข้าระบบเรียบร้อยแล้ว',
+                style: TextStyle(fontSize: 12, color: _muted),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'เลขที่เอกสาร:',
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        ),
+                        Row(
+                          children: [
+                            Text(
+                              orderCode,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: _ink,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: orderCode));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('คัดลอกเลขที่เอกสารแล้ว'),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.copy_rounded, size: 15, color: Color(0xFF64748B)),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              tooltip: 'คัดลอก',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'ยอดรวมสุทธิ:',
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          _money(totalAmount),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'บิลถูกส่งเข้าหน้า "ระบบจัดการสินค้ารอจัดส่ง" แล้ว สามารถพิมพ์ใบเสนอราคา หรือกดยืนยันรับชำระเงิน & ตัดสต็อกได้ในหน้านั้นครับ',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.35),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: FilledButton(
+                  onPressed: onClose,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _ink,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text(
+                    'ตกลง / ทำรายการต่อ',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
