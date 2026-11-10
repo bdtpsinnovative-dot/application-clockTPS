@@ -10,32 +10,68 @@ class DispatchProduct {
     required this.id,
     required this.name,
     required this.sku,
+    this.categoryId,
     this.imageUrl,
     required this.price,
     this.productSup,
     this.material,
     this.sizeStr,
+    this.isWoodSlab = false,
   });
 
   final int id;
   final String name;
   final String sku;
+  final String? categoryId;
   final String? imageUrl;
   final double price;
   final String? productSup;
   final String? material;
   final String? sizeStr;
+  final bool isWoodSlab;
 
-  factory DispatchProduct.fromJson(Map<String, dynamic> json) => DispatchProduct(
-    id: (json['id'] as num?)?.toInt() ?? 0,
-    name: json['name'] as String? ?? '',
-    sku: json['sku'] as String? ?? '',
-    imageUrl: json['image_url'] as String?,
-    price: (json['price'] as num?)?.toDouble() ?? 0.0,
-    productSup: json['product_sup'] as String?,
-    material: json['material'] as String?,
-    sizeStr: json['size_str'] as String?,
-  );
+  factory DispatchProduct.fromJson(Map<String, dynamic> json) {
+    final sku = (json['sku'] as String? ?? '').toUpperCase();
+    final name = (json['name'] as String? ?? '').toLowerCase();
+    final sup = (json['product_sup'] as String? ?? '').toLowerCase();
+    final cat = (json['category_id'] as String? ?? '').toUpperCase();
+    final mat = (json['material'] as String? ?? '').toLowerCase();
+    final serverIsWoodSlab = json['is_wood_slab'] as bool?;
+
+    final clientDetectedSlab = cat == 'SLABS' ||
+        cat == 'WOODSLAB' ||
+        cat == 'SLAB' ||
+        sku.startsWith('ZLB-') ||
+        sku.startsWith('WOOD-') ||
+        sku.startsWith('LEG-') ||
+        sku.startsWith('SLB-') ||
+        sku.startsWith('SLAB-') ||
+        sup.contains('slab') ||
+        sup.contains('แผ่นไม้') ||
+        name.contains('slab') ||
+        name.contains('สแลป') ||
+        name.contains('แผ่นไม้') ||
+        name.contains('stand') ||
+        name.contains('ขาโต๊ะ') ||
+        name.contains('ขาตั้ง') ||
+        mat.contains('wood') ||
+        mat.contains('ไม้');
+
+    final detectedSlab = (serverIsWoodSlab == true) || clientDetectedSlab;
+
+    return DispatchProduct(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      name: json['name'] as String? ?? '',
+      sku: json['sku'] as String? ?? '',
+      categoryId: json['category_id'] as String?,
+      imageUrl: json['image_url'] as String?,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      productSup: json['product_sup'] as String?,
+      material: json['material'] as String?,
+      sizeStr: json['size_str'] as String?,
+      isWoodSlab: detectedSlab,
+    );
+  }
 }
 
 class DispatchOrderItem {
@@ -62,6 +98,11 @@ class DispatchOrderItem {
   final DispatchProduct product;
 
   double get total => priceAtSale * qty;
+
+  bool get isWoodSlab => product.isWoodSlab;
+  bool get isOutOfStock => availableStock < qty;
+  bool get isBlockedSlab => false;
+  bool get isPreOrder => isOutOfStock;
 
   factory DispatchOrderItem.fromJson(Map<String, dynamic> json) => DispatchOrderItem(
     id: (json['id'] as num?)?.toInt() ?? 0,
@@ -112,39 +153,47 @@ class DispatchOrder {
   bool get hasCoordinates => latitude != null && longitude != null;
   int get totalItemQty => items.fold(0, (sum, it) => sum + it.qty);
 
-  bool get isSlabOrder => items.any((it) {
-    final sku = it.product.sku.toUpperCase();
-    final name = it.product.name.toLowerCase();
-    final sup = (it.product.productSup ?? '').toLowerCase();
-    return sku.startsWith('ZLB-') ||
-        sku.startsWith('WOOD-') ||
-        sup.contains('slab') ||
-        sup.contains('แผ่นไม้') ||
-        name.contains('slab') ||
-        name.contains('สแลป') ||
-        name.contains('แผ่นไม้');
-  });
+  bool get hasBlockedWoodSlab =>
+      status == 'PENDING' && items.any((it) => it.isBlockedSlab);
+  bool get hasPreOrderItems =>
+      status == 'PENDING' && items.any((it) => it.isPreOrder);
+  bool get isAnyItemOutOfStock =>
+      status == 'PENDING' && items.any((it) => it.isOutOfStock);
+
+  bool get isSlabOrder => items.any((it) => it.isWoodSlab);
 
   bool get isZenslabOrder => isSlabOrder || items.any((it) {
     final sku = it.product.sku.toUpperCase();
     final name = it.product.name.toLowerCase();
     final sup = (it.product.productSup ?? '').toLowerCase();
+    final mat = (it.product.material ?? '').toLowerCase();
+    final cat = (it.product.categoryId ?? '').toUpperCase();
     return sku.startsWith('WOOD') ||
         sku.startsWith('EMBER') ||
+        sku.startsWith('LEG-') ||
+        sku.startsWith('SLB-') ||
+        sku.startsWith('SLAB-') ||
+        cat == 'SLABS' ||
+        cat == 'WOODSLAB' ||
         sup.contains('slab') ||
         sup.contains('wood') ||
         sup.contains('เฟอร์นิเจอร์') ||
         name.contains('slab') ||
         name.contains('wood') ||
         name.contains('แผ่นไม้') ||
-        name.contains('ไม้');
+        name.contains('ไม้') ||
+        name.contains('stand') ||
+        mat.contains('wood') ||
+        mat.contains('ไม้');
   });
 
-  double get woodPermitFee => isSlabOrder ? 5000.0 : 0.0;
-  double get depositPercent => isSlabOrder ? 50.0 : 100.0;
-  double get grandTotalWithSlab => isSlabOrder ? (totalAmount + woodPermitFee) : totalAmount;
-  double get depositAmount => isSlabOrder ? (grandTotalWithSlab * (depositPercent / 100)) : grandTotalWithSlab;
-  double get remainingBalance => isSlabOrder ? (grandTotalWithSlab - depositAmount) : 0.0;
+  bool get requiresSlabTemplate => isSlabOrder || isZenslabOrder;
+
+  double get woodPermitFee => requiresSlabTemplate ? 5000.0 : 0.0;
+  double get depositPercent => requiresSlabTemplate ? 50.0 : 100.0;
+  double get grandTotalWithSlab => requiresSlabTemplate ? (totalAmount + woodPermitFee) : totalAmount;
+  double get depositAmount => requiresSlabTemplate ? (grandTotalWithSlab * (depositPercent / 100)) : grandTotalWithSlab;
+  double get remainingBalance => requiresSlabTemplate ? (grandTotalWithSlab - depositAmount) : 0.0;
 
   factory DispatchOrder.fromJson(Map<String, dynamic> json) => DispatchOrder(
     id: (json['id'] as num?)?.toInt() ?? 0,

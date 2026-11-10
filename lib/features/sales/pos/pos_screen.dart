@@ -36,7 +36,7 @@ class SalePosScreen extends StatefulWidget {
   final AuthService authService;
   final Future<void> Function() onSignOut;
   final VoidCallback? onOpenDrawer;
-  final VoidCallback? onNavigateToDispatch;
+  final void Function([String? orderCode])? onNavigateToDispatch;
   final PosTab initialTab;
 
   @override
@@ -331,8 +331,12 @@ class SalePosScreenState extends State<SalePosScreen>
         return false;
       }
       if (query.isNotEmpty) {
-        final searchable = '${product.name} ${product.sku} ${product.brand}'.toLowerCase();
-        if (!searchable.contains(query)) return false;
+        final searchable = '${product.name} ${product.sku} ${product.barcode} ${product.brand} ${product.category}'.toLowerCase();
+        final compactQuery = query.replaceAll(RegExp(r'[-_\s]'), '');
+        final compactSearchable = searchable.replaceAll(RegExp(r'[-_\s]'), '');
+        if (!searchable.contains(query) && (compactQuery.length < 2 || !compactSearchable.contains(compactQuery))) {
+          return false;
+        }
       }
       if (_filterLocation != null) {
         if (!product.isFurniture && !product.isSlab) {
@@ -366,10 +370,14 @@ class SalePosScreenState extends State<SalePosScreen>
         break;
       default:
         list.sort((a, b) {
-          final aHasOwn = a.ownBranchQty > 0 ? 0 : 1;
-          final bHasOwn = b.ownBranchQty > 0 ? 0 : 1;
-          if (aHasOwn != bHasOwn) return aHasOwn - bHasOwn;
-          return a.id.compareTo(b.id);
+          final aTier = a.ownBranchQty > 0 ? 0 : (a.otherBranchQty > 0 ? 1 : 2);
+          final bTier = b.ownBranchQty > 0 ? 0 : (b.otherBranchQty > 0 ? 1 : 2);
+          if (aTier != bTier) return aTier - bTier;
+          final aHasPrice = a.price > 0 ? 0 : 1;
+          final bHasPrice = b.price > 0 ? 0 : 1;
+          if (aHasPrice != bHasPrice) return aHasPrice - bHasPrice;
+          if (a.totalStock != b.totalStock) return b.totalStock.compareTo(a.totalStock);
+          return a.name.compareTo(b.name);
         });
         break;
     }
@@ -464,8 +472,28 @@ class SalePosScreenState extends State<SalePosScreen>
       return;
     }
 
-    // 3. สินค้าสั่งผลิต (เฟอร์นิเจอร์ หรือ แผ่นไม้ หรือ External) ไม่ติดข้อจำกัดสต็อก 0
+    // 3. สินค้าสั่งผลิต (เฟอร์นิเจอร์ หรือ แผ่นไม้ หรือ External)
+    // ถ้าสาขาเราไม่มีสต็อก แต่สาขาอื่นมีสต็อก ให้ดึงจากสาขาที่มีของอัตโนมัติ (หรือให้เลือกสาขา) ก่อนเสมอ
     if (isAddingFurnOrWood || product.isExternal) {
+      if (fulfillBranchId == null && product.ownBranchQty <= 0 && product.otherBranchQty > 0) {
+        final otherBranches = product.stocks
+            .where((s) => s.branchId != _currentBranchId && s.qty > 0)
+            .toList();
+        if (otherBranches.length == 1) {
+          final ob = otherBranches.first;
+          _addCartLine(
+            product: product,
+            fulfillBranchId: ob.branchId,
+            fulfillBranchName: ob.branchName,
+            isCrossBranch: true,
+            quantityToAdd: quantityToAdd,
+          );
+          return;
+        } else if (otherBranches.length > 1) {
+          _showBranchPicker(product);
+          return;
+        }
+      }
       final fBranchId = fulfillBranchId ?? _currentBranchId;
       final fBranchName = fulfillBranchName ??
           _branches.where((b) => b.id == fBranchId).firstOrNull?.name ??
@@ -2245,6 +2273,10 @@ class SalePosScreenState extends State<SalePosScreen>
                     totalAmount: result.totalAmount,
                     isDialog: true,
                     onClose: () => Navigator.pop(ctx),
+                    onViewDispatch: () {
+                      Navigator.pop(ctx);
+                      _openDispatchScreen(result.orderCode);
+                    },
                   ),
                 ),
               ),
@@ -2262,6 +2294,10 @@ class SalePosScreenState extends State<SalePosScreen>
                   totalAmount: result.totalAmount,
                   isDialog: false,
                   onClose: () => Navigator.pop(ctx),
+                  onViewDispatch: () {
+                    Navigator.pop(ctx);
+                    _openDispatchScreen(result.orderCode);
+                  },
                 ),
               ),
             ));
@@ -4610,16 +4646,17 @@ class SalePosScreenState extends State<SalePosScreen>
     );
   }
 
-  void _openDispatchScreen() {
+  void _openDispatchScreen([String? orderCode]) {
     HapticFeedback.selectionClick();
     if (widget.onNavigateToDispatch != null) {
-      widget.onNavigateToDispatch!();
+      widget.onNavigateToDispatch!(orderCode);
     } else {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => VanguardDispatchScreen(
             user: widget.user,
             authService: widget.authService,
+            initialSearchCode: orderCode,
             onNavigateToQuote: () => Navigator.of(context).pop(),
             onBackToPos: () => Navigator.of(context).pop(),
           ),
@@ -7204,12 +7241,14 @@ class _QuotationSuccessModalContent extends StatelessWidget {
     required this.totalAmount,
     required this.isDialog,
     required this.onClose,
+    this.onViewDispatch,
   });
 
   final String orderCode;
   final double totalAmount;
   final bool isDialog;
   final VoidCallback onClose;
+  final VoidCallback? onViewDispatch;
 
   @override
   Widget build(BuildContext context) {
@@ -7338,20 +7377,40 @@ class _QuotationSuccessModalContent extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
+              if (onViewDispatch != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton.icon(
+                    onPressed: onViewDispatch,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _ink,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.local_shipping_rounded, size: 18),
+                    label: const Text(
+                      'เปิดดูบิลในระบบจัดส่งทันที',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               SizedBox(
                 width: double.infinity,
-                height: 46,
-                child: FilledButton(
+                height: 44,
+                child: OutlinedButton(
                   onPressed: onClose,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _ink,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _ink,
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text(
-                    'ตกลง / ทำรายการต่อ',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                    'ตกลง / ทำรายการต่อ (หน้า POS)',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),

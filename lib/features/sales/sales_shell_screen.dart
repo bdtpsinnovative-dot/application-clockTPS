@@ -31,6 +31,7 @@ class SalesShellScreen extends StatefulWidget {
 class _SalesShellScreenState extends State<SalesShellScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<SalePosScreenState> _posKey = GlobalKey<SalePosScreenState>();
+  final GlobalKey<VanguardDispatchScreenState> _dispatchKey = GlobalKey<VanguardDispatchScreenState>();
 
   int _currentIndex = 0;
   int _dispatchTasksCount = 0;
@@ -43,10 +44,15 @@ class _SalesShellScreenState extends State<SalesShellScreen> {
     _scaffoldKey.currentState?.openDrawer();
   }
 
-  void _navigateToTab(int index) {
-    Navigator.of(context).pop(); // Close drawer
+  void _navigateToTab(int index, {String? orderCode}) {
+    if (_scaffoldKey.currentState?.isDrawerOpen == true) {
+      Navigator.of(context).pop(); // Close drawer
+    }
     if (_currentIndex != index) {
       setState(() => _currentIndex = index);
+    }
+    if (index == 1) {
+      _dispatchKey.currentState?.reload(searchCode: orderCode);
     }
   }
 
@@ -80,9 +86,10 @@ class _SalesShellScreenState extends State<SalesShellScreen> {
               authService: widget.authService,
               onSignOut: widget.onSignOut,
               onOpenDrawer: _openDrawer,
-              onNavigateToDispatch: () => setState(() => _currentIndex = 1),
+              onNavigateToDispatch: ([String? orderCode]) => _navigateToTab(1, orderCode: orderCode),
             ),
             VanguardDispatchScreen(
+              key: _dispatchKey,
               user: widget.user,
               authService: widget.authService,
               onTasksCountChanged: _onTasksCountChanged,

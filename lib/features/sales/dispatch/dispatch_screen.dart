@@ -35,6 +35,7 @@ class VanguardDispatchScreen extends StatefulWidget {
     super.key,
     required this.user,
     required this.authService,
+    this.initialSearchCode,
     this.onTasksCountChanged,
     this.onOpenDrawer,
     this.onNavigateToQuote,
@@ -43,16 +44,17 @@ class VanguardDispatchScreen extends StatefulWidget {
 
   final AuthenticatedUser user;
   final AuthService authService;
+  final String? initialSearchCode;
   final ValueChanged<int>? onTasksCountChanged;
   final VoidCallback? onOpenDrawer;
   final VoidCallback? onNavigateToQuote;
   final VoidCallback? onBackToPos;
 
   @override
-  State<VanguardDispatchScreen> createState() => _VanguardDispatchScreenState();
+  State<VanguardDispatchScreen> createState() => VanguardDispatchScreenState();
 }
 
-class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
+class VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
   late final DispatchService _dispatchService;
   final _searchController = TextEditingController();
 
@@ -68,10 +70,52 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
   void initState() {
     super.initState();
     _dispatchService = DispatchService(widget.authService);
+    if (widget.initialSearchCode != null && widget.initialSearchCode!.trim().isNotEmpty) {
+      _searchController.text = widget.initialSearchCode!.trim();
+      _searchQuery = widget.initialSearchCode!.trim().toLowerCase();
+    }
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
     });
-    _loadData();
+    _loadData().then((_) {
+      if (widget.initialSearchCode != null && widget.initialSearchCode!.trim().isNotEmpty) {
+        _autoExpandMatching(widget.initialSearchCode!.trim());
+      }
+    });
+  }
+
+  void _autoExpandMatching(String code) {
+    if (!mounted || _dispatches == null) return;
+    final lower = code.toLowerCase();
+    final allOrders = [
+      ..._dispatches!.overviewTasks,
+      ..._dispatches!.myTasks,
+      ..._dispatches!.followUpTasks,
+      ..._dispatches!.completedTasks,
+      ..._dispatches!.cancelledTasks,
+    ];
+    for (final o in allOrders) {
+      if (o.orderCode.toLowerCase().contains(lower)) {
+        setState(() {
+          _expandedOrderIds.add(o.id);
+        });
+        break;
+      }
+    }
+  }
+
+  Future<void> reload({String? searchCode, DispatchTab? tab}) async {
+    if (searchCode != null && searchCode.trim().isNotEmpty) {
+      _searchController.text = searchCode.trim();
+      _searchQuery = searchCode.trim().toLowerCase();
+    }
+    if (tab != null) {
+      _currentTab = tab;
+    }
+    await _loadData();
+    if (searchCode != null && searchCode.trim().isNotEmpty) {
+      _autoExpandMatching(searchCode.trim());
+    }
   }
 
   @override
@@ -148,12 +192,20 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
   }
 
   Future<void> _handleApproveStock(DispatchOrder order) async {
+    final hasPreOrder = order.hasPreOrderItems;
     final codeController = TextEditingController(text: order.orderCode);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.check_circle_outline_rounded, color: _emerald, size: 40),
-        title: const Text('ยืนยันรับชำระเงินและตัดสต็อก?', style: TextStyle(fontWeight: FontWeight.bold)),
+        icon: Icon(
+          hasPreOrder ? Icons.inventory_2_outlined : Icons.check_circle_outline_rounded,
+          color: hasPreOrder ? const Color(0xFFD97706) : _emerald,
+          size: 40,
+        ),
+        title: Text(
+          hasPreOrder ? 'ยืนยันรับชำระเงิน (พรีออเดอร์)?' : 'ยืนยันรับชำระเงินและตัดสต็อก?',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,18 +226,43 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
               textCapitalization: TextCapitalization.characters,
             ),
             const SizedBox(height: 10),
-            const Text(
-              '⚠️ ระบบจะทำการบันทึกตัดสต็อกออกจากคลังสินค้าทันที',
-              style: TextStyle(color: _orange, fontSize: 11, fontWeight: FontWeight.bold),
-            ),
+            if (hasPreOrder)
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Color(0xFFD97706)),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '📦 มีสินค้าพรีออเดอร์ (สต็อกไม่พอในสาขา) ระบบจะบันทึกตัดสต็อกติดลบเพื่อรอสินค้าเข้าคลัง',
+                        style: TextStyle(color: Color(0xFF92400E), fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              const Text(
+                '⚠️ ระบบจะทำการบันทึกตัดสต็อกออกจากคลังสินค้าทันที',
+                style: TextStyle(color: _orange, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: _emerald),
-            child: const Text('ยืนยันตัดสต็อก'),
+            style: FilledButton.styleFrom(
+              backgroundColor: hasPreOrder ? const Color(0xFFD97706) : _emerald,
+            ),
+            child: Text(hasPreOrder ? 'ยืนยันพรีออเดอร์' : 'ยืนยันตัดสต็อก'),
           ),
         ],
       ),
@@ -852,8 +929,8 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
     final isStorefrontTakeaway = order.isTakeaway;
     final isMyTask = (_dispatches?.myTasks.any((t) => t.id == order.id) ?? false) ||
         order.items.any((it) => !it.isCrossBranch);
-    final isAnyItemOutOfStock =
-        order.status == 'PENDING' && order.items.any((it) => it.availableStock < it.qty);
+    final isBlockedWoodSlab = order.hasBlockedWoodSlab;
+    final hasPreOrder = order.hasPreOrderItems;
 
     // Status pill colors & labels matching vanguard-dispatch/page.tsx
     Color pillBg;
@@ -900,7 +977,9 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isAnyItemOutOfStock ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
+          color: isBlockedWoodSlab
+              ? const Color(0xFFFCA5A5)
+              : (hasPreOrder ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0)),
         ),
         boxShadow: const [
           BoxShadow(
@@ -1039,7 +1118,7 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (isAnyItemOutOfStock) ...[
+                          if (isBlockedWoodSlab) ...[
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                               decoration: BoxDecoration(
@@ -1053,11 +1132,36 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                                   Icon(Icons.warning_amber_rounded, size: 10, color: Color(0xFFDC2626)),
                                   SizedBox(width: 2),
                                   Text(
-                                    'ขาดสต็อก',
+                                    'ไม้แผ่นหมด',
                                     style: TextStyle(
                                       fontSize: 9,
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                          ] else if (hasPreOrder) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFFDE68A)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.inventory_2_outlined, size: 10, color: Color(0xFFD97706)),
+                                  SizedBox(width: 2),
+                                  Text(
+                                    'พรีออเดอร์',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFD97706),
                                     ),
                                   ),
                                 ],
@@ -1214,7 +1318,8 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                     order: order,
                     isStorefrontTakeaway: isStorefrontTakeaway,
                     isMyTask: isMyTask,
-                    isAnyItemOutOfStock: isAnyItemOutOfStock,
+                    isBlockedWoodSlab: isBlockedWoodSlab,
+                    hasPreOrder: hasPreOrder,
                   );
 
                   if (isTwoColumn) {
@@ -1269,7 +1374,8 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
     required DispatchOrder order,
     required bool isStorefrontTakeaway,
     required bool isMyTask,
-    required bool isAnyItemOutOfStock,
+    required bool isBlockedWoodSlab,
+    required bool hasPreOrder,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1602,19 +1708,23 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
           SizedBox(
             height: 42,
             child: FilledButton.icon(
-              onPressed: isAnyItemOutOfStock ? null : () => _handleApproveStock(order),
+              onPressed: isBlockedWoodSlab ? null : () => _handleApproveStock(order),
               icon: Icon(
-                isAnyItemOutOfStock ? Icons.warning_amber_rounded : Icons.payments_outlined,
+                isBlockedWoodSlab
+                    ? Icons.warning_amber_rounded
+                    : (hasPreOrder ? Icons.inventory_2_outlined : Icons.payments_outlined),
                 size: 16,
               ),
               label: Text(
-                isAnyItemOutOfStock
-                    ? 'ไม่สามารถอนุมัติได้ (สินค้าหมด)'
-                    : 'ยืนยันรับชำระเงิน & ตัดสต็อก',
+                isBlockedWoodSlab
+                    ? 'ไม่สามารถอนุมัติได้ (ไม้แผ่นหมดสต็อก)'
+                    : (hasPreOrder
+                        ? 'ยืนยันรับชำระเงิน (พรีออเดอร์)'
+                        : 'ยืนยันรับชำระเงิน & ตัดสต็อก'),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
+                backgroundColor: hasPreOrder ? const Color(0xFFD97706) : const Color(0xFF10B981),
                 disabledBackgroundColor: const Color(0xFFF87171),
                 disabledForegroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -2203,10 +2313,10 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                                                               crossAxisAlignment: CrossAxisAlignment.start,
                                                               children: [
                                                                 Image.memory(
-                                                                  order.isZenslabOrder
+                                                                  order.requiresSlabTemplate
                                                                       ? kZenslabLogoBytes
                                                                       : kTerraHomeLogoBytes,
-                                                                  height: order.isZenslabOrder ? 34 : 42,
+                                                                  height: order.requiresSlabTemplate ? 34 : 42,
                                                                   fit: BoxFit.contain,
                                                                   alignment: Alignment.centerLeft,
                                                                 ),
@@ -2543,10 +2653,12 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                                                     }),
                                                   ],
 
+                                                  // Push footer / page number to the bottom of the A4 canvas
+                                                  const Spacer(),
+
                                                   // ─── FOOTER SECTION ───
                                                   if (hasFooter) ...[
-                                                    if (pageItems.isNotEmpty) const SizedBox(height: 18),
-                                                    if (order.isSlabOrder)
+                                                    if (order.requiresSlabTemplate)
                                                       _buildSlabSummaryFooter(order)
                                                     else
                                                       Container(
@@ -2641,8 +2753,10 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                                                                 'AUTHORIZED SIGNATURE',
                                                                 style: TextStyle(fontSize: 8, fontWeight: FontWeight.w500, letterSpacing: 0.8, color: Color(0xFF171717)),
                                                               ),
-                                                              const SizedBox(height: 2),
-                                                              const Text('Terra Home Studio', style: TextStyle(fontSize: 7, color: Color(0xFFA3A3A3))),
+                                                              Text(
+                                                                order.requiresSlabTemplate ? 'ZENSLAB Co., Ltd.' : 'Terra Home Studio',
+                                                                style: const TextStyle(fontSize: 7, color: Color(0xFFA3A3A3)),
+                                                              ),
                                                             ],
                                                           ),
                                                         ),
@@ -2676,9 +2790,9 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                                                         style: TextStyle(fontSize: 7, letterSpacing: 2.0, color: Color(0xFFD4D4D4)),
                                                       ),
                                                     ),
+                                                    const SizedBox(height: 8),
                                                   ],
 
-                                                  const Spacer(),
                                                   // Subtle bottom page number indicator
                                                   Align(
                                                     alignment: Alignment.centerRight,
@@ -3040,8 +3154,6 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                 child: Column(
                   children: [
                     cell('Total (ราคารวมก่อน VAT)', _money2(preVat)),
-                    Container(height: 6, color: const Color(0xFFB4A5D9).withValues(alpha: 0.5)),
-                    cell('Total (ราคารวมก่อน VAT)', _money2(preVat)),
                     cell('ภาษีมูลค่าเพิ่ม VAT 7%', _money2(vat)),
                     cell('ราคา(สินค้า)ทั้งหมด รวมภาษี', _money2(goodsTotal)),
                     cell('ค่าขนส่งสินค้า', '-'),
@@ -3054,7 +3166,7 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                     ),
                     cell('Grand Total', _money2(grandTotal), isYellow: true),
                     cell(
-                      'ยอดเปอร์เซ็นการมัดจำ',
+                      'ยอดเปอร์เซ็นต์การมัดจำ',
                       _money2(deposit),
                       badge: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
@@ -3120,16 +3232,21 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
   }
 
   Widget _buildItemRow(DispatchOrderItem item, {String orderStatus = 'PENDING'}) {
-    final isOutOfStock = orderStatus == 'PENDING' && item.availableStock < item.qty;
+    final isBlocked = orderStatus == 'PENDING' && item.isBlockedSlab;
+    final isPreOrder = orderStatus == 'PENDING' && item.isPreOrder;
     final hasBranch = item.fulfillBranchName.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: isOutOfStock ? const Color(0x66FEF2F2) : Colors.white,
+        color: isBlocked
+            ? const Color(0x66FEF2F2)
+            : (isPreOrder ? const Color(0x66FFFBEB) : Colors.white),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isOutOfStock ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0),
+          color: isBlocked
+              ? const Color(0xFFFECACA)
+              : (isPreOrder ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0)),
         ),
         boxShadow: const [
           BoxShadow(
@@ -3152,15 +3269,15 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                   height: 44,
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: isOutOfStock ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+                    color: isBlocked ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: isOutOfStock ? const Color(0xFFE2E8F0) : const Color(0xFFF1F5F9),
+                      color: isBlocked ? const Color(0xFFE2E8F0) : const Color(0xFFF1F5F9),
                     ),
                   ),
                   child: item.product.imageUrl != null && item.product.imageUrl!.isNotEmpty
                       ? Opacity(
-                          opacity: isOutOfStock ? 0.5 : 1.0,
+                          opacity: isBlocked ? 0.5 : 1.0,
                           child: Image.network(
                             item.product.imageUrl!,
                             fit: BoxFit.contain,
@@ -3194,8 +3311,10 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: isOutOfStock ? const Color(0xFF94A3B8) : const Color(0xFF1E293B),
-                            decoration: isOutOfStock ? TextDecoration.lineThrough : null,
+                            color: isBlocked
+                                ? const Color(0xFF94A3B8)
+                                : (isPreOrder ? const Color(0xFFB45309) : const Color(0xFF1E293B)),
+                            decoration: isBlocked ? TextDecoration.lineThrough : null,
                           ),
                         ),
                       ),
@@ -3213,7 +3332,7 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                               ),
                             ),
                           ),
-                          if (isOutOfStock) ...[
+                          if (isBlocked) ...[
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
@@ -3237,11 +3356,50 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'โดนซื้อตัดหน้า (เหลือ ${item.availableStock})',
+                                      text: 'ไม้แผ่นหมด (เหลือ ${item.availableStock})',
                                       style: const TextStyle(
                                         fontSize: 9.5,
                                         fontWeight: FontWeight.w700,
                                         color: Color(0xFFDC2626),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ] else if (isPreOrder) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFFBEB),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFFDE68A)),
+                              ),
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    const WidgetSpan(
+                                      alignment: PlaceholderAlignment.middle,
+                                      child: Padding(
+                                        padding: EdgeInsets.only(right: 3),
+                                        child: Icon(
+                                          Icons.inventory_2_outlined,
+                                          size: 10,
+                                          color: Color(0xFFD97706),
+                                        ),
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: item.availableStock > 0
+                                          ? 'พรีออเดอร์ (ในคลังมี ${item.availableStock})'
+                                          : 'พรีออเดอร์ (รอของเข้าคลัง)',
+                                      style: const TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFD97706),
                                       ),
                                     ),
                                   ],
@@ -3267,7 +3425,7 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: isOutOfStock ? const Color(0xFF94A3B8) : const Color(0xFF1E293B),
+                        color: isBlocked ? const Color(0xFF94A3B8) : const Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 1),
@@ -3276,7 +3434,7 @@ class _VanguardDispatchScreenState extends State<VanguardDispatchScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: isOutOfStock ? const Color(0xFF94A3B8) : const Color(0xFF059669),
+                        color: isBlocked ? const Color(0xFF94A3B8) : const Color(0xFF059669),
                       ),
                     ),
                   ],
