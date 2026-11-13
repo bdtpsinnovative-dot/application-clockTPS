@@ -3813,12 +3813,13 @@ class SalePosScreenState extends State<SalePosScreen>
     final lower = code.toLowerCase();
     final exactMatch = _activeProducts.where((p) {
       return p.sku.trim().toLowerCase() == lower ||
+          p.barcode.trim().toLowerCase() == lower ||
           p.id.toString() == lower ||
           p.name.trim().toLowerCase() == lower;
     }).firstOrNull;
 
     final partialMatches = _activeProducts.where((p) {
-      final searchable = '${p.sku} ${p.name} ${p.id}'.toLowerCase();
+      final searchable = '${p.sku} ${p.barcode} ${p.name} ${p.id}'.toLowerCase();
       return searchable.contains(lower);
     }).toList();
 

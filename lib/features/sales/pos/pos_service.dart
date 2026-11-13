@@ -47,6 +47,7 @@ class PosProduct {
     required this.id,
     required this.name,
     required this.sku,
+    this.barcode = '',
     required this.price,
     this.originalPrice,
     this.discountLabel,
@@ -68,6 +69,7 @@ class PosProduct {
   final int id;
   final String name;
   final String sku;
+  final String barcode;
   final double price;
   final double? originalPrice;
   final String? discountLabel;
@@ -90,6 +92,7 @@ class PosProduct {
       id: id,
       name: name,
       sku: sku,
+      barcode: barcode,
       price: newPrice,
       originalPrice: newPrice,
       discountLabel: null,
@@ -157,6 +160,7 @@ class PosProduct {
       id: (json['id'] as num).toInt(),
       name: cleanedName.isNotEmpty && cleanedName != '-' ? cleanedName : rawName,
       sku: json['sku'] as String? ?? '',
+      barcode: (json['barcode'] as String? ?? json['barcode_raw'] as String? ?? '').trim(),
       price: (json['price'] as num?)?.toDouble() ?? 0,
       originalPrice: (json['original_price'] as num?)?.toDouble(),
       discountLabel: json['discount_label'] as String?,
