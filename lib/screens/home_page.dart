@@ -21,6 +21,8 @@ import '../widgets/sign_out_confirm_sheet.dart';
 import '../widgets/attendance_nav_fab.dart';
 import '../features/sales/sales_shell_screen.dart';
 import '../features/sales/sales_auth_adapter.dart';
+import '../features/chat/chat_inbox_screen.dart';
+import '../features/chat/chat_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -44,6 +46,9 @@ class _HomePageState extends State<HomePage> {
   int _animatingSelectedIndex = 0;
   int _pendingCount = 0;
   int _notificationCount = 0;
+  bool _hasChatAccess = false;
+  int _unreadChatCount = 0;
+  Timer? _chatBadgeTimer;
   AttendanceRecord? _todayAttendance;
   late AppUser _currentUser;
   String? _targetRequestId;
@@ -60,6 +65,7 @@ class _HomePageState extends State<HomePage> {
     }
     _loadNotificationCount();
     _loadTodayAttendance();
+    _checkChatAccess();
     _notificationTapSubscription = FcmService.instance.notificationTaps.listen(
       _openNotificationTarget,
     );
@@ -71,6 +77,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _chatBadgeTimer?.cancel();
     _notificationTapSubscription?.cancel();
     super.dispose();
   }
@@ -165,6 +172,32 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
   }
 
+  Future<void> _checkChatAccess() async {
+    try {
+      final hasAccess =
+          await ChatService.instance.checkUserChatAccess(_currentUser);
+      if (!mounted) return;
+      setState(() => _hasChatAccess = hasAccess);
+      if (hasAccess) {
+        _loadUnreadChatCount();
+        _chatBadgeTimer?.cancel();
+        _chatBadgeTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+          if (mounted && _hasChatAccess) _loadUnreadChatCount();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadUnreadChatCount() async {
+    try {
+      final count = await ChatService.instance
+          .fetchUnreadCount(currentUserId: _currentUser.id.toString());
+      if (mounted && _unreadChatCount != count) {
+        setState(() => _unreadChatCount = count);
+      }
+    } catch (_) {}
+  }
+
   void _openMenu() => _scaffoldKey.currentState?.openDrawer();
 
   void _openProfile() {
@@ -184,7 +217,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _selectPage(int index, {String? targetRequestId}) {
-    if (index == 5) {
+    if (index == 6) {
       _openProfile();
       return;
     }
@@ -214,6 +247,9 @@ class _HomePageState extends State<HomePage> {
     }
     if (index == 4) {
       _loadNotificationCount();
+    }
+    if (index == 5) {
+      _loadUnreadChatCount();
     }
   }
 
@@ -249,13 +285,34 @@ class _HomePageState extends State<HomePage> {
                   height: barHeight,
                   child: Row(
                     children: [
-                      // Left 2 items (Home, Requests)
+                      // Left 2 items: 1) หน้าหลัก, 2) แชท (ถ้ามีสิทธิ์) หรือ แจ้งเตือน (ถ้าไม่มีสิทธิ์)
                       _buildModernNavItem(
                         0,
                         Icons.home_outlined,
                         Icons.home_rounded,
                         'หน้าหลัก',
                       ),
+                      if (_hasChatAccess)
+                        _buildModernNavItem(
+                          5,
+                          Icons.forum_outlined,
+                          Icons.forum_rounded,
+                          'แชท',
+                          badgeCount: _unreadChatCount,
+                        )
+                      else
+                        _buildModernNavItem(
+                          4,
+                          Icons.notifications_none_rounded,
+                          Icons.notifications_rounded,
+                          'แจ้งเตือน',
+                          badgeCount: _notificationCount,
+                        ),
+
+                      // Gap reserved for the scooped center cradle
+                      const SizedBox(width: 82),
+
+                      // Right 2 items: 3) คำขอ, 4) ปฏิทิน
                       _buildModernNavItem(
                         2,
                         Icons.assignment_outlined,
@@ -263,23 +320,11 @@ class _HomePageState extends State<HomePage> {
                         'คำขอ',
                         badgeCount: _pendingCount,
                       ),
-
-                      // Gap reserved for the scooped center cradle
-                      const SizedBox(width: 82),
-
-                      // Right 2 items (Calendar, Notifications)
                       _buildModernNavItem(
                         3,
                         Icons.calendar_month_outlined,
                         Icons.calendar_month_rounded,
                         'ปฏิทิน',
-                      ),
-                      _buildModernNavItem(
-                        4,
-                        Icons.notifications_none_rounded,
-                        Icons.notifications_rounded,
-                        'แจ้งเตือน',
-                        badgeCount: _notificationCount,
                       ),
                     ],
                   ),
@@ -381,6 +426,7 @@ class _HomePageState extends State<HomePage> {
           onSelect: _selectPage,
           onOpenProfile: _openProfile,
           onSignOut: widget.onSignOut,
+          hasChatAccess: _hasChatAccess,
         ),
         body: IndexedStack(
           index: _selectedIndex,
@@ -464,6 +510,13 @@ class _HomePageState extends State<HomePage> {
                 }
               },
             ),
+            // Index 5: แชท (กล่องข้อความลูกค้า Omnichannel)
+            ChatInboxScreen(
+              key: const PageStorageKey('chat_inbox'),
+              currentUser: _currentUser,
+              onOpenNotifications: () => _selectPage(4),
+              notificationCount: _notificationCount,
+            ),
           ],
         ),
         bottomNavigationBar: _buildScoopedBottomBar(),
@@ -533,6 +586,7 @@ class _AppDrawer extends StatelessWidget {
     required this.onSelect,
     required this.onOpenProfile,
     required this.onSignOut,
+    this.hasChatAccess = false,
   });
 
   final AppUser user;
@@ -541,6 +595,7 @@ class _AppDrawer extends StatelessWidget {
   final ValueChanged<int> onSelect;
   final VoidCallback onOpenProfile;
   final Future<void> Function() onSignOut;
+  final bool hasChatAccess;
 
   @override
   Widget build(BuildContext context) {
@@ -633,6 +688,13 @@ class _AppDrawer extends StatelessWidget {
             selected: selectedIndex == 4,
             onTap: () => onSelect(4),
           ),
+          if (hasChatAccess)
+            _DrawerItem(
+              icon: Icons.forum_outlined,
+              label: 'กล่องข้อความลูกค้า (แชท)',
+              selected: selectedIndex == 5,
+              onTap: () => onSelect(5),
+            ),
           _DrawerItem(
             icon: Icons.person_outline_rounded,
             label: 'โปรไฟล์ของฉัน',
