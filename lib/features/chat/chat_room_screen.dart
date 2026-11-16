@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/app_user.dart';
-import '../../widgets/work_ui.dart';
+import '../../widgets/user_avatar.dart';
+import 'assign_agent_bottom_sheet.dart';
 import 'chat_models.dart';
 import 'chat_service.dart';
 
@@ -25,15 +27,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   late ChatConversation _conversation;
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
+
   List<ChatMessage> _messages = [];
+  Map<String, ChatAgentUser> _usersMap = {};
   bool _isLoading = true;
   bool _isSending = false;
+  bool _isAssigning = false;
   Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
     _conversation = widget.conversation;
+    _loadUsers();
     _loadMessages();
     ChatService.instance.markAsRead(_conversation.id);
     _startPolling();
@@ -44,6 +51,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _pollingTimer?.cancel();
     _textController.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -52,6 +60,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (mounted) {
         _loadMessages(silent: true);
       }
+    });
+  }
+
+  Future<void> _loadUsers() async {
+    final users = await ChatService.instance.fetchActiveUsers();
+    if (!mounted) return;
+    setState(() {
+      _usersMap = {for (final u in users) u.id: u};
     });
   }
 
@@ -111,6 +127,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (newMsg != null) {
       setState(() {
         _messages.add(newMsg);
+        // If chat was unassigned, sending a message automatically assigns it to current user
+        if (!_conversation.isAssigned) {
+          _conversation = _conversation.copyWith(
+            assignedTo: widget.currentUser.id.toString(),
+            assignedToName: senderName,
+          );
+        }
       });
       _scrollToBottom();
     } else {
@@ -120,42 +143,120 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  Future<void> _handleClaimChat() async {
-    final senderName = widget.currentUser.nickname.isNotEmpty
-        ? widget.currentUser.nickname
-        : widget.currentUser.firstName.isNotEmpty
-            ? widget.currentUser.firstName
-            : widget.currentUser.email;
-
-    final success = await ChatService.instance.assignConversation(
-      convId: _conversation.id,
-      agentId: widget.currentUser.id.toString(),
-      agentName: senderName,
+  /// Open Assign Agent Bottom Sheet (Matches Image 2)
+  void _handleOpenAssignSheet() {
+    AssignAgentBottomSheet.show(
+      context,
+      conversation: _conversation,
+      onAssigned: (updated) {
+        setState(() {
+          _conversation = updated;
+        });
+      },
     );
+  }
 
+  /// Random Assign / 🎲 สุ่มคนดูแล
+  Future<void> _handleRandomAssign() async {
+    if (_isAssigning) return;
+    setState(() => _isAssigning = true);
+
+    final picked = await ChatService.instance.randomAssign(_conversation);
     if (!mounted) return;
-    if (success) {
+    setState(() => _isAssigning = false);
+
+    if (picked != null) {
       setState(() {
-        _conversation = ChatConversation(
-          id: _conversation.id,
-          platform: _conversation.platform,
-          brand: _conversation.brand,
-          customerName: _conversation.customerName,
-          customerAvatar: _conversation.customerAvatar,
-          externalUserId: _conversation.externalUserId,
-          assignedTo: widget.currentUser.id.toString(),
-          assignedToName: senderName,
-          unreadCount: 0,
-          lastMessageText: _conversation.lastMessageText,
-          lastMessageAt: _conversation.lastMessageAt,
+        _conversation = _conversation.copyWith(
+          assignedTo: picked.id,
+          assignedToName: picked.displayName,
           metadata: {
             ..._conversation.metadata,
-            'assigned_agent_ids': [widget.currentUser.id.toString()],
-          },
+            'assigned_agent_ids': [picked.id],
+          }..remove('assigned_group_id')..remove('assigned_group_name'),
         );
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('คุณได้รับงานแชทนี้แล้ว')),
+        SnackBar(
+          content: Text('สุ่มผู้ดูแลสำเร็จ: ${picked.displayName}'),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่สามารถสุ่มผู้ดูแลได้ในขณะนี้')),
+      );
+    }
+  }
+
+  /// Edit customer name dialog
+  Future<void> _handleEditCustomerName() async {
+    final nameCtrl = TextEditingController(text: _conversation.customerName);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'แก้ไขชื่อลูกค้า',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'ระบุชื่อลูกค้า...',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('บันทึก'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && nameCtrl.text.trim().isNotEmpty) {
+      final newName = nameCtrl.text.trim();
+      final ok = await ChatService.instance.updateCustomerName(_conversation.id, newName);
+      if (ok && mounted) {
+        setState(() {
+          _conversation = _conversation.copyWith(customerName: newName);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('อัปเดตชื่อลูกค้าเรียบร้อยแล้ว')),
+        );
+      }
+    }
+  }
+
+  /// Toggle resolved / active status
+  Future<void> _handleToggleStatus() async {
+    final isResolved = _conversation.status == 'resolved';
+    final nextStatus = isResolved ? 'active' : 'resolved';
+    final ok = await ChatService.instance.updateStatus(_conversation.id, nextStatus);
+    if (ok && mounted) {
+      setState(() {
+        _conversation = _conversation.copyWith(status: nextStatus);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nextStatus == 'resolved' ? 'ปิดเคสการสนทนานี้แล้ว' : 'เปิดเคสการสนทนาอีกครั้ง',
+          ),
+          backgroundColor:
+              nextStatus == 'resolved' ? const Color(0xFF64748B) : const Color(0xFF10B981),
+        ),
       );
     }
   }
@@ -175,8 +276,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMyChat = _conversation.assignedTo == widget.currentUser.id.toString() ||
-        _conversation.assignedAgentIds.contains(widget.currentUser.id.toString());
+    final bInfo = getBrandInfo(_conversation.brand);
+    final assignedUser =
+        _conversation.assignedTo != null ? _usersMap[_conversation.assignedTo] : null;
+    final assignedAvatar = assignedUser != null
+        ? UserAvatar.resolveAvatarUrl(assignedUser.avatarUrl)
+        : '';
+    final assignedDisplayName =
+        assignedUser?.displayName ?? _conversation.assignedToName ?? '';
+    final isGroup = _conversation.assignedGroupId != null &&
+        _conversation.assignedGroupId!.isNotEmpty;
+    final groupName = _conversation.assignedGroupName ?? 'กลุ่มแชท';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -185,130 +295,354 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF0F172A),
         titleSpacing: 0,
-        title: Row(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: const Color(0xFFE2E8F0),
-                  backgroundImage: _conversation.customerAvatar != null &&
-                          _conversation.customerAvatar!.isNotEmpty
-                      ? NetworkImage(_conversation.customerAvatar!)
-                      : null,
-                  child: _conversation.customerAvatar == null ||
-                          _conversation.customerAvatar!.isEmpty
-                      ? Text(
-                          _conversation.customerName.isNotEmpty
-                              ? _conversation.customerName.characters.first
-                              : '?',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF475569),
-                          ),
-                        )
-                      : null,
-                ),
-                Positioned(
-                  bottom: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: _getPlatformColor(_conversation.platform),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    child: Text(
-                      _conversation.platform == 'line' ? 'L' : 'F',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+        title: InkWell(
+          onTap: _handleEditCustomerName,
+          child: Row(
+            children: [
+              // Customer Avatar with platform badge
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Text(
-                    _conversation.customerName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
-                    ),
+                  CircleAvatar(
+                    radius: 19,
+                    backgroundColor: const Color(0xFFE2E8F0),
+                    backgroundImage: _conversation.customerAvatar != null &&
+                            _conversation.customerAvatar!.isNotEmpty
+                        ? NetworkImage(_conversation.customerAvatar!)
+                        : null,
+                    child: _conversation.customerAvatar == null ||
+                            _conversation.customerAvatar!.isEmpty
+                        ? Text(
+                            _conversation.customerName.isNotEmpty
+                                ? _conversation.customerName.characters.first
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569),
+                            ),
+                          )
+                        : null,
                   ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _conversation.brand.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: workBlue,
-                          ),
+                  Positioned(
+                    bottom: -2,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: _getPlatformColor(_conversation.platform),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        _conversation.platform == 'line' ? 'L' : 'F',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _conversation.isAssigned
-                            ? (_conversation.assignedToName ?? 'มีผู้รับแล้ว')
-                            : 'รอรับงาน',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: _conversation.isAssigned
-                              ? const Color(0xFF64748B)
-                              : const Color(0xFFEA580C),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+
+              // Customer Name + Brand & Status Subtitle
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _conversation.customerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.edit_outlined, size: 13, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
+                    const SizedBox(height: 1),
+                    Row(
+                      children: [
+                        // Brand Badge (Logo + Name)
+                        if (bInfo.logoUrl.isNotEmpty) ...[
+                          CircleAvatar(
+                            radius: 5,
+                            backgroundColor: Colors.transparent,
+                            backgroundImage: NetworkImage(bInfo.logoUrl),
+                          ),
+                          const SizedBox(width: 3),
+                        ],
+                        Text(
+                          bInfo.shortLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: bInfo.color,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Status pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: _conversation.status == 'resolved'
+                                ? const Color(0xFFF1F5F9)
+                                : const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _conversation.status == 'resolved' ? 'ปิดเคส' : 'เปิดอยู่',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: _conversation.status == 'resolved'
+                                  ? const Color(0xFF64748B)
+                                  : const Color(0xFF16A34A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
-          if (!_conversation.isAssigned || !isMyChat)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: TextButton.icon(
-                onPressed: _handleClaimChat,
-                icon: const Icon(Icons.person_add_rounded, size: 16),
-                label: const Text('รับงาน', style: TextStyle(fontSize: 12)),
-                style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                  foregroundColor: const Color(0xFF2563EB),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+          // 1. Assigned Agent Dropdown Button (Matches Image 2)
+          Center(
+            child: InkWell(
+              onTap: _handleOpenAssignSheet,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  color: _conversation.isAssigned
+                      ? const Color(0xFFF1F5F9)
+                      : const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _conversation.isAssigned
+                        ? const Color(0xFFE2E8F0)
+                        : const Color(0xFFFDBA74),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                ),
+                child: isGroup
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEFF6FF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.group_rounded,
+                                size: 12, color: Color(0xFF2563EB)),
+                          ),
+                          const SizedBox(width: 4),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 65),
+                            child: Text(
+                              groupName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2563EB),
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.keyboard_arrow_down_rounded,
+                              size: 14, color: Color(0xFF2563EB)),
+                        ],
+                      )
+                    : _conversation.isAssigned
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 9,
+                                backgroundColor: const Color(0xFFDBEAFE),
+                                backgroundImage: assignedAvatar.isNotEmpty
+                                    ? NetworkImage(assignedAvatar)
+                                    : null,
+                                child: assignedAvatar.isEmpty
+                                    ? Text(
+                                        assignedDisplayName.isNotEmpty
+                                            ? assignedDisplayName.characters.first
+                                            : 'U',
+                                        style: const TextStyle(
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1E40AF),
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 4),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 65),
+                                child: Text(
+                                  assignedDisplayName.isNotEmpty
+                                      ? assignedDisplayName
+                                      : 'ผู้ดูแล',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.keyboard_arrow_down_rounded,
+                                  size: 14, color: Color(0xFF64748B)),
+                            ],
+                          )
+                        : const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '⚠️ รอผู้ดูแล',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFEA580C),
+                                ),
+                              ),
+                              Icon(Icons.keyboard_arrow_down_rounded,
+                                  size: 14, color: Color(0xFFEA580C)),
+                            ],
+                          ),
+              ),
+            ),
+          ),
+
+          // 2. Random Assign / 🔀 สุ่มคนดูแล
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: InkWell(
+                onTap: _isAssigning ? null : _handleRandomAssign,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4F46E5), Color(0xFF3B82F6)],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: _isAssigning
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.shuffle_rounded,
+                          color: Colors.white, size: 16),
                 ),
               ),
             ),
+          ),
+
+          // 3. More Menu (Popup)
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, size: 20, color: Color(0xFF64748B)),
+            padding: EdgeInsets.zero,
+            onSelected: (val) {
+              if (val == 'edit_name') {
+                _handleEditCustomerName();
+              } else if (val == 'toggle_status') {
+                _handleToggleStatus();
+              } else if (val == 'copy_id') {
+                if (_conversation.externalUserId != null) {
+                  Clipboard.setData(ClipboardData(text: _conversation.externalUserId!));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('คัดลอก ID ลูกค้าแล้ว')),
+                  );
+                }
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'edit_name',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                    SizedBox(width: 8),
+                    Text('แก้ไขชื่อลูกค้า', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'toggle_status',
+                child: Row(
+                  children: [
+                    Icon(
+                      _conversation.status == 'resolved'
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.archive_outlined,
+                      size: 18,
+                      color: _conversation.status == 'resolved'
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFEF4444),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _conversation.status == 'resolved'
+                          ? 'เปิดเคสการสนทนาอีกครั้ง'
+                          : 'ปิดเคสการสนทนา',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              if ((_conversation.externalUserId ?? '').isNotEmpty)
+                const PopupMenuItem(
+                  value: 'copy_id',
+                  child: Row(
+                    children: [
+                      Icon(Icons.copy_rounded, size: 18, color: Color(0xFF64748B)),
+                      SizedBox(width: 8),
+                      Text('คัดลอก ID ลูกค้า', style: TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
       body: SafeArea(
         child: Column(
           children: [
+            // Message List
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -321,7 +655,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         )
                       : ListView.builder(
                           controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                           itemCount: _messages.length,
                           itemBuilder: (context, index) {
                             final msg = _messages[index];
@@ -330,6 +664,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                           },
                         ),
             ),
+
+            // Quick Replies Tray (คำตอบด่วน)
+            _buildQuickRepliesTray(),
+
+            // Bottom Input Bar
             _buildInputBar(),
           ],
         ),
@@ -349,9 +688,94 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
   }
 
+  Widget _buildQuickRepliesTray() {
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF1F5F9),
+        border: Border(
+          top: BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
+        ),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.only(left: 4, right: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.flash_on_rounded, size: 14, color: Color(0xFFF59E0B)),
+                  SizedBox(width: 2),
+                  Text(
+                    'ด่วน:',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ...kQuickReplies.map((reply) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _textController.text = reply;
+                    _textController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: reply.length),
+                    );
+                  });
+                  _focusNode.requestFocus();
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      reply,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF1E293B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMessageBubble(ChatMessage msg, bool isAgent) {
     final timeStr = DateFormat('HH:mm').format(msg.createdAt);
     final hasMedia = (msg.mediaUrl ?? '').isNotEmpty;
+
+    // Agent Avatar resolution
+    String? agentAvatar;
+    if (isAgent) {
+      if ((msg.senderAvatar ?? '').isNotEmpty) {
+        agentAvatar = UserAvatar.resolveAvatarUrl(msg.senderAvatar);
+      } else if (msg.senderId != null && _usersMap.containsKey(msg.senderId)) {
+        agentAvatar = UserAvatar.resolveAvatarUrl(_usersMap[msg.senderId]!.avatarUrl);
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -359,6 +783,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         mainAxisAlignment: isAgent ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Left: Customer Avatar (for customer messages)
           if (!isAgent) ...[
             CircleAvatar(
               radius: 14,
@@ -377,6 +802,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
             const SizedBox(width: 8),
           ],
+
+          // Middle: Message Bubble + Timestamp
           Flexible(
             child: Column(
               crossAxisAlignment:
@@ -406,7 +833,30 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ],
             ),
           ),
-          if (isAgent) const SizedBox(width: 4),
+
+          // Right: Agent Avatar (for staff/agent messages)
+          if (isAgent) ...[
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: const Color(0xFFDBEAFE),
+              backgroundImage: (agentAvatar != null && agentAvatar.isNotEmpty)
+                  ? NetworkImage(agentAvatar)
+                  : null,
+              child: (agentAvatar == null || agentAvatar.isEmpty)
+                  ? Text(
+                      (msg.senderName ?? 'A').isNotEmpty
+                          ? (msg.senderName ?? 'A').characters.first
+                          : 'A',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E40AF),
+                      ),
+                    )
+                  : null,
+            ),
+          ],
         ],
       ),
     );
@@ -688,6 +1138,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ),
               child: TextField(
                 controller: _textController,
+                focusNode: _focusNode,
                 maxLines: 4,
                 minLines: 1,
                 style: const TextStyle(fontSize: 14),

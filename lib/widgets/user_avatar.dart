@@ -96,6 +96,8 @@ class UserAvatar extends StatelessWidget {
     );
   }
 
+  static String resolveAvatarUrl(String? url) => _resolveAvatarUrl(url);
+
   static String _resolveAvatarUrl(String? url) {
     if (url == null) return '';
     var trimmed = url.trim();

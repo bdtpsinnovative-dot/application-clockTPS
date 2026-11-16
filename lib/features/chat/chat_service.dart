@@ -97,17 +97,96 @@ class ChatService {
     return 0;
   }
 
-  /// Fetch conversations list
+  /// Fetch active staff users for assignment
+  Future<List<ChatAgentUser>> fetchActiveUsers() async {
+    try {
+      final uri = Uri.parse(
+          '$_supabaseUrl/rest/v1/users?status=eq.active&select=id,first_name,last_name,nickname,avatar_url,role,department&order=first_name.asc');
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final list = jsonDecode(res.body) as List;
+        return list
+            .map((item) => ChatAgentUser.fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching active users: $e');
+    }
+    return [];
+  }
+
+  /// Fetch care groups from settings
+  Future<List<ChatCareGroup>> fetchCareGroups() async {
+    try {
+      final uri = Uri.parse(
+          '$_supabaseUrl/rest/v1/settings?key=eq.chat_care_groups&select=value');
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final list = jsonDecode(res.body);
+        if (list is List && list.isNotEmpty) {
+          final rawVal = list[0]['value'];
+          dynamic parsed = rawVal;
+          if (rawVal is String) {
+            try {
+              parsed = jsonDecode(rawVal);
+            } catch (_) {}
+          }
+          if (parsed is List) {
+            return parsed
+                .map((item) => ChatCareGroup.fromJson(item as Map<String, dynamic>))
+                .toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching care groups: $e');
+    }
+    return [];
+  }
+
+  /// Fetch channels for brand logos
+  Future<List<ChatChannel>> fetchChannels() async {
+    try {
+      final uri = Uri.parse(
+          '$_supabaseUrl/rest/v1/chat_channels?is_active=eq.true&select=*&order=created_at.asc');
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final list = jsonDecode(res.body) as List;
+        return list
+            .map((item) => ChatChannel.fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching channels: $e');
+    }
+    return [];
+  }
+
+  /// Fetch conversations list with complete filtering
   Future<List<ChatConversation>> fetchConversations({
     String filter = 'all', // all, mine, unassigned
-    String? brand,
+    String statusFilter = 'all', // all, unread, active, resolved
+    String platformFilter = 'all', // all, line, facebook, instagram
+    String brandFilter = 'all', // all, terrahome, zenslab, wallcraft, emberandash
     String? currentUserId,
     String? searchQuery,
   }) async {
     try {
-      String query = '$_supabaseUrl/rest/v1/chat_conversations?select=*&order=last_message_at.desc.nullslast';
-      if (brand != null && brand.isNotEmpty && brand != 'all') {
-        query += '&brand=eq.$brand';
+      String query =
+          '$_supabaseUrl/rest/v1/chat_conversations?select=*&order=last_message_at.desc.nullslast';
+
+      if (brandFilter != 'all') {
+        query += '&brand=eq.$brandFilter';
+      }
+      if (platformFilter != 'all') {
+        query += '&platform=eq.$platformFilter';
+      }
+      if (statusFilter == 'active') {
+        query += '&status=eq.active';
+      } else if (statusFilter == 'resolved') {
+        query += '&status=eq.resolved';
+      } else if (statusFilter == 'unread') {
+        query += '&unread_count=gt.0';
       }
 
       final uri = Uri.parse(query);
@@ -177,6 +256,38 @@ class ChatService {
     }
   }
 
+  /// Update customer name
+  Future<bool> updateCustomerName(String convId, String newName) async {
+    try {
+      final uri = Uri.parse('$_supabaseUrl/rest/v1/chat_conversations?id=eq.$convId');
+      final res = await http.patch(
+        uri,
+        headers: _headers,
+        body: jsonEncode({'customer_name': newName.trim()}),
+      );
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      debugPrint('Error updating customer name: $e');
+      return false;
+    }
+  }
+
+  /// Update conversation status ('active' or 'resolved')
+  Future<bool> updateStatus(String convId, String newStatus) async {
+    try {
+      final uri = Uri.parse('$_supabaseUrl/rest/v1/chat_conversations?id=eq.$convId');
+      final res = await http.patch(
+        uri,
+        headers: _headers,
+        body: jsonEncode({'status': newStatus}),
+      );
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      debugPrint('Error updating status: $e');
+      return false;
+    }
+  }
+
   /// Send message to conversation
   Future<ChatMessage?> sendMessage({
     required ChatConversation conversation,
@@ -224,7 +335,7 @@ class ChatService {
       // 2. Update chat_conversations last_message & last_message_at
       final convUri =
           Uri.parse('$_supabaseUrl/rest/v1/chat_conversations?id=eq.${conversation.id}');
-      final convUpdate = {
+      final convUpdate = <String, dynamic>{
         'last_message': content,
         'last_message_at': DateTime.now().toUtc().toIso8601String(),
         'status': 'active',
@@ -267,30 +378,97 @@ class ChatService {
     }
   }
 
-  /// Assign conversation to agent
-  Future<bool> assignConversation({
-    required String convId,
-    required String agentId,
-    required String agentName,
+  /// Assign conversation to individual agent
+  Future<bool> assignAgent(
+    String convId, {
+    required String? agentId,
+    required String? agentName,
+    Map<String, dynamic>? existingMetadata,
   }) async {
     try {
       final uri = Uri.parse('$_supabaseUrl/rest/v1/chat_conversations?id=eq.$convId');
+      final meta = Map<String, dynamic>.from(existingMetadata ?? {});
+      if (agentId != null) {
+        meta['assigned_at'] = DateTime.now().toUtc().toIso8601String();
+        meta['assigned_agent_ids'] = [agentId];
+        meta.remove('assigned_group_id');
+        meta.remove('assigned_group_name');
+      } else {
+        meta.remove('assigned_agent_ids');
+        meta.remove('assigned_group_id');
+        meta.remove('assigned_group_name');
+      }
+
       final res = await http.patch(
         uri,
         headers: _headers,
         body: jsonEncode({
           'assigned_to': agentId,
           'assigned_name': agentName,
-          'metadata': {
-            'assigned_at': DateTime.now().toUtc().toIso8601String(),
-            'assigned_agent_ids': [agentId],
-          },
+          'metadata': meta,
         }),
       );
       return res.statusCode == 200 || res.statusCode == 204;
     } catch (e) {
-      debugPrint('Error assigning conversation: $e');
+      debugPrint('Error assigning agent: $e');
       return false;
+    }
+  }
+
+  /// Assign conversation to a care group
+  Future<bool> assignCareGroup(
+    String convId,
+    ChatCareGroup group, {
+    Map<String, dynamic>? existingMetadata,
+  }) async {
+    try {
+      final uri = Uri.parse('$_supabaseUrl/rest/v1/chat_conversations?id=eq.$convId');
+      final meta = Map<String, dynamic>.from(existingMetadata ?? {});
+      meta['assigned_at'] = DateTime.now().toUtc().toIso8601String();
+      meta['assigned_agent_ids'] = group.agentIds;
+      meta['assigned_group_id'] = group.id;
+      meta['assigned_group_name'] = group.name;
+
+      final res = await http.patch(
+        uri,
+        headers: _headers,
+        body: jsonEncode({
+          'assigned_to': group.agentIds.isNotEmpty ? group.agentIds.first : null,
+          'assigned_name': group.name,
+          'metadata': meta,
+        }),
+      );
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (e) {
+      debugPrint('Error assigning care group: $e');
+      return false;
+    }
+  }
+
+  /// Clear assignment (unassigned)
+  Future<bool> clearAssignment(String convId, {Map<String, dynamic>? existingMetadata}) async {
+    return assignAgent(convId, agentId: null, agentName: null, existingMetadata: existingMetadata);
+  }
+
+  /// Random / Auto-assign agent
+  Future<ChatAgentUser?> randomAssign(ChatConversation conv) async {
+    try {
+      final users = await fetchActiveUsers();
+      if (users.isEmpty) return null;
+      final filtered = users.where((u) => u.id != conv.assignedTo).toList();
+      final pool = filtered.isNotEmpty ? filtered : users;
+      final random = DateTime.now().microsecondsSinceEpoch % pool.length;
+      final picked = pool[random];
+      final ok = await assignAgent(
+        conv.id,
+        agentId: picked.id,
+        agentName: picked.displayName,
+        existingMetadata: conv.metadata,
+      );
+      return ok ? picked : null;
+    } catch (e) {
+      debugPrint('Error in randomAssign: $e');
+      return null;
     }
   }
 }
