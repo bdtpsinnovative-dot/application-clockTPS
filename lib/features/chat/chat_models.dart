@@ -118,6 +118,14 @@ class ChatMessage {
       created = DateTime.tryParse(json['created_at'].toString())?.toLocal() ?? DateTime.now();
     }
 
+    String? media = (json['media_url'] ?? json['image_url']) as String?;
+    if ((media == null || media.isEmpty) && meta['media_url'] != null) {
+      media = meta['media_url']?.toString();
+    }
+    if ((media == null || media.isEmpty) && meta['url'] != null) {
+      media = meta['url']?.toString();
+    }
+
     return ChatMessage(
       id: json['id']?.toString() ?? '',
       conversationId: json['conversation_id']?.toString() ?? '',
@@ -126,7 +134,7 @@ class ChatMessage {
       senderName: json['sender_name'] as String?,
       messageType: (json['message_type'] as String? ?? 'text').toLowerCase(),
       content: json['content'] as String? ?? '',
-      mediaUrl: json['media_url'] as String?,
+      mediaUrl: media,
       createdAt: created,
       metadata: meta,
     );
@@ -135,7 +143,26 @@ class ChatMessage {
   bool get isCustomer => senderType == 'customer';
   bool get isAgent => senderType == 'agent';
   bool get isSystem => senderType == 'system' || senderType == 'bot';
-  bool get isImage => messageType == 'image' || (mediaUrl != null && mediaUrl!.isNotEmpty);
+  bool get isSticker => messageType == 'sticker';
+  bool get isImage {
+    if (messageType == 'image' || messageType == 'sticker') return true;
+    final m = (mediaUrl ?? '').toLowerCase();
+    if (m.isNotEmpty) {
+      if (m.contains('.jpg') ||
+          m.contains('.jpeg') ||
+          m.contains('.png') ||
+          m.contains('.webp') ||
+          m.contains('.gif') ||
+          m.contains('scontent') ||
+          m.contains('fbcdn') ||
+          m.contains('line.me')) {
+        return true;
+      }
+    }
+    if (content.startsWith('📷')) return true;
+    return false;
+  }
+  bool get isFile => messageType == 'file' && !isImage;
 }
 
 class ChatChannel {
