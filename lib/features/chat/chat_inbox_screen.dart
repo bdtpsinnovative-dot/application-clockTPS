@@ -46,7 +46,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     {'key': 'instagram', 'label': 'IG'},
   ];
 
-  final List<Map<String, String>> _brands = [
+  List<Map<String, String>> _brands = [
     {'slug': 'all', 'label': 'All'},
     {'slug': 'terrahome', 'label': 'TERRA'},
     {'slug': 'zenslab', 'label': 'ZENSLAB'},
@@ -58,6 +58,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   void initState() {
     super.initState();
     _loadUsers();
+    _loadChannels();
     _loadConversations();
     _pollingTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (mounted) _loadConversations(silent: true);
@@ -69,6 +70,39 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     _pollingTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadChannels() async {
+    final channels = await ChatService.instance.fetchChannels();
+    if (!mounted || channels.isEmpty) return;
+
+    final seen = <String>{};
+    final dynamicBrands = <Map<String, String>>[
+      {'slug': 'all', 'label': 'All'},
+    ];
+    for (final ch in channels) {
+      final slug = ch.brandSlug.toLowerCase().trim();
+      if (slug.isNotEmpty && seen.add(slug)) {
+        final short = slug == 'terrahome'
+            ? 'TERRA'
+            : slug == 'zenslab'
+                ? 'ZENSLAB'
+                : slug == 'emberandash'
+                    ? 'EMBER & ASH'
+                    : slug == 'wallcraft'
+                        ? 'WALLCRAFT'
+                        : ch.brandName.isNotEmpty
+                            ? ch.brandName.toUpperCase()
+                            : slug.toUpperCase();
+        dynamicBrands.add({'slug': slug, 'label': short});
+      }
+    }
+
+    if (dynamicBrands.length > 1) {
+      setState(() {
+        _brands = dynamicBrands;
+      });
+    }
   }
 
   Future<void> _loadUsers() async {
