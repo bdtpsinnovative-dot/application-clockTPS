@@ -176,21 +176,14 @@ class _AssignAgentBottomSheetState extends State<AssignAgentBottomSheet> {
                     itemBuilder: (ctx, idx) {
                       final u = _users[idx];
                       final isChecked = selectedIds.contains(u.id);
-                      final av = UserAvatar.resolveAvatarUrl(u.avatarUrl);
                       return CheckboxListTile(
                         value: isChecked,
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        secondary: CircleAvatar(
+                        secondary: UserAvatar(
+                          avatarUrl: u.avatarUrl,
+                          name: u.displayName,
                           radius: 14,
-                          backgroundColor: const Color(0xFFDBEAFE),
-                          backgroundImage: av.isNotEmpty ? NetworkImage(av) : null,
-                          child: av.isEmpty
-                              ? Text(
-                                  u.displayName.isNotEmpty ? u.displayName[0] : 'U',
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                )
-                              : null,
                         ),
                         title: Text(u.fullName,
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -518,31 +511,15 @@ class _AssignAgentBottomSheetState extends State<AssignAgentBottomSheet> {
                             final isSelected = currentAssignedTo == user.id &&
                                 (currentGroupId == null ||
                                     currentGroupId.isEmpty);
-                            final avatar =
-                                UserAvatar.resolveAvatarUrl(user.avatarUrl);
 
                             return ListTile(
                               dense: true,
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 18, vertical: 2),
-                              leading: CircleAvatar(
+                              leading: UserAvatar(
+                                avatarUrl: user.avatarUrl,
+                                name: user.displayName,
                                 radius: 18,
-                                backgroundColor: const Color(0xFFE2E8F0),
-                                backgroundImage: avatar.isNotEmpty
-                                    ? NetworkImage(avatar)
-                                    : null,
-                                child: avatar.isEmpty
-                                    ? Text(
-                                        user.displayName.isNotEmpty
-                                            ? user.displayName.characters.first
-                                            : 'U',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                          color: Color(0xFF475569),
-                                        ),
-                                      )
-                                    : null,
                               ),
                               title: Text(
                                 user.fullName,

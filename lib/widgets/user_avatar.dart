@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../config/app_config.dart';
@@ -40,6 +41,10 @@ class UserAvatar extends StatelessWidget {
           resolvedUrl,
           fit: BoxFit.cover,
           headers: headers,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return _buildFallbackText(radius, name);
+          },
           errorBuilder: (context, error, stackTrace) =>
               _buildFallbackText(radius, name),
         );
@@ -81,14 +86,15 @@ class UserAvatar extends StatelessWidget {
   }
 
   static Widget _buildFallbackText(double radius, String name) {
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final clean = name.trim();
+    final initial = clean.isNotEmpty ? clean.characters.first.toUpperCase() : '?';
     return Container(
       alignment: Alignment.center,
       color: const Color(0xFFDBEAFE),
       child: Text(
         initial,
         style: TextStyle(
-          fontSize: radius * 0.9,
+          fontSize: radius * 0.85,
           color: const Color(0xFF1E40AF),
           fontWeight: FontWeight.bold,
         ),
@@ -104,17 +110,37 @@ class UserAvatar extends StatelessWidget {
     if (trimmed.isEmpty) return '';
     String finalUrl;
     if (trimmed.startsWith('r2://')) {
-      finalUrl = trimmed.replaceFirst(
-        'r2://',
-        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-      );
+      final key = trimmed.replaceFirst('r2://', '');
+      if (kIsWeb) {
+        final encoded = Uri.encodeComponent(
+            'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/$key');
+        finalUrl = 'https://wsrv.nl/?url=$encoded';
+      } else {
+        finalUrl = 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/$key';
+      }
     } else if (trimmed.startsWith('okpr2://')) {
-      finalUrl = trimmed.replaceFirst(
-        'okpr2://',
-        'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/',
-      );
+      final key = trimmed.replaceFirst('okpr2://', '');
+      if (kIsWeb) {
+        final encoded = Uri.encodeComponent(
+            'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/$key');
+        finalUrl = 'https://wsrv.nl/?url=$encoded';
+      } else {
+        finalUrl = 'https://pub-2a877f7cc07b481ca09dec82cb240465.r2.dev/$key';
+      }
     } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      finalUrl = trimmed;
+      final isLocal = trimmed.contains('localhost') ||
+          trimmed.contains('127.0.0.1') ||
+          trimmed.contains('172.20.') ||
+          trimmed.contains('192.168.');
+      final isDicebear = trimmed.contains('dicebear.com');
+      final isWsrv = trimmed.contains('wsrv.nl');
+
+      if (kIsWeb && !isLocal && !isDicebear && !isWsrv) {
+        final encoded = Uri.encodeComponent(trimmed);
+        finalUrl = 'https://wsrv.nl/?url=$encoded';
+      } else {
+        finalUrl = trimmed;
+      }
     } else {
       final apiBase = AppConfig.apiBaseUrl;
       if (trimmed.startsWith('/')) {
@@ -123,6 +149,6 @@ class UserAvatar extends StatelessWidget {
         finalUrl = '$apiBase/$trimmed';
       }
     }
-    return Uri.encodeFull(finalUrl);
+    return finalUrl;
   }
 }

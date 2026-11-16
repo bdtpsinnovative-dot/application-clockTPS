@@ -600,11 +600,10 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   Widget _buildConversationCard(ChatConversation conv) {
     final hasUnread = conv.unreadCount > 0;
     final bInfo = getBrandInfo(conv.brand);
+    final assignedUserId =
+        conv.assignedTo ?? conv.assignedAgentIds.firstOrNull;
     final assignedUser =
-        conv.assignedTo != null ? _usersMap[conv.assignedTo!] : null;
-    final assignedAvatar = assignedUser != null
-        ? UserAvatar.resolveAvatarUrl(assignedUser.avatarUrl)
-        : '';
+        assignedUserId != null ? _usersMap[assignedUserId] : null;
 
     return InkWell(
       onTap: () async {
@@ -645,24 +644,10 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                CircleAvatar(
+                UserAvatar(
+                  avatarUrl: conv.customerAvatar,
+                  name: conv.customerName,
                   radius: 24,
-                  backgroundColor: const Color(0xFFE2E8F0),
-                  backgroundImage: conv.customerAvatar != null &&
-                          conv.customerAvatar!.isNotEmpty
-                      ? NetworkImage(conv.customerAvatar!)
-                      : null,
-                  child: conv.customerAvatar == null ||
-                          conv.customerAvatar!.isEmpty
-                      ? Text(
-                          conv.customerName.characters.firstOrNull ?? '?',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF475569),
-                          ),
-                        )
-                      : null,
                 ),
                 Positioned(
                   bottom: -1,
@@ -793,24 +778,10 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   Row(
                     children: [
                       if (assignedUser != null) ...[
-                        CircleAvatar(
+                        UserAvatar(
+                          avatarUrl: assignedUser.avatarUrl,
+                          name: assignedUser.displayName,
                           radius: 10,
-                          backgroundColor: const Color(0xFFDBEAFE),
-                          backgroundImage: assignedAvatar.isNotEmpty
-                              ? NetworkImage(assignedAvatar)
-                              : null,
-                          child: assignedAvatar.isEmpty
-                              ? Text(
-                                  assignedUser.displayName.isNotEmpty
-                                      ? assignedUser.displayName.characters.first
-                                      : 'U',
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1E40AF),
-                                  ),
-                                )
-                              : null,
                         ),
                         const SizedBox(width: 4),
                         Text(

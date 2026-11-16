@@ -279,9 +279,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final bInfo = getBrandInfo(_conversation.brand);
     final assignedUser =
         _conversation.assignedTo != null ? _usersMap[_conversation.assignedTo] : null;
-    final assignedAvatar = assignedUser != null
-        ? UserAvatar.resolveAvatarUrl(assignedUser.avatarUrl)
-        : '';
     final assignedDisplayName =
         assignedUser?.displayName ?? _conversation.assignedToName ?? '';
     final isGroup = _conversation.assignedGroupId != null &&
@@ -303,26 +300,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  CircleAvatar(
+                  UserAvatar(
+                    avatarUrl: _conversation.customerAvatar,
+                    name: _conversation.customerName,
                     radius: 19,
-                    backgroundColor: const Color(0xFFE2E8F0),
-                    backgroundImage: _conversation.customerAvatar != null &&
-                            _conversation.customerAvatar!.isNotEmpty
-                        ? NetworkImage(_conversation.customerAvatar!)
-                        : null,
-                    child: _conversation.customerAvatar == null ||
-                            _conversation.customerAvatar!.isEmpty
-                        ? Text(
-                            _conversation.customerName.isNotEmpty
-                                ? _conversation.customerName.characters.first
-                                : '?',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF475569),
-                            ),
-                          )
-                        : null,
                   ),
                   Positioned(
                     bottom: -2,
@@ -476,24 +457,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         ? Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              CircleAvatar(
+                              UserAvatar(
+                                avatarUrl: assignedUser?.avatarUrl,
+                                name: assignedDisplayName,
                                 radius: 9,
-                                backgroundColor: const Color(0xFFDBEAFE),
-                                backgroundImage: assignedAvatar.isNotEmpty
-                                    ? NetworkImage(assignedAvatar)
-                                    : null,
-                                child: assignedAvatar.isEmpty
-                                    ? Text(
-                                        assignedDisplayName.isNotEmpty
-                                            ? assignedDisplayName.characters.first
-                                            : 'U',
-                                        style: const TextStyle(
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF1E40AF),
-                                        ),
-                                      )
-                                    : null,
                               ),
                               const SizedBox(width: 4),
                               ConstrainedBox(
@@ -785,20 +752,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         children: [
           // Left: Customer Avatar (for customer messages)
           if (!isAgent) ...[
-            CircleAvatar(
+            UserAvatar(
+              avatarUrl: _conversation.customerAvatar,
+              name: _conversation.customerName,
               radius: 14,
-              backgroundColor: const Color(0xFFE2E8F0),
-              backgroundImage: _conversation.customerAvatar != null &&
-                      _conversation.customerAvatar!.isNotEmpty
-                  ? NetworkImage(_conversation.customerAvatar!)
-                  : null,
-              child: _conversation.customerAvatar == null ||
-                      _conversation.customerAvatar!.isEmpty
-                  ? Text(
-                      _conversation.customerName.characters.firstOrNull ?? 'C',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                    )
-                  : null,
             ),
             const SizedBox(width: 8),
           ],
@@ -837,24 +794,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           // Right: Agent Avatar (for staff/agent messages)
           if (isAgent) ...[
             const SizedBox(width: 8),
-            CircleAvatar(
+            UserAvatar(
+              avatarUrl: agentAvatar,
+              name: msg.senderName ?? 'A',
               radius: 14,
-              backgroundColor: const Color(0xFFDBEAFE),
-              backgroundImage: (agentAvatar != null && agentAvatar.isNotEmpty)
-                  ? NetworkImage(agentAvatar)
-                  : null,
-              child: (agentAvatar == null || agentAvatar.isEmpty)
-                  ? Text(
-                      (msg.senderName ?? 'A').isNotEmpty
-                          ? (msg.senderName ?? 'A').characters.first
-                          : 'A',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E40AF),
-                      ),
-                    )
-                  : null,
             ),
           ],
         ],
