@@ -59,7 +59,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     super.initState();
     _loadUsers();
     _loadConversations();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (mounted) _loadConversations(silent: true);
     });
   }

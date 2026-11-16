@@ -56,7 +56,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   void _startPolling() {
-    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 7), (_) {
       if (mounted) {
         _loadMessages(silent: true);
       }
