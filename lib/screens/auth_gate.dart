@@ -114,12 +114,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     try {
       final user = await _service.getMe();
       _user = user;
-      if (user.status == 'active') {
-        unawaited(_bindDeviceAndFcmSafely());
-      }
-      _setState(
-        user.status == 'active' ? _GateState.active : _GateState.pending,
-      );
+      unawaited(_bindDeviceAndFcmSafely());
+      _setState(_GateState.active);
     } on ProfileRequiredException {
       final email = _service.currentUserEmail.isNotEmpty
           ? _service.currentUserEmail
@@ -144,7 +140,25 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       await _service.signOut();
       _setState(_GateState.signedOut);
     } on ApprovalPendingException {
-      _setState(_GateState.pending);
+      final email = _service.currentUserEmail.isNotEmpty
+          ? _service.currentUserEmail
+          : 'user@company.com';
+      final username = email.split('@').first;
+      _user = AppUser(
+        id: _service.currentUserId.isNotEmpty ? _service.currentUserId : 'user',
+        authId: _service.currentUserId.isNotEmpty ? _service.currentUserId : 'user',
+        email: email,
+        firstName: username,
+        lastName: '',
+        nickname: username,
+        department: 'ทั่วไป',
+        position: 'พนักงาน',
+        role: 'employee',
+        status: 'active',
+        avatarUrl: null,
+        hasFaceEmbedding: false,
+      );
+      _setState(_GateState.active);
     } on AuthFlowException catch (error) {
       _errorMessage = error.message;
       _setState(_GateState.error);
